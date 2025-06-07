@@ -1,0 +1,143 @@
+# SAM Community Edition Beta - Git Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# SAM Specific - User Data
+memory_store/*.json
+logs/*.log
+logs/*.db
+data/uploads/*
+data/documents/*
+data/vector_store/*
+web_ui/uploads/*
+web_ui/data/*
+web_ui/memory_store/*
+web_ui/multimodal_output/*
+multimodal_output/
+backups/
+temp_uploads/
+
+# SAM Specific - Development Files
+MyStuff/
+execution_logs/
+task_run_reports/
+curiosity.log
+enrichment.log
+
+# SAM Specific - Config (keep templates)
+config/sam_config.json
+config/collab_key.json
+
+# SAM Specific - Models and Cache
+models/
+vector_store/enriched_chunks/*
+.cache/
+
+# Keep essential empty directories
+!logs/.gitkeep
+!memory_store/.gitkeep
+!data/uploads/.gitkeep
+!data/documents/.gitkeep
+!data/vector_store/.gitkeep
+!web_ui/uploads/.gitkeep
+!web_ui/data/.gitkeep
+!web_ui/memory_store/.gitkeep
+!web_ui/multimodal_output/.gitkeep
+!models/embeddings/.gitkeep
+!vector_store/enriched_chunks/.gitkeep
+!backups/.gitkeep
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation
+docs/_build/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/

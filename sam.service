@@ -1,0 +1,58 @@
+# SAM Systemd Service Configuration
+# Sprint 13 Task 3: Deployment Files
+# 
+# Installation:
+# 1. Copy this file to /etc/systemd/system/sam.service
+# 2. Update User, Group, WorkingDirectory, and ExecStart paths
+# 3. Run: sudo systemctl daemon-reload
+# 4. Run: sudo systemctl enable sam.service
+# 5. Run: sudo systemctl start sam.service
+
+[Unit]
+Description=SAM (Small Agent Model) - Intelligent Assistant with Memory
+Documentation=https://github.com/your-org/sam
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=sam
+Group=sam
+WorkingDirectory=/opt/sam
+ExecStart=/opt/sam/venv/bin/python /opt/sam/start_sam.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sam
+
+# Environment variables
+Environment=SAM_CONFIG_DIR=/opt/sam/config
+Environment=SAM_MEMORY_DIR=/opt/sam/memory_store
+Environment=SAM_LOGS_DIR=/opt/sam/logs
+Environment=SAM_LOG_LEVEL=INFO
+Environment=SAM_AGENT_MODE=solo
+Environment=SAM_MEMORY_BACKEND=simple
+Environment=SAM_CHAT_PORT=5001
+Environment=SAM_MEMORY_UI_PORT=8501
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/sam/config /opt/sam/memory_store /opt/sam/logs /opt/sam/backups
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=2G
+CPUQuota=200%
+
+# Health check
+ExecStartPost=/bin/sleep 30
+ExecStartPost=/bin/bash -c 'curl -f http://localhost:5001/health || exit 1'
+
+[Install]
+WantedBy=multi-user.target

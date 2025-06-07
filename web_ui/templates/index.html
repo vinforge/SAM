@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAM - Multimodal AI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 1200px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .header-left {
+            text-align: left;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            margin: 0;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .memory-control-btn, .upload-btn {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .memory-control-btn:hover, .upload-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-2px);
+        }
+
+        .memory-control-btn {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        .memory-control-btn:hover {
+            background: rgba(255,255,255,0.25);
+            border-color: rgba(255,255,255,0.6);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 14px;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .message.assistant .message-avatar {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 5px;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field:focus {
+            border-color: #4facfe;
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            border-bottom-left-radius: 5px;
+            max-width: 70%;
+            margin-bottom: 20px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            background: #4facfe;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .upload-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .upload-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 2px dashed #4facfe;
+            border-radius: 10px;
+            padding: 40px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            background: #f0f8ff;
+            border-color: #00f2fe;
+        }
+
+        .upload-area.dragover {
+            background: #e6f3ff;
+            border-color: #00f2fe;
+        }
+
+        .close-modal {
+            background: #f0f0f0;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .process-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .status-info {
+            background: #e8f4fd;
+            border-left: 4px solid #4facfe;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                height: 95vh;
+                margin: 10px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .header-left {
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .header-right {
+                justify-content: center;
+            }
+
+            .memory-control-btn, .upload-btn {
+                font-size: 12px;
+                padding: 8px 16px;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>🤖 SAM</h1>
+                <p>Multimodal AI Assistant</p>
+            </div>
+            <div class="header-right">
+                <button class="memory-control-btn" onclick="openMemoryControlCenter()" title="Open Memory Control Center">
+                    🧠⚙️ Memory Center
+                </button>
+                <button class="upload-btn" onclick="openUploadModal()">📄 Upload Document</button>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="chat-container" id="chatContainer">
+                <div class="message assistant">
+                    <div class="message-avatar">SAM</div>
+                    <div class="message-content">
+Hello! I'm SAM, your multimodal AI assistant. I can help you with:
+
+🧠 **Intelligent Conversations** - Ask me anything!
+📄 **Document Processing** - Upload PDFs, DOCX, Markdown, code files
+🔍 **Content Search** - Find information across your documents
+📊 **Analysis & Insights** - Get enrichment scores and content analysis
+🧠⚙️ **Memory Management** - Access the Memory Control Center for advanced memory operations
+
+**Quick Commands:**
+• `/status` - System status
+• `/search <query>` - Search content
+• `/help` - Show help
+
+**Memory Control Center:**
+The Memory Control Center auto-starts with SAM. Click the 🧠⚙️ Memory Center button above to access:
+• Interactive memory browsing and search
+• Memory editing and management tools
+• Visual memory graph and connections
+• Role-based access control
+
+How can I assist you today?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+            
+            <div class="input-container">
+                <input type="text" class="input-field" id="messageInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <h3>📄 Upload Document</h3>
+            <p>Upload a document to process and add to SAM's knowledge base</p>
+            
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <p>🔄 Click to select file or drag & drop</p>
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">
+                    Supported: PDF, DOCX, MD, HTML, TXT, PY, JS, JAVA, CPP, C
+                </p>
+            </div>
+            
+            <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.md,.html,.htm,.txt,.py,.js,.java,.cpp,.c" onchange="handleFileSelect(event)">
+            
+            <div id="uploadStatus" style="margin: 15px 0;"></div>
+            
+            <button class="process-btn" id="processBtn" onclick="uploadFile()" style="display: none;">Process Document</button>
+            <button class="close-modal" onclick="closeUploadModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Disable send button
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    addMessage(`Error: ${data.error}`, 'assistant');
+                } else {
+                    addMessage(data.response, 'assistant');
+                }
+                
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, 'assistant');
+            } finally {
+                hideTypingIndicator();
+                sendBtn.disabled = false;
+            }
+        }
+
+        function addMessage(content, sender) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender} chat-container`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender === 'user' ? 'You' : 'SAM';
+
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+
+            // Handle thought processing for assistant messages
+            if (sender === 'assistant' && content.includes('[THOUGHT_TOGGLE]')) {
+                console.log('Processing assistant message with thoughts');
+                console.log('Full content:', content);
+
+                // Split main content and thought data
+                const parts = content.split('[THOUGHT_TOGGLE]');
+                const mainContent = parts[0].trim();
+                const thoughtSection = parts[1] || '';
+
+                console.log('Main content extracted:', `"${mainContent}"`);
+                console.log('Thought section:', thoughtSection);
+
+                // Make sure we have main content
+                if (!mainContent) {
+                    console.error('No main content found!');
+                    messageContent.innerHTML = '<em>Error: No response content</em>';
+                    return;
+                }
+
+                // Apply basic formatting to main content
+                const htmlContent = mainContent
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
+                    .replace(/\n/g, '<br>')                            // Line breaks
+                    .replace(/- (.*?)(<br>|$)/g, '• $1$2');           // Bullet points
+
+                console.log('HTML content for main response:', `"${htmlContent}"`);
+
+                // Set the main content FIRST
+                messageContent.innerHTML = htmlContent;
+
+                // Verify it was set
+                console.log('Content actually set in DOM:', messageContent.innerHTML);
+
+                // Extract thought data
+                const thoughtMatches = thoughtSection.match(/\[THOUGHT_DATA:(\d+)\](.*?)\[\/THOUGHT_DATA:\1\]/g);
+
+                if (thoughtMatches && thoughtMatches.length > 0) {
+                    // Create thought toggle button
+                    const thoughtContainer = document.createElement('div');
+                    thoughtContainer.style.cssText = 'margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;';
+
+                    const toggleButton = document.createElement('button');
+                    toggleButton.style.cssText = `
+                        background: #ffffff;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        padding: 12px 16px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        color: #495057;
+                        width: 100%;
+                        text-align: left;
+                        transition: all 0.2s ease;
+                    `;
+
+                    const tokenCount = thoughtMatches.reduce((total, match) => {
+                        const content = match.replace(/\[THOUGHT_DATA:\d+\](.*?)\[\/THOUGHT_DATA:\d+\]/, '$1');
+                        return total + content.trim().split(' ').length;
+                    }, 0);
+
+                    toggleButton.innerHTML = `🧠 SAM's Thoughts (${tokenCount} tokens)`;
+
+                    const thoughtContent = document.createElement('div');
+                    thoughtContent.style.cssText = `
+                        display: none;
+                        margin-top: 10px;
+                        padding: 15px;
+                        background: #ffffff;
+                        border: 1px solid #e9ecef;
+                        border-radius: 6px;
+                        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                        font-size: 13px;
+                        line-height: 1.6;
+                        color: #495057;
+                        white-space: pre-wrap;
+                    `;
+
+                    // Extract and display thought content
+                    let allThoughts = '';
+                    thoughtMatches.forEach((match, index) => {
+                        const content = match.replace(/\[THOUGHT_DATA:\d+\](.*?)\[\/THOUGHT_DATA:\d+\]/, '$1').trim();
+                        if (index > 0) allThoughts += '\n\n---\n\n';
+                        allThoughts += content;
+                    });
+
+                    thoughtContent.textContent = allThoughts;
+
+                    // Toggle functionality
+                    let isExpanded = false;
+                    toggleButton.addEventListener('click', () => {
+                        isExpanded = !isExpanded;
+                        thoughtContent.style.display = isExpanded ? 'block' : 'none';
+                        toggleButton.innerHTML = `🧠 SAM's Thoughts (${tokenCount} tokens) ${isExpanded ? '▼' : '▶'}`;
+                        toggleButton.style.backgroundColor = isExpanded ? '#f8f9fa' : '#ffffff';
+                    });
+
+                    // Hover effects
+                    toggleButton.addEventListener('mouseenter', () => {
+                        if (!isExpanded) toggleButton.style.backgroundColor = '#f8f9fa';
+                    });
+
+                    toggleButton.addEventListener('mouseleave', () => {
+                        if (!isExpanded) toggleButton.style.backgroundColor = '#ffffff';
+                    });
+
+                    thoughtContainer.appendChild(toggleButton);
+                    thoughtContainer.appendChild(thoughtContent);
+                    messageDiv.appendChild(thoughtContainer);
+                }
+
+            } else {
+                // Regular message processing
+                console.log('Adding regular message:', sender, content);
+
+                // Apply basic formatting
+                const htmlContent = content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
+                    .replace(/\n/g, '<br>')                            // Line breaks
+                    .replace(/- (.*?)(<br>|$)/g, '• $1$2');           // Bullet points
+
+                messageContent.innerHTML = htmlContent;
+            }
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Process thoughts if this is an assistant message
+            if (sender === 'assistant' && window.thoughtToggleManager) {
+                setTimeout(() => {
+                    window.thoughtToggleManager.processNewMessage(messageDiv);
+                }, 100);
+            }
+        }
+
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'block';
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        function openMemoryControlCenter() {
+            // Try to open the Memory Control Center
+            const memoryUrl = 'http://localhost:8501';
+
+            // Show loading message
+            addMessage('🧠 Connecting to Memory Control Center...', 'assistant');
+
+            // Check if the Memory Control Center is running
+            fetch(memoryUrl)
+                .then(response => {
+                    if (response.ok) {
+                        // If running, open it
+                        window.open(memoryUrl, '_blank');
+                        addMessage('✅ Memory Control Center opened in a new tab!', 'assistant');
+                    } else {
+                        throw new Error('Memory Control Center not responding');
+                    }
+                })
+                .catch(error => {
+                    // If not running, show helpful message
+                    addMessage(`🧠 Memory Control Center is starting up...
+
+The Memory Control Center should auto-start with SAM. If it's not available:
+
+**Option 1: Wait a moment**
+The service may still be starting up. Try clicking the 🧠⚙️ Memory Center button again in a few seconds.
+
+**Option 2: Manual start**
+If the auto-start failed, you can manually start it:
+\`python launch_memory_ui.py\`
+
+**Option 3: Direct access**
+Try visiting directly: ${memoryUrl}
+
+**Memory Control Center Features:**
+• 🔍 Interactive memory search and browsing
+• ✏️ Memory editing and management tools
+• 📊 Memory visualization and graph view
+• 🎭 Role-based access control
+• 💻 Advanced memory commands
+
+The Memory Control Center runs on port 8501 and should be accessible once SAM is fully started.`, 'assistant');
+                });
+        }
+
+        function openUploadModal() {
+            document.getElementById('uploadModal').style.display = 'flex';
+        }
+
+        function closeUploadModal() {
+            document.getElementById('uploadModal').style.display = 'none';
+            selectedFile = null;
+            document.getElementById('uploadStatus').innerHTML = '';
+            document.getElementById('processBtn').style.display = 'none';
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div style="color: #4facfe; font-weight: 600;">
+                        📄 Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                `;
+                document.getElementById('processBtn').style.display = 'inline-block';
+            }
+        }
+
+        async function uploadFile() {
+            if (!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            document.getElementById('uploadStatus').innerHTML = `
+                <div style="color: #4facfe;">🔄 Processing document...</div>
+            `;
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('uploadStatus').innerHTML = `
+                        <div style="color: #e74c3c;">❌ Error: ${data.error}</div>
+                    `;
+                } else {
+                    // Enhanced display with knowledge consolidation confirmation
+                    let consolidationInfo = '';
+                    if (data.result.knowledge_consolidation) {
+                        const kc = data.result.knowledge_consolidation;
+                        const statusColor = kc.status === 'successful' ? '#27ae60' :
+                                          kc.status === 'partial' ? '#f39c12' : '#e74c3c';
+
+                        consolidationInfo = `
+                            <div style="margin-top: 10px; padding: 10px; background: rgba(39, 174, 96, 0.1); border-radius: 5px;">
+                                <div style="color: ${statusColor}; font-weight: 600;">
+                                    🧠 Knowledge Consolidation: ${kc.status.toUpperCase()}
+                                </div>
+                                <div style="font-size: 0.9em; margin-top: 5px;">
+                                    ${kc.learning_confirmation}
+                                </div>
+                                <div style="font-size: 0.8em; margin-top: 5px; color: #666;">
+                                    📝 Summary: ${kc.summary_created ? '✅' : '❌'} |
+                                    🔑 Concepts: ${kc.key_concepts_extracted} |
+                                    💾 Memory: ${kc.memory_chunks_stored} chunks
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    document.getElementById('uploadStatus').innerHTML = `
+                        <div style="color: #27ae60;">✅ Document processed successfully!</div>
+                        <div class="status-info">
+                            📄 Document ID: ${data.result.document_id}<br>
+                            🧩 Content Blocks: ${data.result.content_blocks}<br>
+                            📊 Enrichment Score: ${data.result.enrichment_score}<br>
+                            🎯 Priority: ${data.result.priority_level}<br>
+                            🎨 Content Types: ${data.result.content_types.join(', ')}<br>
+                            🔑 Key Concepts: ${data.result.key_concepts}
+                        </div>
+                        ${consolidationInfo}
+                    `;
+
+                    // Enhanced chat message with consolidation status
+                    let chatMessage = data.result.message || `The document "${data.filename}" has been successfully processed and I can now answer specific questions about its content!`;
+
+                    if (data.result.knowledge_consolidation && data.result.knowledge_consolidation.status === 'successful') {
+                        chatMessage += `\n\n${data.result.knowledge_consolidation.learning_confirmation}`;
+                    }
+
+                    addMessage(chatMessage, 'assistant');
+                }
+                
+            } catch (error) {
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div style="color: #e74c3c;">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                selectedFile = files[0];
+                document.getElementById('uploadStatus').innerHTML = `
+                    <div style="color: #4facfe; font-weight: 600;">
+                        📄 Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                `;
+                document.getElementById('processBtn').style.display = 'inline-block';
+            }
+        });
+    </script>
+
+    <!-- Sprint 16: Thought Toggle JavaScript -->
+    <script src="{{ url_for('static', filename='js/thought_toggle.js') }}"></script>
+</body>
+</html>

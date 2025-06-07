@@ -1,0 +1,61 @@
+{
+  "tool_id": "custom_ffcf7cd34014",
+  "name": "Test Calculator",
+  "description": "A test calculation tool",
+  "creator_id": "test_user",
+  "template_id": "computation_template",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "expression": {
+        "type": "string",
+        "description": "Mathematical expression to evaluate"
+      },
+      "variables": {
+        "type": "object",
+        "description": "Variables to use in computation"
+      }
+    },
+    "required": [
+      "expression"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "number",
+        "description": "Computation result"
+      },
+      "steps": {
+        "type": "array",
+        "description": "Computation steps"
+      }
+    }
+  },
+  "logic_code": "def execute(input_data): return {'result': 42}",
+  "status": "active",
+  "version": "1.0.0",
+  "test_results": [
+    {
+      "test_case": 1,
+      "input": {
+        "expression": "6 * 7"
+      },
+      "output": {
+        "result": 42,
+        "steps": [
+          "Simulated computation"
+        ]
+      },
+      "success": true,
+      "error": null,
+      "execution_time_ms": 100
+    }
+  ],
+  "usage_count": 0,
+  "success_rate": 1.0,
+  "created_at": "2025-06-04T17:50:10.536314",
+  "last_updated": "2025-06-04T17:50:10.537085",
+  "metadata": {}
+}
