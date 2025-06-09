@@ -300,12 +300,30 @@ class MemoryDrivenReasoningEngine:
     def _recall_relevant_memories(self, query: str, user_id: str) -> MemoryContext:
         """Recall memories relevant to the query."""
         try:
-            # Search for relevant memories
-            memory_results = self.search_memories(
-                query=query,
-                user_id=user_id,
-                max_results=self.config['max_recalled_memories']
-            )
+            # Phase 3.2: Use enhanced search for memory reasoning
+            try:
+                if hasattr(self.memory_store, 'enhanced_search_memories'):
+                    # Enhanced search with hybrid ranking for reasoning
+                    memory_results = self.memory_store.enhanced_search_memories(
+                        query=query,
+                        max_results=self.config['max_recalled_memories'],
+                        initial_candidates=self.config['max_recalled_memories'] * 2
+                    )
+                    logger.info(f"Enhanced memory reasoning search: {len(memory_results)} results")
+                else:
+                    # Fallback to regular search
+                    memory_results = self.search_memories(
+                        query=query,
+                        user_id=user_id,
+                        max_results=self.config['max_recalled_memories']
+                    )
+            except Exception as e:
+                logger.warning(f"Enhanced search failed in memory reasoning, using fallback: {e}")
+                memory_results = self.search_memories(
+                    query=query,
+                    user_id=user_id,
+                    max_results=self.config['max_recalled_memories']
+                )
             
             # Filter by relevance threshold
             relevant_memories = [

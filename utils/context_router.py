@@ -145,13 +145,34 @@ class EnhancedContextRouter:
             # Determine number of results based on query type
             max_results = 8 if analysis.query_type.value == "document_specific" else 6
             
-            # Search memory store
-            memory_results = self.memory_store.search_memories(
-                query,
-                max_results=max_results,
-                memory_types=search_filters.get('memory_types'),
-                tags=search_filters.get('tags')
-            )
+            # Phase 3.2: Use enhanced search with hybrid ranking
+            try:
+                if hasattr(self.memory_store, 'enhanced_search_memories'):
+                    # Enhanced search with ranking
+                    memory_results = self.memory_store.enhanced_search_memories(
+                        query=query,
+                        max_results=max_results,
+                        memory_types=search_filters.get('memory_types'),
+                        tags=search_filters.get('tags'),
+                        initial_candidates=max_results * 3
+                    )
+                    logger.info(f"Enhanced search returned {len(memory_results)} ranked results")
+                else:
+                    # Fallback to regular search
+                    memory_results = self.memory_store.search_memories(
+                        query,
+                        max_results=max_results,
+                        memory_types=search_filters.get('memory_types'),
+                        tags=search_filters.get('tags')
+                    )
+            except Exception as e:
+                logger.warning(f"Enhanced search failed in context router, using fallback: {e}")
+                memory_results = self.memory_store.search_memories(
+                    query,
+                    max_results=max_results,
+                    memory_types=search_filters.get('memory_types'),
+                    tags=search_filters.get('tags')
+                )
             
             logger.info(f"Found {len(memory_results)} relevant memories")
             return memory_results

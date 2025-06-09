@@ -3,22 +3,27 @@ Title: SAM: A Self-Refining, Memory-Augmented AI Analyst Framework
 Executive Summary
 SAM (Small Agent Model) is a lightweight, highly capable AI framework built to operate efficiently in local environments with minimal resource overhead. It is designed to process, understand, and synthesize knowledge from documents while maintaining transparency, traceability, and adaptability. SAM achieves its intelligence and resilience not through brute-force training or size, but through a multi-layered suite of complementary mechanisms that include knowledge distillation, self-evaluation loops, memory ranking, enhanced citation systems with granular metadata tracking, structured prompt libraries, explicit refusal logic, intelligent query routing, and interactive feedback.
 
-**Recent Enhancement (2025):** SAM has been enhanced with selective LongBioBench-inspired features, including granular source tracking, structured prompt organization, and explicit refusal mechanisms, while maintaining our superior SELF-DISCOVER + CRITIC reasoning framework and advanced confidence calibration systems.
+**Phase 3 Enhancement (2025):** SAM has been significantly enhanced with Phase 3 features including hybrid search & ranking engines, refactored citation systems with direct metadata access, and an advanced Memory Control Center with real-time filtering and analytics. These enhancements build upon our selective LongBioBench integration while maintaining our superior SELF-DISCOVER + CRITIC reasoning framework and advanced confidence calibration systems.
 
 1. Introduction
 Large Language Models (LLMs) offer impressive performance but are often impractical in resource-constrained or offline environments. SAM addresses this gap by serving as a compact, locally deployable AI analyst that can ingest and reason over domain-specific data with transparency and context awareness.
 
 2. System Architecture Overview
 
-Model Base: DeepSeek-R1-0528-Qwen3-8B (Q4_K_M quantization via GGUF), locally served via Ollama
+**Model Base:** DeepSeek-R1-0528-Qwen3-8B (Q4_K_M quantization via GGUF), locally served via Ollama
 
-Chat Interface: Streamlit UI supporting document upload, enhanced Q&A, summarization, and memory inspection
+**Chat Interface:** Streamlit UI supporting document upload, enhanced Q&A, summarization, and memory inspection
 
-Memory Engine: Vector-augmented memory with semantic search, quality ranking, and source-linked citations
+**Memory Engine:** Vector-augmented memory with hybrid search, quality ranking, and enhanced citation systems
 
-Routing Logic: Intelligent dispatch of queries to appropriate strategies (memory search, summarization, chat)
+**Phase 3 Enhancements:**
+- **Hybrid Search & Ranking Engine:** Multi-strategy search with semantic similarity, recency scoring, and confidence weighting
+- **Enhanced Citation System:** Direct metadata access with granular source attribution and transparency scoring
+- **Memory Control Center:** Real-time filtering, source analysis, and interactive configuration controls
 
-Configurable Modes: Default solo-agent operation with unlockable swarm-based collaboration
+**Routing Logic:** Intelligent dispatch of queries to appropriate strategies (memory search, summarization, chat)
+
+**Configurable Modes:** Default solo-agent operation with unlockable swarm-based collaboration
 
 3. Enhancement Mechanisms
 SAM achieves state-of-the-art reasoning and error resilience for a compact model through the following mechanisms:
@@ -37,7 +42,7 @@ Identification of weak assumptions
 
 Improved confidence calibration
 
-3.3 Memory Ranking Engine
+3.3 Enhanced Memory Ranking Engine (Phase 3.2.1)
 
 All knowledge stored in SAM’s memory is ranked using multi-factor criteria:
 
@@ -50,9 +55,9 @@ User priority and pinning
 Confidence of source
 This ranking system ensures that the most relevant and trustworthy data is prioritized during context assembly.
 
-3.4 Enhanced Citation System with Granular Metadata
+3.4 Enhanced Citation System with Granular Metadata (Phase 3.2.2)
 
-SAM's citation system has been significantly enhanced with LongBioBench-inspired granular source tracking:
+SAM's citation system has been significantly enhanced with LongBioBench-inspired granular source tracking and Phase 3.2.2 refactoring for direct metadata access:
 
 **Granular Source Attribution:** Citations now include precise location information:
 - Page numbers and chunk indices
@@ -72,13 +77,48 @@ SAM's citation system has been significantly enhanced with LongBioBench-inspired
 - Section headers and structural elements
 - Position-based heuristics for precise location tracking
 
+**Phase 3.2.2 Refactoring Enhancements:**
+- **Direct Metadata Access:** Eliminated legacy JSON file lookups for improved performance
+- **Enhanced Result Handling:** Seamless integration with `RankedMemoryResult` objects
+- **Rich Citation Formatting:** Confidence indicators and granular location metadata
+- **Backward Compatibility:** Graceful handling of both new and legacy result formats
+
 This enhanced system provides unprecedented transparency and traceability, allowing users to verify information at the most granular level while maintaining our superior confidence scoring and source attribution capabilities.
 
-3.5 Smart Summarization and Topic Modeling
+3.5 Advanced Memory Control Center (Phase 3.2.3)
+
+SAM features a comprehensive Memory Control Center with advanced filtering, real-time search, and interactive analytics:
+
+**Enhanced Search & Filtering:**
+- **Multi-Mode Search:** Enhanced Hybrid, Semantic Only, Keyword Only, Recent First strategies
+- **Source-Specific Filtering:** Filter by document sources and source types
+- **Quality Filters:** Confidence score ranges and ranking thresholds
+- **Real-time Search:** Search as you type with live result updates
+- **Filter Presets:** Save and load custom filter configurations
+
+**Interactive Analytics Dashboard:**
+- **Source Analysis:** Visual source distribution and quality metrics
+- **Citation Quality Metrics:** Transparency scoring and source attribution analysis
+- **Memory Statistics:** Comprehensive analytics with performance tracking
+- **Real-time Configuration:** Interactive weight adjustment with live preview
+
+**Advanced UI Features:**
+- **Enhanced Memory Cards:** Ranking indicators, confidence badges, location metadata
+- **Similar Memory Discovery:** Find related content with one click
+- **Categorized Quick Searches:** Organized by Documents, Conversations, Research, Analytics
+- **Progressive Disclosure:** Expandable sections for detailed information
+
+**Real-time Controls:**
+- **Weight Adjustment:** Interactive sliders for all ranking factors
+- **Threshold Configuration:** Priority, confidence, and quality thresholds
+- **Live Preview:** See changes immediately without page refresh
+- **Performance Monitoring:** Real-time analytics and system health metrics
+
+3.6 Smart Summarization and Topic Modeling
 
 SAM can synthesize long-form content into topic-driven summaries. These summaries are confidence-scored and stored alongside raw memories to provide layered abstraction for complex reasoning tasks.
 
-3.6 Structured Prompt Library System
+3.7 Structured Prompt Library System
 
 SAM now features a comprehensive structured prompt library inspired by LongBioBench's organization while maintaining our superior reasoning capabilities:
 
@@ -100,7 +140,7 @@ SAM now features a comprehensive structured prompt library inspired by LongBioBe
 - Easy extension and modification of prompt strategies
 - Integration with our advanced reasoning frameworks
 
-3.7 Explicit Refusal Logic with Confidence Calibration
+3.8 Explicit Refusal Logic with Confidence Calibration
 
 SAM implements sophisticated refusal mechanisms that go beyond simple "I don't know" responses:
 
@@ -121,11 +161,11 @@ SAM implements sophisticated refusal mechanisms that go beyond simple "I don't k
 - Integration with our advanced SELF-DISCOVER + CRITIC framework
 - Partial answer capability when some information is available
 
-3.8 Adaptive Query Routing
+3.9 Adaptive Query Routing
 
 An internal classifier assesses each user query to determine the best strategy: direct answer, summarization, memory lookup, or hybrid. Enhanced with structured prompts and explicit refusal logic, this maximizes accuracy and reduces hallucination.
 
-3.9 Enhanced Data Enrichment with GPU Acceleration
+3.10 Enhanced Data Enrichment with GPU Acceleration
 
 SAM features advanced data enrichment capabilities with GPU acceleration and domain-specific processing:
 
@@ -147,7 +187,7 @@ SAM features advanced data enrichment capabilities with GPU acceleration and dom
 - Enhanced PDF layout analysis and content extraction
 - Batch processing capabilities for multiple documents
 
-3.10 Thought Transparency (Sprint 16)
+3.11 Thought Transparency (Sprint 16)
 
 To promote accountability and clarity, SAM includes a toggleable view of its internal reasoning for each output, helping users and developers understand how a conclusion was reached. Enhanced with structured prompts and confidence indicators for improved transparency.
 
@@ -198,6 +238,53 @@ SAM's approach to LongBioBench integration demonstrates our commitment to select
 
 **Technical Implementation Details:**
 
+*Phase 3.2.1: Enhanced Search & Ranking:*
+```python
+# Hybrid search with configurable weights
+enhanced_results = memory_store.enhanced_search_memories(
+    query="Blue Cloak cybersecurity",
+    max_results=5,
+    initial_candidates=20
+)
+
+# Multi-factor ranking with transparency
+RankedMemoryResult(
+    chunk_id="chunk_123",
+    content="Blue Cloak is a cybersecurity company...",
+    final_score=0.847,  # Hybrid score
+    semantic_score=0.823,  # Vector similarity
+    recency_score=0.945,   # Temporal relevance
+    confidence_score=0.756, # Source quality
+    metadata={"source_name": "Blue_Cloak_Document.pdf", "page_number": 1}
+)
+```
+
+*Phase 3.2.2: Refactored Citation System:*
+```python
+# Direct metadata access (no secondary lookups)
+def _get_direct_metadata(self, memory):
+    if hasattr(memory, 'metadata'):
+        return memory.metadata  # Direct access
+    return self._extract_legacy_metadata(memory)  # Fallback
+
+# Enhanced citation with confidence indicators
+citation = f"📚 **{source_name}** {'●●●○○' if confidence > 0.7 else '●●○○○'} ({confidence:.1%})"
+```
+
+*Phase 3.2.3: Memory Control Center:*
+```python
+# Real-time filtering with multiple strategies
+filtered_results = self._apply_enhanced_filters(results)
+
+# Interactive analytics dashboard
+source_stats = {
+    'source_types': {'PDF Documents': 45, 'Web Pages': 23},
+    'high_confidence_sources': 34,
+    'avg_quality': 0.78,
+    'transparency_score': 0.85
+}
+```
+
 *Enhanced Citation System:*
 ```python
 # Granular metadata tracking
@@ -232,9 +319,18 @@ if confidence < threshold:
 ```
 
 7. Conclusion
-SAM is more than a distilled LLM; it is a tightly integrated system that learns from itself, validates its reasoning, and delivers trusted, domain-specific insights. Through its multi-tier enhancement architecture and selective LongBioBench integration, SAM bridges the gap between compact AI models and real-world analyst performance while maintaining superior reasoning capabilities and advanced confidence calibration.
+SAM is more than a distilled LLM; it is a tightly integrated system that learns from itself, validates its reasoning, and delivers trusted, domain-specific insights. Through its multi-tier enhancement architecture, selective LongBioBench integration, and comprehensive Phase 3 enhancements, SAM bridges the gap between compact AI models and real-world analyst performance while maintaining superior reasoning capabilities and advanced confidence calibration.
+
+**Phase 3 has transformed SAM into a production-ready system** with hybrid search capabilities, refactored citation systems for optimal performance, and an advanced Memory Control Center that provides unprecedented transparency and control over the AI's knowledge management processes. These enhancements ensure that SAM not only delivers accurate, well-sourced responses but also provides users with the tools and insights needed to understand, verify, and optimize the system's performance.
 
 8. Future Work
+
+**Phase 3 Achievements (Completed 2025):**
+- ✅ **Enhanced Search & Ranking Engine:** Hybrid search with configurable weights and multi-strategy ranking
+- ✅ **Citation System Refactoring:** Direct metadata access with enhanced performance and transparency
+- ✅ **Memory Control Center Enhancement:** Real-time filtering, analytics, and interactive configuration
+
+**Phase 4 Roadmap (Next Development Cycle):**
 
 **Core System Enhancements:**
 - Integrate vision support for multimodal documents
@@ -242,17 +338,30 @@ SAM is more than a distilled LLM; it is a tightly integrated system that learns 
 - Incorporate temporal decay and time-aware memory scoring
 - Explore live ingestion from file monitors and streaming data sources
 
+**Advanced Memory & Search:**
+- Multi-modal memory support (text, images, audio)
+- Federated search across multiple knowledge bases
+- Advanced temporal relevance with decay functions
+- Cross-document relationship mapping and analysis
+
+**Enhanced User Experience:**
+- Voice interface integration with speech-to-text
+- Mobile-responsive design for tablet and phone access
+- Collaborative workspaces for team-based analysis
+- Advanced visualization for memory relationships
+
 **LongBioBench Integration Roadmap:**
 - Expand granular metadata to include more document types
 - Enhance structured prompts with domain-specific templates
 - Develop advanced refusal logic with multi-modal uncertainty detection
 - Integrate citation confidence with temporal relevance scoring
 
-**Advanced Features:**
+**Enterprise Features:**
 - Multi-language support for international document processing
 - Real-time collaboration features for team-based analysis
 - Advanced GPU optimization for large-scale document processing
 - Integration with external knowledge bases and APIs
+- Role-based access control and audit logging
 
 Appendix: Technical Artifacts Delivered
 
@@ -262,12 +371,32 @@ Appendix: Technical Artifacts Delivered
 - Memory ranking and summarization engines
 - Web UI enhancements for thought toggling and summary inspection
 
+**Phase 3 Enhancements (2025):**
+
+**Phase 3.2.1: Enhanced Search & Ranking Engine**
+- Hybrid Memory Ranking Engine (`memory/memory_ranking.py`) with configurable weights
+- Enhanced Memory Vector Store (`memory/memory_vectorstore.py`) with multi-strategy search
+- Ranking Configuration System (`memory/ranking_config.yaml`) with real-time adjustment
+- Performance Analytics and Scoring Transparency
+
+**Phase 3.2.2: Citation System Refactoring**
+- Refactored Citation Engine (`memory/citation_engine.py`) with direct metadata access
+- Enhanced Citation Formatting with confidence indicators and granular location data
+- Memory Result Adapter (`utils/memory_result_adapter.py`) for seamless compatibility
+- Eliminated legacy JSON file lookups for improved performance
+
+**Phase 3.2.3: Memory Control Center Enhancement**
+- Advanced Memory Browser (`ui/memory_browser.py`) with real-time filtering
+- Enhanced Memory Control Center (`ui/memory_app.py`) with interactive analytics
+- Source Analysis Dashboard with visual metrics and quality indicators
+- Real-time Configuration Controls with live preview capabilities
+
 **LongBioBench Integration Enhancements:**
-- Enhanced Citation Engine (`memory/citation_engine.py`) with granular metadata tracking
+- Enhanced Citation Engine with granular metadata tracking
 - Structured Prompt Library (`prompts/`) with organized template system
 - Explicit Refusal Logic in RAG Pipeline (`rag_pipeline/new_rag_pipeline.py`)
 - Enhanced Data Enrichment with GPU acceleration and domain processing
-- Comprehensive test suite (`test_enhanced_features.py`) with 100% success rate
+- Comprehensive test suite with 100% success rate
 
 **New Components:**
 - `prompts/base.py`: Structured prompt management framework

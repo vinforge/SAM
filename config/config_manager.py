@@ -34,6 +34,16 @@ class SAMConfig:
     memory_max_size_mb: int = 1000
     memory_auto_cleanup: bool = True
     memory_similarity_threshold: float = 0.3
+
+    # Chroma-specific settings
+    chroma_persist_path: str = "web_ui/chroma_db"
+    chroma_collection_name: str = "sam_memory_store"
+    chroma_distance_function: str = "cosine"
+    chroma_batch_size: int = 100
+    chroma_enable_hnsw: bool = True
+    chroma_hnsw_space: str = "cosine"
+    chroma_hnsw_construction_ef: int = 200
+    chroma_hnsw_search_ef: int = 50
     
     # Server settings
     chat_port: int = 5001

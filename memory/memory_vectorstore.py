@@ -17,6 +17,14 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import pickle
 
+# Import ranking engine for Phase 3
+try:
+    from .ranking_engine import MemoryRankingEngine, RankedMemoryResult
+except ImportError:
+    # Fallback if ranking engine not available
+    MemoryRankingEngine = None
+    RankedMemoryResult = None
+
 logger = logging.getLogger(__name__)
 
 class VectorStoreType(Enum):
@@ -97,6 +105,16 @@ class MemoryVectorStore:
             'importance_decay_rate': 0.95,
             'max_search_results': 10
         }
+
+        # Initialize ranking engine for Phase 3 hybrid search
+        self.ranking_engine = None
+        if MemoryRankingEngine:
+            try:
+                self.ranking_engine = MemoryRankingEngine()
+                logger.info("Memory Ranking Engine initialized for hybrid search")
+            except Exception as e:
+                logger.warning(f"Could not initialize ranking engine: {e}")
+                self.ranking_engine = None
         
         # Initialize vector store
         self._initialize_vector_store()
@@ -171,7 +189,8 @@ class MemoryVectorStore:
     def search_memories(self, query: str, max_results: int = 5,
                        memory_types: List[MemoryType] = None,
                        tags: List[str] = None,
-                       min_similarity: float = None) -> List[MemorySearchResult]:
+                       min_similarity: float = None,
+                       where_filter: Optional[Dict[str, Any]] = None) -> List[MemorySearchResult]:
         """
         Search for relevant memories.
         
@@ -192,8 +211,8 @@ class MemoryVectorStore:
             # Generate query embedding
             query_embedding = self._generate_embedding(query)
             
-            # Search vector index
-            similar_chunks = self._search_vector_index(query_embedding, max_results * 2)
+            # Search vector index with optional filtering
+            similar_chunks = self._search_vector_index(query_embedding, max_results * 2, where_filter=where_filter)
             
             # Filter and rank results
             results = []
@@ -231,10 +250,213 @@ class MemoryVectorStore:
             
             logger.info(f"Memory search: '{query[:50]}...' returned {len(results)} results")
             return results
-            
+
         except Exception as e:
             logger.error(f"Error searching memories: {e}")
             return []
+
+    def enhanced_search_memories(self, query: str, max_results: int = 5,
+                               initial_candidates: Optional[int] = None,
+                               where_filter: Optional[Dict[str, Any]] = None,
+                               ranking_weights: Optional[Dict[str, float]] = None,
+                               memory_types: List[MemoryType] = None,
+                               tags: List[str] = None,
+                               min_similarity: float = None) -> List[RankedMemoryResult]:
+        """
+        Enhanced two-stage hybrid search with ranking engine.
+
+        Stage 1: Retrieve larger candidate pool from ChromaDB with filtering
+        Stage 2: Re-rank candidates using hybrid scoring algorithm
+
+        Args:
+            query: Search query
+            max_results: Number of final results to return
+            initial_candidates: Number of initial candidates to retrieve (adaptive if None)
+            where_filter: ChromaDB metadata filter
+            ranking_weights: Custom ranking weights (overrides config)
+            memory_types: Optional filter by memory types
+            tags: Optional filter by tags
+            min_similarity: Minimum similarity threshold
+
+        Returns:
+            List of RankedMemoryResult objects, sorted by hybrid score
+        """
+        try:
+            if not query.strip():
+                return []
+
+            # Determine candidate count
+            if initial_candidates is None and self.ranking_engine:
+                initial_candidates = self.ranking_engine.get_adaptive_candidate_count(
+                    len(self.memory_chunks), max_results
+                )
+            elif initial_candidates is None:
+                initial_candidates = max(max_results * 3, 20)  # Fallback
+
+            logger.info(f"Enhanced search: '{query[:50]}...' - retrieving {initial_candidates} candidates for {max_results} final results")
+
+            # Stage 1: Candidate Retrieval from ChromaDB
+            if self.store_type == VectorStoreType.CHROMA and self.chroma_client:
+                chroma_results = self._search_chroma_candidates(query, initial_candidates, where_filter)
+            else:
+                # Fallback to regular search for non-ChromaDB stores
+                logger.info("Using fallback search (non-ChromaDB store)")
+                return self._fallback_enhanced_search(query, max_results, memory_types, tags, min_similarity)
+
+            # Stage 2: Hybrid Re-ranking
+            if self.ranking_engine and chroma_results:
+                ranked_results = self.ranking_engine.rank_memory_results(chroma_results)
+
+                # Apply additional filters if specified
+                filtered_results = self._apply_additional_filters(
+                    ranked_results, memory_types, tags, min_similarity
+                )
+
+                # Return top N results
+                final_results = filtered_results[:max_results]
+
+                # Update access tracking
+                for result in final_results:
+                    self._update_memory_access(result.chunk_id)
+
+                logger.info(f"Enhanced search completed: {len(final_results)} final results "
+                           f"(top score: {final_results[0].final_score:.3f})" if final_results else "Enhanced search completed: 0 results")
+
+                return final_results
+            else:
+                # Fallback to semantic-only ranking
+                logger.warning("Ranking engine not available, using semantic-only results")
+                return self._convert_chroma_to_ranked_results(chroma_results, max_results)
+
+        except Exception as e:
+            logger.error(f"Error in enhanced search: {e}")
+            return []
+
+    def _search_chroma_candidates(self, query: str, n_candidates: int,
+                                where_filter: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Stage 1: Retrieve candidates from ChromaDB with filtering."""
+        try:
+            # Generate query embedding
+            query_embedding = self._generate_embedding(query)
+
+            # Prepare ChromaDB query parameters
+            query_params = {
+                "query_embeddings": [query_embedding],
+                "n_results": n_candidates,
+                "include": ["metadatas", "documents", "distances"]
+            }
+
+            # Add where filter if provided
+            if where_filter:
+                query_params["where"] = where_filter
+                logger.debug(f"Applying ChromaDB filter: {where_filter}")
+
+            # Execute ChromaDB query
+            chroma_results = self.chroma_collection.query(**query_params)
+
+            # Convert to standard format
+            candidates = []
+            for i, chunk_id in enumerate(chroma_results['ids'][0]):
+                candidate = {
+                    "id": chunk_id,
+                    "document": chroma_results['documents'][0][i],
+                    "metadata": chroma_results['metadatas'][0][i],
+                    "distance": chroma_results['distances'][0][i]
+                }
+                candidates.append(candidate)
+
+            logger.debug(f"Retrieved {len(candidates)} candidates from ChromaDB")
+            return candidates
+
+        except Exception as e:
+            logger.error(f"Error retrieving ChromaDB candidates: {e}")
+            return []
+
+    def _apply_additional_filters(self, ranked_results: List[RankedMemoryResult],
+                                memory_types: List[MemoryType] = None,
+                                tags: List[str] = None,
+                                min_similarity: float = None) -> List[RankedMemoryResult]:
+        """Apply additional filters to ranked results."""
+        filtered_results = []
+
+        for result in ranked_results:
+            # Get memory chunk for filtering
+            chunk = self.memory_chunks.get(result.chunk_id)
+            if not chunk:
+                continue
+
+            # Apply memory type filter
+            if memory_types and chunk.memory_type not in memory_types:
+                continue
+
+            # Apply tags filter
+            if tags and not any(tag in chunk.tags for tag in tags):
+                continue
+
+            # Apply similarity threshold
+            if min_similarity and result.semantic_score < min_similarity:
+                continue
+
+            filtered_results.append(result)
+
+        return filtered_results
+
+    def _fallback_enhanced_search(self, query: str, max_results: int,
+                                memory_types: List[MemoryType] = None,
+                                tags: List[str] = None,
+                                min_similarity: float = None) -> List[RankedMemoryResult]:
+        """Fallback enhanced search for non-ChromaDB stores."""
+        # Use existing search_memories method
+        search_results = self.search_memories(
+            query=query,
+            max_results=max_results,
+            memory_types=memory_types,
+            tags=tags,
+            min_similarity=min_similarity
+        )
+
+        # Convert to RankedMemoryResult format
+        ranked_results = []
+        for result in search_results:
+            if RankedMemoryResult:
+                ranked_result = RankedMemoryResult(
+                    chunk_id=result.chunk.chunk_id,
+                    content=result.chunk.content,
+                    metadata=result.chunk.metadata,
+                    semantic_score=result.similarity_score,
+                    recency_score=0.0,  # Not calculated in fallback
+                    confidence_score=result.chunk.importance_score,
+                    priority_score=0.0,  # Not calculated in fallback
+                    final_score=result.similarity_score,
+                    original_distance=1.0 - result.similarity_score
+                )
+                ranked_results.append(ranked_result)
+
+        return ranked_results
+
+    def _convert_chroma_to_ranked_results(self, chroma_results: List[Dict[str, Any]],
+                                        max_results: int) -> List[RankedMemoryResult]:
+        """Convert ChromaDB results to RankedMemoryResult format without ranking engine."""
+        ranked_results = []
+
+        for result in chroma_results[:max_results]:
+            if RankedMemoryResult:
+                semantic_score = 1.0 - result.get("distance", 1.0)  # Convert distance to similarity
+
+                ranked_result = RankedMemoryResult(
+                    chunk_id=result.get("id", ""),
+                    content=result.get("document", ""),
+                    metadata=result.get("metadata", {}),
+                    semantic_score=semantic_score,
+                    recency_score=0.0,
+                    confidence_score=result.get("metadata", {}).get("confidence_score", 0.5),
+                    priority_score=0.0,
+                    final_score=semantic_score,
+                    original_distance=result.get("distance", 1.0)
+                )
+                ranked_results.append(ranked_result)
+
+        return ranked_results
     
     def get_memory(self, chunk_id: str) -> Optional[MemoryChunk]:
         """Get a specific memory by ID."""
@@ -551,23 +773,57 @@ class MemoryVectorStore:
             self._initialize_simple()
     
     def _initialize_chroma(self):
-        """Initialize Chroma vector store."""
+        """Initialize Chroma vector store with enhanced configuration."""
         try:
             import chromadb
-            
-            # Create Chroma client
-            self.chroma_client = chromadb.PersistentClient(path=str(self.storage_dir / "chroma"))
-            
-            # Get or create collection
-            self.chroma_collection = self.chroma_client.get_or_create_collection(
-                name="sam_memories",
-                metadata={"description": "SAM long-term memory store"}
+            from chromadb.config import Settings
+
+            # Load Chroma configuration
+            chroma_config = self._load_chroma_config()
+
+            # Create Chroma client with persistent storage
+            chroma_path = self.storage_dir / "chroma_db"
+            chroma_path.mkdir(parents=True, exist_ok=True)
+
+            # Configure Chroma settings
+            settings = Settings(
+                persist_directory=str(chroma_path),
+                anonymized_telemetry=False,
+                allow_reset=True
             )
-            
-            logger.info("Initialized Chroma vector store")
-            
+
+            self.chroma_client = chromadb.PersistentClient(
+                path=str(chroma_path),
+                settings=settings
+            )
+
+            # Get or create collection with enhanced metadata (ChromaDB compatible)
+            collection_metadata = {
+                "description": "SAM Enhanced Memory Store with Citation Support",
+                "version": "2.0",
+                "embedding_model": "all-MiniLM-L6-v2",
+                "embedding_dimension": str(self.embedding_dimension),
+                "distance_function": chroma_config.get("distance_function", "cosine"),
+                "created_at": datetime.now().isoformat(),
+                "features": "metadata_filtering,hybrid_ranking,rich_citations"  # Convert list to string
+            }
+
+            self.chroma_collection = self.chroma_client.get_or_create_collection(
+                name=chroma_config.get("collection_name", "sam_memory_store"),
+                metadata=collection_metadata
+            )
+
+            # Store configuration for later use
+            self.chroma_config = chroma_config
+
+            logger.info(f"Initialized enhanced Chroma vector store: {self.chroma_collection.name}")
+            logger.info(f"Collection count: {self.chroma_collection.count()}")
+
+            # Load existing memories from ChromaDB
+            self._load_memories_from_chroma()
+
         except ImportError:
-            logger.warning("Chroma not available, falling back to simple store")
+            logger.warning("ChromaDB not available, falling back to simple store")
             self.store_type = VectorStoreType.SIMPLE
             self._initialize_simple()
         except Exception as e:
@@ -580,6 +836,204 @@ class MemoryVectorStore:
         self.embeddings_matrix = None
         self.chunk_ids = []
         logger.info("Initialized simple vector store")
+
+    def _load_chroma_config(self):
+        """Load Chroma-specific configuration."""
+        try:
+            # Try to load from config file
+            config_path = Path("config/sam_config.json")
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    return config.get("memory", {}).get("chroma_config", {})
+        except Exception as e:
+            logger.warning(f"Could not load Chroma config: {e}")
+
+        # Return default configuration
+        return {
+            "persist_path": "web_ui/chroma_db",
+            "collection_name": "sam_memory_store",
+            "distance_function": "cosine",
+            "batch_size": 100,
+            "enable_hnsw": True,
+            "hnsw_space": "cosine",
+            "hnsw_construction_ef": 200,
+            "hnsw_search_ef": 50
+        }
+
+    def _prepare_chroma_metadata(self, memory_chunk: MemoryChunk) -> Dict[str, Any]:
+        """Prepare enhanced metadata for Chroma storage aligned with Citation schema."""
+        try:
+            # Extract source information
+            source_parts = memory_chunk.source.split(':')
+            source_type = source_parts[0] if len(source_parts) > 0 else "unknown"
+            source_path = source_parts[1] if len(source_parts) > 1 else ""
+            block_info = source_parts[2] if len(source_parts) > 2 else ""
+
+            # Parse source file name
+            source_name = "unknown"
+            if source_path:
+                source_name = Path(source_path).name if source_path.startswith("uploads/") else source_path
+
+            # Extract block/chunk information
+            chunk_index = 0
+            page_number = 1
+            paragraph_number = 1
+            section_title = "Content"
+
+            if block_info:
+                # Extract block index from "block_N" format
+                if "block_" in block_info:
+                    try:
+                        chunk_index = int(block_info.split("_")[1])
+                    except (IndexError, ValueError):
+                        chunk_index = 0
+
+            # Get metadata from memory chunk
+            chunk_metadata = memory_chunk.metadata or {}
+
+            # Calculate document position (0.0-1.0 relative location)
+            document_position = 0.0
+            if "block_index" in chunk_metadata:
+                # Estimate position based on block index (rough approximation)
+                block_idx = chunk_metadata.get("block_index", 0)
+                total_blocks = chunk_metadata.get("total_blocks", 10)  # Default estimate
+                document_position = min(block_idx / max(total_blocks, 1), 1.0)
+
+            # Determine confidence score and indicator
+            confidence_score = memory_chunk.importance_score
+            confidence_indicator = "✓" if confidence_score > 0.7 else "~" if confidence_score > 0.4 else "?"
+
+            # Parse timestamp
+            created_at = datetime.now().timestamp()
+            try:
+                if memory_chunk.timestamp:
+                    created_at = datetime.fromisoformat(memory_chunk.timestamp.replace('Z', '+00:00')).timestamp()
+            except Exception:
+                pass
+
+            # Build enhanced metadata aligned with Citation schema
+            enhanced_metadata = {
+                # Core Citation fields
+                "source_name": source_name,
+                "page_number": page_number,
+                "chunk_index": chunk_index,
+                "paragraph_number": paragraph_number,
+                "section_title": section_title,
+                "document_position": document_position,
+                "confidence_indicator": confidence_indicator,
+                "confidence_score": float(confidence_score),
+                "text_content": memory_chunk.content[:500] + "..." if len(memory_chunk.content) > 500 else memory_chunk.content,
+                "created_at": int(created_at),
+
+                # Extended metadata for filtering and ranking
+                "memory_type": memory_chunk.memory_type.value if hasattr(memory_chunk.memory_type, 'value') else str(memory_chunk.memory_type),
+                "source_type": source_type,
+                "source_path": source_path,
+                "content_hash": memory_chunk.content_hash,
+                "importance_score": float(memory_chunk.importance_score),
+                "access_count": memory_chunk.access_count,
+                "last_accessed": memory_chunk.last_accessed,
+                "tags": ",".join(memory_chunk.tags) if memory_chunk.tags else "",
+
+                # Document-specific metadata
+                "content_type": chunk_metadata.get("content_type", "text"),
+                "file_name": chunk_metadata.get("file_name", source_name),
+                "document_id": chunk_metadata.get("document_id", ""),
+                "block_length": len(memory_chunk.content),
+                "processing_timestamp": chunk_metadata.get("processing_timestamp", ""),
+                "upload_timestamp": chunk_metadata.get("upload_timestamp", "")
+            }
+
+            # Add any additional metadata from the original chunk (ChromaDB compatible)
+            for key, value in chunk_metadata.items():
+                if key not in enhanced_metadata:
+                    # Convert lists to comma-separated strings for ChromaDB compatibility
+                    if isinstance(value, list):
+                        enhanced_metadata[f"extra_{key}"] = ",".join(str(v) for v in value)
+                    elif isinstance(value, (str, int, float, bool)):
+                        enhanced_metadata[f"extra_{key}"] = value
+                    elif value is not None:
+                        enhanced_metadata[f"extra_{key}"] = str(value)
+
+            return enhanced_metadata
+
+        except Exception as e:
+            logger.error(f"Error preparing Chroma metadata: {e}")
+            # Return minimal metadata on error
+            return {
+                "source_name": "unknown",
+                "chunk_index": 0,
+                "confidence_score": float(memory_chunk.importance_score),
+                "created_at": int(datetime.now().timestamp()),
+                "memory_type": str(memory_chunk.memory_type),
+                "text_content": memory_chunk.content[:100] + "..." if len(memory_chunk.content) > 100 else memory_chunk.content
+            }
+
+    def _load_memories_from_chroma(self):
+        """Load existing memories from ChromaDB collection."""
+        try:
+            if not self.chroma_collection:
+                return
+
+            # Get all documents from ChromaDB
+            all_data = self.chroma_collection.get(include=["metadatas", "documents", "embeddings"])
+
+            if not all_data["ids"]:
+                logger.info("No existing memories found in ChromaDB")
+                return
+
+            logger.info(f"Loading {len(all_data['ids'])} memories from ChromaDB...")
+
+            for i, chunk_id in enumerate(all_data["ids"]):
+                try:
+                    # Reconstruct MemoryChunk from ChromaDB data
+                    content = all_data["documents"][i]
+                    embedding = all_data["embeddings"][i]
+                    metadata = all_data["metadatas"][i]
+
+                    # Extract core fields from metadata
+                    memory_type_str = metadata.get("memory_type", "document")
+                    if memory_type_str == "document":
+                        memory_type = MemoryType.DOCUMENT
+                    elif memory_type_str == "conversation":
+                        memory_type = MemoryType.CONVERSATION
+                    elif memory_type_str == "system":
+                        memory_type = MemoryType.SYSTEM
+                    else:
+                        memory_type = MemoryType.DOCUMENT
+
+                    # Reconstruct tags from string
+                    tags_str = metadata.get("tags", "")
+                    tags = tags_str.split(",") if tags_str else []
+
+                    # Create MemoryChunk
+                    chunk = MemoryChunk(
+                        chunk_id=chunk_id,
+                        content=content,
+                        content_hash=metadata.get("content_hash", ""),
+                        embedding=embedding,
+                        memory_type=memory_type,
+                        source=metadata.get("source_path", ""),
+                        timestamp=metadata.get("created_at", ""),
+                        tags=tags,
+                        importance_score=float(metadata.get("importance_score", 0.0)),
+                        access_count=int(metadata.get("access_count", 0)),
+                        last_accessed=metadata.get("last_accessed", ""),
+                        metadata=metadata  # Store all metadata
+                    )
+
+                    # Add to memory store
+                    self.memory_chunks[chunk_id] = chunk
+
+                except Exception as e:
+                    logger.error(f"Error loading memory chunk {chunk_id}: {e}")
+                    continue
+
+            logger.info(f"Successfully loaded {len(self.memory_chunks)} memories from ChromaDB")
+
+        except Exception as e:
+            logger.error(f"Error loading memories from ChromaDB: {e}")
     
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using proper embedding model."""
@@ -640,9 +1094,14 @@ class MemoryVectorStore:
                 faiss.write_index(self.faiss_index, str(index_file))
                 
             elif self.store_type == VectorStoreType.CHROMA and self.chroma_client:
+                # Prepare enhanced metadata for Chroma
+                memory_chunk = self.memory_chunks[chunk_id]
+                enhanced_metadata = self._prepare_chroma_metadata(memory_chunk)
+
                 self.chroma_collection.add(
                     embeddings=[embedding],
-                    documents=[self.memory_chunks[chunk_id].content],
+                    documents=[memory_chunk.content],
+                    metadatas=[enhanced_metadata],
                     ids=[chunk_id]
                 )
                 
@@ -657,7 +1116,7 @@ class MemoryVectorStore:
         except Exception as e:
             logger.error(f"Error adding to vector index: {e}")
     
-    def _search_vector_index(self, query_embedding: List[float], max_results: int) -> List[Tuple[str, float]]:
+    def _search_vector_index(self, query_embedding: List[float], max_results: int, **kwargs) -> List[Tuple[str, float]]:
         """Search vector index for similar embeddings."""
         try:
             results = []
@@ -671,11 +1130,19 @@ class MemoryVectorStore:
                         results.append((self.chunk_ids[idx], float(score)))
                         
             elif self.store_type == VectorStoreType.CHROMA and self.chroma_client:
-                chroma_results = self.chroma_collection.query(
-                    query_embeddings=[query_embedding],
-                    n_results=max_results
-                )
-                
+                # Prepare query parameters
+                query_params = {
+                    "query_embeddings": [query_embedding],
+                    "n_results": max_results
+                }
+
+                # Add where filter if provided in metadata
+                where_filter = kwargs.get('where_filter')
+                if where_filter:
+                    query_params["where"] = where_filter
+
+                chroma_results = self.chroma_collection.query(**query_params)
+
                 for chunk_id, distance in zip(chroma_results['ids'][0], chroma_results['distances'][0]):
                     similarity = 1.0 - distance  # Convert distance to similarity
                     results.append((chunk_id, similarity))

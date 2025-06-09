@@ -13,9 +13,79 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 
 from .document_parser import ParsedDocument, MultimodalContent
-from deepseek_enhanced_learning.model_loader import OllamaModel
+import requests
 
 logger = logging.getLogger(__name__)
+
+class OllamaModel:
+    """Enhanced Ollama model implementation with knowledge injection for true learning."""
+
+    def __init__(self):
+        self.base_url = "http://localhost:11434"
+        self.model_name = "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M"
+        self.learned_knowledge = []  # Store learned facts for context injection
+
+    def inject_learned_knowledge(self, knowledge_summary: str, key_concepts: List[str]):
+        """Inject learned knowledge into the model's context for future queries."""
+        knowledge_entry = {
+            'summary': knowledge_summary,
+            'concepts': key_concepts,
+            'timestamp': datetime.now().isoformat(),
+            'source': 'document_learning'
+        }
+        self.learned_knowledge.append(knowledge_entry)
+
+        # Keep only the most recent 10 knowledge entries to avoid context overflow
+        if len(self.learned_knowledge) > 10:
+            self.learned_knowledge = self.learned_knowledge[-10:]
+
+        logger.info(f"🧠 Injected new knowledge into model context: {len(key_concepts)} concepts")
+
+    def _build_enhanced_context(self, prompt: str) -> str:
+        """Build enhanced context with learned knowledge for better responses."""
+        if not self.learned_knowledge:
+            return prompt
+
+        # Create knowledge context
+        knowledge_context = "LEARNED KNOWLEDGE FROM DOCUMENTS:\n"
+        for i, knowledge in enumerate(self.learned_knowledge[-5:], 1):  # Use last 5 entries
+            knowledge_context += f"\n{i}. {knowledge['summary'][:200]}...\n"
+            knowledge_context += f"   Key concepts: {', '.join(knowledge['concepts'][:5])}\n"
+
+        # Inject knowledge before the actual prompt
+        enhanced_prompt = f"{knowledge_context}\n\nBased on the above learned knowledge and your training, respond to:\n\n{prompt}"
+        return enhanced_prompt
+
+    def generate(self, prompt, temperature=0.7, max_tokens=500, use_learned_knowledge=True):
+        """Generate text using Ollama API with optional learned knowledge injection."""
+        try:
+            # Enhance prompt with learned knowledge if requested
+            if use_learned_knowledge:
+                enhanced_prompt = self._build_enhanced_context(prompt)
+                logger.info(f"🧠 Enhanced prompt with {len(self.learned_knowledge)} learned knowledge entries")
+            else:
+                enhanced_prompt = prompt
+
+            response = requests.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": enhanced_prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens
+                    }
+                },
+                timeout=60  # Longer timeout for consolidation tasks
+            )
+            if response.status_code == 200:
+                return response.json().get("response", "No response generated")
+            else:
+                raise Exception(f"Ollama API error: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Ollama generation error: {e}")
+            return f"Knowledge consolidation unavailable: {str(e)}"
 
 @dataclass
 class ConsolidatedKnowledge:
@@ -92,7 +162,11 @@ class KnowledgeConsolidator:
                 enriched_metadata=enriched_metadata,
                 consolidation_timestamp=datetime.now().isoformat()
             )
-            
+
+            # CRITICAL: Inject learned knowledge into the model for true learning
+            self.model.inject_learned_knowledge(summary, key_concepts)
+            logger.info(f"🎓 MODEL LEARNING: Injected knowledge from {parsed_doc.source_file} into Ollama model context")
+
             logger.info(f"Successfully consolidated document: {len(summary)} chars summary, {len(key_concepts)} key concepts")
             return consolidated
             

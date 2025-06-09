@@ -16,10 +16,15 @@ import uuid
 import sys
 sys.path.append('..')
 
-# from deepseek_enhanced_learning.model_loader import OllamaModel
-from utils.vector_manager import VectorManager
-from multimodal_processing.multimodal_pipeline import get_multimodal_pipeline
-from utils.embedding_utils import get_embedding_manager
+try:
+    from utils.vector_manager import VectorManager
+    from multimodal_processing.multimodal_pipeline import get_multimodal_pipeline
+    from utils.embedding_utils import get_embedding_manager
+except ImportError:
+    # Fallback imports for development
+    VectorManager = None
+    get_multimodal_pipeline = None
+    get_embedding_manager = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,56 +67,119 @@ def initialize_sam():
     try:
         logger.info("Initializing SAM components...")
 
-        # Initialize Mock SAM model for Sprint 16 demo
-        class MockSAMModel:
-            def generate(self, prompt, temperature=0.7, max_tokens=500):
-                # Demo response with <think> blocks for Sprint 16 testing
-                if "hello" in prompt.lower() or "hi" in prompt.lower():
-                    return """<think>
-The user is greeting me. I should respond warmly and mention the new Sprint 16 thought transparency features.
-</think>
-
-Hello! I'm SAM with new Sprint 16 thought transparency features. You can now see my thinking process by clicking the thought toggle buttons!"""
-
-                elif "date" in prompt.lower() or "time" in prompt.lower():
-                    return """<think>
-The user is asking about dates. I should:
-1. Provide current date information
-2. Mention document date capabilities
-3. Show how the thought process works
-</think>
-
-Today's date is important for context. I can also help you find dates in your uploaded documents using my enhanced memory system."""
-
-                else:
-                    return f"""<think>
-The user asked: "{prompt}"
-I should provide a helpful response while demonstrating the Sprint 16 thought transparency feature.
-</think>
-
-I understand you're asking about "{prompt}". This response demonstrates Sprint 16's new thought transparency - you can see my reasoning process above!"""
+        # Initialize real SAM model with Ollama - NO MOCK MODEL
 
         # Initialize real SAM model with Ollama
         try:
-            from deepseek_enhanced_learning.model_loader import OllamaModel
-            sam_model = OllamaModel()
-            logger.info("✅ Real SAM model initialized with Ollama")
+            # Try to use Ollama directly via requests
+            import requests
+
+            class OllamaModel:
+                def __init__(self):
+                    self.base_url = "http://localhost:11434"
+                    self.model_name = "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M"
+                    self.model_type = "REAL_OLLAMA_MODEL"  # For debugging
+                    self.learned_knowledge = []  # Store learned facts for context injection
+                    logger.info(f"🤖 Initialized REAL Ollama model with learning capability: {self.model_name}")
+
+                def inject_learned_knowledge(self, knowledge_summary: str, key_concepts: list):
+                    """Inject learned knowledge into the model's context for future queries."""
+                    from datetime import datetime
+                    knowledge_entry = {
+                        'summary': knowledge_summary,
+                        'concepts': key_concepts,
+                        'timestamp': datetime.now().isoformat(),
+                        'source': 'document_learning'
+                    }
+                    self.learned_knowledge.append(knowledge_entry)
+
+                    # Keep only the most recent 10 knowledge entries to avoid context overflow
+                    if len(self.learned_knowledge) > 10:
+                        self.learned_knowledge = self.learned_knowledge[-10:]
+
+                    logger.info(f"🧠 WEB UI: Injected new knowledge into model context: {len(key_concepts)} concepts")
+
+                def _build_enhanced_context(self, prompt: str) -> str:
+                    """Build enhanced context with learned knowledge for better responses."""
+                    if not self.learned_knowledge:
+                        return prompt
+
+                    # Create knowledge context
+                    knowledge_context = "LEARNED KNOWLEDGE FROM UPLOADED DOCUMENTS:\n"
+                    for i, knowledge in enumerate(self.learned_knowledge[-5:], 1):  # Use last 5 entries
+                        knowledge_context += f"\n{i}. {knowledge['summary'][:200]}...\n"
+                        knowledge_context += f"   Key concepts: {', '.join(knowledge['concepts'][:5])}\n"
+
+                    # Inject knowledge before the actual prompt
+                    enhanced_prompt = f"{knowledge_context}\n\nBased on the above learned knowledge from uploaded documents and your training, respond to:\n\n{prompt}"
+                    return enhanced_prompt
+
+                def generate(self, prompt, temperature=0.7, max_tokens=500, use_learned_knowledge=True):
+                    logger.info(f"🤖 REAL Ollama model generating response for prompt: {prompt[:100]}...")
+                    try:
+                        # Enhance prompt with learned knowledge if requested
+                        if use_learned_knowledge and self.learned_knowledge:
+                            enhanced_prompt = self._build_enhanced_context(prompt)
+                            logger.info(f"🧠 Enhanced prompt with {len(self.learned_knowledge)} learned knowledge entries")
+                        else:
+                            enhanced_prompt = prompt
+
+                        response = requests.post(
+                            f"{self.base_url}/api/generate",
+                            json={
+                                "model": self.model_name,
+                                "prompt": enhanced_prompt,
+                                "stream": False,
+                                "options": {
+                                    "temperature": temperature,
+                                    "num_predict": max_tokens
+                                }
+                            },
+                            timeout=120  # Increased timeout for document queries
+                        )
+                        if response.status_code == 200:
+                            result = response.json().get("response", "No response generated")
+                            logger.info(f"✅ REAL Ollama model generated {len(result)} character response")
+                            return result
+                        else:
+                            raise Exception(f"Ollama API error: {response.status_code}")
+                    except Exception as e:
+                        logger.error(f"Ollama generation error: {e}")
+                        return f"I apologize, but I'm having trouble generating a response right now: {str(e)}"
+
+            # Test Ollama connection
+            test_response = requests.get(f"http://localhost:11434/api/tags", timeout=5)
+            if test_response.status_code == 200:
+                sam_model = OllamaModel()
+                logger.info("✅ Real SAM model initialized with Ollama")
+            else:
+                raise Exception("Ollama not responding")
+
         except Exception as e:
-            logger.warning(f"Failed to initialize Ollama model: {e}")
-            sam_model = MockSAMModel()
-            logger.info("✅ Fallback to Mock SAM model for demo")
+            logger.error(f"Failed to initialize Ollama model: {e}")
+            logger.error("CRITICAL: Ollama model is required for SAM to function properly")
+            raise Exception(f"Cannot start SAM without Ollama model: {e}")
 
-        # Initialize vector manager
-        vector_manager = VectorManager()
-        logger.info("✅ Vector manager initialized")
+        # Initialize vector manager (optional)
+        if VectorManager:
+            vector_manager = VectorManager()
+            logger.info("✅ Vector manager initialized")
+        else:
+            logger.warning("⚠️ Vector manager not available")
 
-        # Initialize multimodal pipeline
-        multimodal_pipeline = get_multimodal_pipeline()
-        logger.info("✅ Multimodal pipeline initialized")
+        # Initialize multimodal pipeline (optional)
+        if get_multimodal_pipeline:
+            multimodal_pipeline = get_multimodal_pipeline()
+            logger.info("✅ Multimodal pipeline initialized")
+        else:
+            logger.warning("⚠️ Multimodal pipeline not available")
 
-        # Initialize embedding manager
-        embedding_manager = get_embedding_manager()
-        logger.info("✅ Embedding manager initialized")
+        # Initialize embedding manager (optional)
+        if get_embedding_manager:
+            embedding_manager = get_embedding_manager()
+            logger.info("✅ Embedding manager initialized")
+        else:
+            logger.warning("⚠️ Embedding manager not available")
 
         # Initialize tool-augmented reasoning components
         try:
@@ -129,9 +197,13 @@ I understand you're asking about "{prompt}". This response demonstrates Sprint 1
             self_decide_framework.tool_selector = tool_selector
             self_decide_framework.model = sam_model
 
-            # CRITICAL FIX: Connect to memory vector store with adapter
-            from memory.memory_vectorstore import get_memory_store
-            memory_store = get_memory_store()
+            # CRITICAL FIX: Connect to memory vector store with adapter (Phase 3.2: Use ChromaDB)
+            from memory.memory_vectorstore import get_memory_store, VectorStoreType
+            memory_store = get_memory_store(
+                store_type=VectorStoreType.CHROMA,
+                storage_directory="web_ui",
+                embedding_dimension=384
+            )
 
             # Create dynamic adapter to make memory store compatible with SELF-DECIDE framework
             class MemoryStoreAdapter:
@@ -453,7 +525,7 @@ def handle_thoughts_command(action):
         return f"❌ Error processing thoughts command: {str(e)}"
 
 def is_document_query(message):
-    """Check if the message is asking about a specific document."""
+    """Check if the message is asking about a specific document or content from uploaded documents."""
     message_lower = message.lower()
 
     # Document query indicators
@@ -463,7 +535,38 @@ def is_document_query(message):
         'file', 'paper', 'report'
     ]
 
-    return any(indicator in message_lower for indicator in document_indicators)
+    # Person/entity query indicators that might be in uploaded documents
+    person_indicators = [
+        'who is', 'who was', 'tell me about', 'what about',
+        'describe', 'information about', 'details about',
+        'background on', 'profile of'
+    ]
+
+    # Check for document indicators first
+    if any(indicator in message_lower for indicator in document_indicators):
+        return True
+
+    # Check for person/entity queries that might be answered from uploaded documents
+    if any(indicator in message_lower for indicator in person_indicators):
+        # Check if we have any uploaded documents that might contain this information
+        try:
+            from memory.memory_vectorstore import get_memory_store, VectorStoreType
+            memory_store = get_memory_store(
+                store_type=VectorStoreType.CHROMA,
+                storage_directory="web_ui",
+                embedding_dimension=384
+            )
+            all_memories = memory_store.get_all_memories()
+
+            # If we have document memories, treat person queries as document queries
+            document_memories = [m for m in all_memories if 'document:' in str(getattr(m, 'source', ''))]
+            if document_memories:
+                logger.info(f"Person/entity query detected with {len(document_memories)} document memories available")
+                return True
+        except Exception as e:
+            logger.warning(f"Error checking for document memories: {e}")
+
+    return False
 
 def handle_document_query(message):
     """Handle document-specific queries using the new RAG pipeline."""
@@ -473,15 +576,19 @@ def handle_document_query(message):
         # Extract document name from the query
         document_name = extract_document_name(message)
 
+        # Get memory store for document search (Phase 3.2: Use ChromaDB)
+        from memory.memory_vectorstore import get_memory_store, VectorStoreType
+        memory_store = get_memory_store(
+            store_type=VectorStoreType.CHROMA,
+            storage_directory="web_ui",
+            embedding_dimension=384
+        )
+        all_memories = memory_store.get_all_memories()
+
         if document_name:
             logger.info(f"Extracted document name: {document_name}")
 
-            # Check if document exists in memory first
-            from memory.memory_vectorstore import get_memory_store
-            memory_store = get_memory_store()
-
             # Check for document-specific memories
-            all_memories = memory_store.get_all_memories()
             document_memories = [m for m in all_memories if document_name in str(getattr(m, 'source', ''))]
 
             if not document_memories:
@@ -545,9 +652,25 @@ def handle_document_query(message):
             logger.info(f"Generated document summary: {len(summary_result)} chars")
             return summary_result
         else:
-            # Fallback to general document search
-            logger.info("No specific document name found, using general document search")
-            return generate_general_document_response(message)
+            # No specific document name found - this might be a person/entity query
+            logger.info("No specific document name found, checking for person/entity query in uploaded documents")
+
+            # Check if we have any document memories
+            document_memories = [m for m in all_memories if 'document:' in str(getattr(m, 'source', ''))]
+
+            if document_memories:
+                logger.info(f"Found {len(document_memories)} document memories, searching for relevant content")
+
+                # Use enhanced document search for person/entity queries
+                return generate_enhanced_document_response(message, document_memories)
+            else:
+                # No documents available
+                return """I don't have any uploaded documents to search through. Please upload a document first, then I can help answer questions about people, entities, or content mentioned in those documents.
+
+**To get started:**
+1. Click the upload button to add a document
+2. Wait for processing to complete
+3. Ask me questions about the content"""
 
     except Exception as e:
         logger.error(f"Error handling document query: {e}")
@@ -576,6 +699,284 @@ def extract_document_name(message):
 
     return None
 
+def generate_enhanced_document_response(message, document_memories):
+    """Generate enhanced response for person/entity queries using uploaded documents with citations."""
+    try:
+        logger.info(f"Generating enhanced document response for: {message}")
+
+        # Search for relevant content in document memories
+        from memory.memory_vectorstore import get_memory_store
+        memory_store = get_memory_store()
+
+        # Phase 3.2: Use enhanced search with hybrid ranking
+        try:
+            if hasattr(memory_store, 'enhanced_search_memories'):
+                relevant_memories = memory_store.enhanced_search_memories(
+                    query=message,
+                    max_results=10,
+                    initial_candidates=20
+                )
+                logger.info(f"Enhanced document search returned {len(relevant_memories)} ranked results")
+            else:
+                relevant_memories = memory_store.search_memories(message, max_results=10, min_similarity=0.1)
+                logger.info(f"Fallback document search returned {len(relevant_memories)} results")
+        except Exception as e:
+            logger.warning(f"Enhanced document search failed, using fallback: {e}")
+            relevant_memories = memory_store.search_memories(message, max_results=10, min_similarity=0.1)
+
+        # Filter to only document memories and get the most relevant ones
+        # DEBUG: Log source formats to understand filtering issue
+        for i, m in enumerate(relevant_memories[:3]):
+            # Phase 3.2: Handle both RankedMemoryResult and MemorySearchResult
+            if hasattr(m, 'content') and hasattr(m, 'final_score'):
+                # RankedMemoryResult
+                source = m.metadata.get('source_path', 'NO_SOURCE')
+                content_preview = str(m.content)[:100]
+                memory_type = m.metadata.get('memory_type', 'NO_TYPE')
+            elif hasattr(m, 'chunk'):
+                # MemorySearchResult
+                chunk = m.chunk
+                source = getattr(chunk, 'source', 'NO_SOURCE')
+                content_preview = str(getattr(chunk, 'content', 'NO_CONTENT'))[:100]
+                memory_type = getattr(chunk, 'memory_type', 'NO_TYPE')
+            else:
+                # Fallback
+                source = getattr(m, 'source', 'NO_SOURCE')
+                content_preview = str(getattr(m, 'content', 'NO_CONTENT'))[:100]
+                memory_type = getattr(m, 'memory_type', 'NO_TYPE')
+            logger.info(f"DEBUG Memory {i}: source='{source}', content='{content_preview}...', type='{memory_type}'")
+
+        # More flexible filtering - check for document indicators
+        document_relevant = []
+        for m in relevant_memories:
+            # Phase 3.2: Handle both RankedMemoryResult and MemorySearchResult
+            if hasattr(m, 'content') and hasattr(m, 'final_score'):
+                # RankedMemoryResult
+                source = str(m.metadata.get('source_path', ''))
+                memory_type = str(m.metadata.get('memory_type', ''))
+            elif hasattr(m, 'chunk'):
+                # MemorySearchResult
+                chunk = m.chunk
+                source = str(getattr(chunk, 'source', ''))
+                memory_type = str(getattr(chunk, 'memory_type', ''))
+            else:
+                # Fallback
+                source = str(getattr(m, 'source', ''))
+                memory_type = str(getattr(m, 'memory_type', ''))
+
+            # Check for document type or document indicators in source
+            if (memory_type.lower() == 'document' or
+                any(indicator in source.lower() for indicator in ['document:', 'uploads/', '.pdf', '.txt', '.docx'])):
+                document_relevant.append(m)
+
+        logger.info(f"Found {len(document_relevant)} document memories out of {len(relevant_memories)} total memories")
+
+        if not document_relevant:
+            # Try a broader search with key terms from the query
+            import re
+            # Extract potential names or key terms
+            words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', message)
+            if words:
+                broader_query = ' '.join(words)
+                logger.info(f"Trying broader search with: {broader_query}")
+                relevant_memories = memory_store.search_memories(broader_query, max_results=10, min_similarity=0.05)
+                # Use same flexible filtering for broader search
+                document_relevant = []
+                for m in relevant_memories:
+                    # Handle MemorySearchResult objects
+                    if hasattr(m, 'chunk'):
+                        chunk = m.chunk
+                        source = str(getattr(chunk, 'source', ''))
+                        memory_type = str(getattr(chunk, 'memory_type', ''))
+                    else:
+                        source = str(getattr(m, 'source', ''))
+                        memory_type = str(getattr(m, 'memory_type', ''))
+
+                    # Check for document type or document indicators in source
+                    if (memory_type.lower() == 'document' or
+                        any(indicator in source.lower() for indicator in ['document:', 'uploads/', '.pdf', '.txt', '.docx'])):
+                        document_relevant.append(m)
+
+        if document_relevant:
+            logger.info(f"Found {len(document_relevant)} relevant document memories")
+
+            # Build context with enhanced citations and confidence tracking
+            context_parts = []
+            sources = set()
+            source_details = []  # Track detailed source information
+            confidence_scores = []
+
+            for i, memory in enumerate(document_relevant[:3]):  # Use top 3 results to reduce context size
+                # Phase 3.2: Handle both RankedMemoryResult and MemorySearchResult
+                if hasattr(memory, 'content') and hasattr(memory, 'final_score'):
+                    # RankedMemoryResult
+                    content = memory.content
+                    source = memory.metadata.get('source_path', 'unknown')
+                    similarity = memory.final_score  # Use final hybrid score
+                elif hasattr(memory, 'chunk'):
+                    # MemorySearchResult
+                    chunk = memory.chunk
+                    content = getattr(chunk, 'content', str(chunk))
+                    source = getattr(chunk, 'source', 'unknown')
+                    similarity = getattr(memory, 'similarity_score', 0.0)
+                else:
+                    # Fallback
+                    content = getattr(memory, 'content', str(memory))
+                    source = getattr(memory, 'source', 'unknown')
+                    similarity = getattr(memory, 'similarity_score', 0.0)
+
+                # Extract clean source name
+                clean_source = extract_clean_source_name(source)
+                sources.add(clean_source)
+
+                # Track confidence scores
+                confidence_scores.append(similarity)
+
+                # Store detailed source information for citations
+                source_details.append({
+                    'name': clean_source,
+                    'similarity': similarity,
+                    'content_preview': content[:100] + "..." if len(content) > 100 else content
+                })
+
+                # Add content with citation marker
+                context_parts.append(f"[Source: {clean_source}] {content}")
+
+            context_text = "\n\n".join(context_parts)
+
+            # Create concise prompt to reduce processing time
+            prompt = f"""Based on the uploaded documents, answer: {message}
+
+Context:
+{context_text}
+
+Instructions: Answer using only the provided context. Include source citations. Be concise and accurate."""
+
+            response = sam_model.generate(prompt, temperature=0.3, max_tokens=300, use_learned_knowledge=False)
+
+            # Clean up response - remove think blocks for document queries
+            import re
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE)
+            response = response.strip()
+
+            # Clean up response
+            if response.startswith("Response:"):
+                response = response[9:].strip()
+
+            # Phase 3.2: Inject enhanced citations with rich metadata
+            try:
+                from memory.citation_engine import get_citation_engine
+                citation_engine = get_citation_engine()
+
+                logger.info(f"Attempting citation generation with {len(document_relevant)} memories")
+                logger.info(f"Memory types: {[type(m).__name__ for m in document_relevant[:3]]}")
+
+                # Generate citations from the memories used
+                cited_response = citation_engine.inject_citations(response, document_relevant, message)
+
+                logger.info(f"Enhanced citations generated: {len(cited_response.citations)} citations, "
+                           f"transparency: {cited_response.transparency_score:.1%}")
+
+                # Use the cited response with enhanced formatting
+                response = cited_response.response_text
+
+            except Exception as e:
+                logger.error(f"Citation generation failed: {e}")
+                import traceback
+                logger.error(f"Citation error traceback: {traceback.format_exc()}")
+
+                # Fallback: add basic source list
+                if document_relevant and len(document_relevant) > 0:
+                    response += f"\n\n**Sources:** {len(document_relevant)} document(s) referenced"
+
+            # Calculate overall confidence
+            overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
+
+            # Add enhanced source transparency with detailed citations
+            response += f"\n\n**📚 Sources:**"
+
+            # Add detailed source citations with confidence indicators
+            for i, source_detail in enumerate(source_details, 1):
+                similarity_pct = source_detail['similarity'] * 100
+
+                # Create confidence indicator dots
+                confidence_dots = "●" * min(5, int(similarity_pct / 20)) + "○" * (5 - min(5, int(similarity_pct / 20)))
+
+                response += f"\n{i}. 📚 **{source_detail['name']}** {confidence_dots} ({similarity_pct:.1f}%)"
+                response += f"\n   _{source_detail['content_preview']}_"
+
+            # Add overall confidence score with color coding
+            confidence_pct = overall_confidence * 100
+            if confidence_pct >= 70:
+                confidence_emoji = "🟢"
+            elif confidence_pct >= 50:
+                confidence_emoji = "🟡"
+            else:
+                confidence_emoji = "🔴"
+
+            response += f"\n\n{confidence_emoji} **Confidence:** {confidence_pct:.1f}%"
+
+            logger.info(f"Enhanced document response generated: {len(response)} chars")
+            return response
+        else:
+            # No relevant content found
+            available_docs = set()
+            for memory in document_memories:
+                # Handle MemorySearchResult objects
+                if hasattr(memory, 'chunk'):
+                    chunk = memory.chunk
+                    source = getattr(chunk, 'source', '')
+                else:
+                    source = getattr(memory, 'source', '')
+                clean_source = extract_clean_source_name(source)
+                if clean_source:
+                    available_docs.add(clean_source)
+
+            response = f"""I couldn't find information about "{message}" in the uploaded documents.
+
+**Available documents I can search:**
+"""
+            for doc in sorted(available_docs):
+                response += f"• {doc}\n"
+
+            response += f"""
+**Suggestions:**
+1. Try rephrasing your question with different terms
+2. Check if the person/entity is mentioned by a different name
+3. Upload additional documents that might contain this information"""
+
+            return response
+
+    except Exception as e:
+        logger.error(f"Error generating enhanced document response: {e}")
+        return f"I apologize, but I encountered an error while searching the uploaded documents: {str(e)}"
+
+def extract_clean_source_name(source):
+    """Extract a clean, readable source name from the full source path."""
+    if not source:
+        return "Unknown Document"
+
+    import re
+
+    # Handle "document:web_ui/uploads/20250606_154557_filename.pdf:block_1"
+    match = re.search(r'uploads/\d{8}_\d{6}_([^:]+)', source)
+    if match:
+        return match.group(1)
+
+    # Handle "document:filename.pdf" or "document:filename.pdf:block_1"
+    if source.startswith('document:'):
+        filename_part = source[9:]  # Remove "document:" prefix
+        filename = filename_part.split(':')[0]  # Remove ":block_X" suffix
+        if not filename.startswith('web_ui/'):
+            return filename
+
+    # Handle direct filenames
+    filename = source.split('/')[-1].split(':')[0]
+    if '.' in filename:
+        return filename
+
+    return "Document"
+
 def generate_general_document_response(message):
     """Generate response for general document queries."""
     try:
@@ -584,12 +985,49 @@ def generate_general_document_response(message):
 
         memory_store = get_memory_store()
 
-        # Search for relevant memories
-        memories = memory_store.search_memories(message, max_results=5)
+        # Phase 3.2: Use enhanced search with hybrid ranking
+        try:
+            # Try enhanced search first (Phase 3 upgrade)
+            if hasattr(memory_store, 'enhanced_search_memories'):
+                memories = memory_store.enhanced_search_memories(
+                    query=message,
+                    max_results=5,
+                    initial_candidates=20
+                )
+                logger.info(f"Enhanced search returned {len(memories)} ranked results")
+            else:
+                # Fallback to regular search
+                memories = memory_store.search_memories(message, max_results=5)
+                logger.info(f"Fallback search returned {len(memories)} results")
+        except Exception as e:
+            logger.warning(f"Enhanced search failed, using fallback: {e}")
+            memories = memory_store.search_memories(message, max_results=5)
 
         if memories:
-            # Use the first relevant memory to generate a response
-            context = "\n".join([str(memory) for memory in memories[:3]])
+            # Phase 3.2: Handle both RankedMemoryResult and MemorySearchResult
+            context_parts = []
+            for memory in memories[:3]:
+                try:
+                    # Check if this is a RankedMemoryResult (Phase 3 enhanced)
+                    if hasattr(memory, 'content') and hasattr(memory, 'final_score'):
+                        # Enhanced result with ranking information
+                        content = memory.content
+                        source_name = memory.metadata.get('source_name', 'Unknown')
+                        confidence = memory.confidence_score
+                        context_parts.append(f"[Source: {source_name}, Confidence: {confidence:.2f}] {content}")
+                    elif hasattr(memory, 'chunk'):
+                        # Legacy MemorySearchResult
+                        content = memory.chunk.content
+                        source = getattr(memory.chunk, 'source', 'Unknown')
+                        context_parts.append(f"[Source: {source}] {content}")
+                    else:
+                        # Fallback string representation
+                        context_parts.append(str(memory))
+                except Exception as e:
+                    logger.warning(f"Error processing memory result: {e}")
+                    context_parts.append(str(memory))
+
+            context = "\n\n".join(context_parts)
 
             prompt = f"""You are SAM, an intelligent assistant. The user is asking about documents. Based on the following context from uploaded documents, provide a helpful response.
 
@@ -654,6 +1092,10 @@ def generate_standard_response(message):
         else:
             system_prompt = f"You are SAM, an intelligent multimodal assistant. Answer the user's question helpfully and accurately.{context if context.strip() else ''}"
             user_message = message
+
+        # Debug: Check which model is being used
+        model_type = getattr(sam_model, 'model_type', 'UNKNOWN_MODEL')
+        logger.info(f"🔍 Using model type: {model_type} for query: {message[:50]}...")
 
         # Generate response using chat API for better prompt handling
         if hasattr(sam_model, 'chat'):
@@ -770,6 +1212,36 @@ def upload_file():
         # ENHANCED: Add knowledge consolidation confirmation
         consolidation_status = confirm_knowledge_consolidation(result, filename)
         result['knowledge_consolidation'] = consolidation_status
+
+        # CRITICAL: Inject learned knowledge into web UI model for true learning
+        if consolidation_status['status'] == 'successful':
+            try:
+                # Extract knowledge from processing result
+                if 'summary_length' in result or 'key_concepts' in result:
+                    # Get summary from memory storage if available
+                    summary = f"Document processed: {filename}"
+                    if 'memory_storage' in result:
+                        summary = f"Document: {filename} - Successfully processed with {result.get('content_blocks', 0)} content blocks"
+
+                    # Handle key_concepts which might be an integer count
+                    key_concepts_data = result.get('key_concepts', [])
+                    if isinstance(key_concepts_data, int):
+                        # If it's just a count, create placeholder concepts
+                        key_concepts = [f"concept_{i+1}" for i in range(min(key_concepts_data, 5))]
+                    elif isinstance(key_concepts_data, list):
+                        key_concepts = key_concepts_data
+                    else:
+                        key_concepts = []
+
+                    # Inject into web UI model
+                    if hasattr(sam_model, 'inject_learned_knowledge'):
+                        sam_model.inject_learned_knowledge(summary, key_concepts)
+                        logger.info(f"🎓 WEB UI MODEL LEARNING: Injected knowledge from {filename}")
+                    else:
+                        logger.warning("Web UI model does not support knowledge injection")
+
+            except Exception as e:
+                logger.error(f"Failed to inject knowledge into web UI model: {e}")
 
         logger.info(f"File processing successful: {filename}")
         logger.info(f"Knowledge consolidation status: {consolidation_status['status']}")
@@ -1053,6 +1525,105 @@ def get_help_text():
 - 🔍 Semantic search across content
 - 📊 Content enrichment scoring
 - 🎨 Support for text, code, tables, images"""
+
+@app.route('/api/model-status')
+def model_status():
+    """Get detailed model status information for the status bar."""
+    try:
+        import requests
+
+        # Check if sam_model is available and get its details
+        if not sam_model:
+            return jsonify({
+                'status': 'offline',
+                'error': 'SAM model not initialized',
+                'model_name': 'Unknown',
+                'model_type': 'Unknown',
+                'parameter_size': 'Unknown',
+                'quantization': 'Unknown',
+                'learned_knowledge_count': 0
+            })
+
+        # Get model type and learned knowledge count
+        model_type = getattr(sam_model, 'model_type', 'Unknown')
+        learned_count = len(getattr(sam_model, 'learned_knowledge', []))
+
+        # Test Ollama connection and get model details
+        try:
+            # Check if Ollama is responding
+            ollama_response = requests.get("http://localhost:11434/api/tags", timeout=5)
+
+            if ollama_response.status_code == 200:
+                models_data = ollama_response.json()
+
+                # Find our specific model
+                target_model = "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M"
+                model_info = None
+
+                for model in models_data.get('models', []):
+                    if model.get('name') == target_model:
+                        model_info = model
+                        break
+
+                if model_info:
+                    # Extract model details
+                    details = model_info.get('details', {})
+                    parameter_size = details.get('parameter_size', '8.19B')
+                    quantization = details.get('quantization_level', 'Q4_K_M')
+
+                    return jsonify({
+                        'status': 'online',
+                        'model_name': 'DeepSeek-R1-Qwen3-8B',
+                        'model_type': model_type,
+                        'parameter_size': parameter_size,
+                        'quantization': quantization,
+                        'learned_knowledge_count': learned_count,
+                        'full_model_name': target_model,
+                        'ollama_status': 'connected'
+                    })
+                else:
+                    return jsonify({
+                        'status': 'offline',
+                        'error': 'Target model not found in Ollama',
+                        'model_name': 'DeepSeek-R1-Qwen3-8B',
+                        'model_type': model_type,
+                        'parameter_size': 'Unknown',
+                        'quantization': 'Unknown',
+                        'learned_knowledge_count': learned_count
+                    })
+            else:
+                return jsonify({
+                    'status': 'offline',
+                    'error': f'Ollama API error: {ollama_response.status_code}',
+                    'model_name': 'DeepSeek-R1-Qwen3-8B',
+                    'model_type': model_type,
+                    'parameter_size': 'Unknown',
+                    'quantization': 'Unknown',
+                    'learned_knowledge_count': learned_count
+                })
+
+        except requests.exceptions.RequestException as e:
+            return jsonify({
+                'status': 'offline',
+                'error': f'Ollama connection failed: {str(e)}',
+                'model_name': 'DeepSeek-R1-Qwen3-8B',
+                'model_type': model_type,
+                'parameter_size': 'Unknown',
+                'quantization': 'Unknown',
+                'learned_knowledge_count': learned_count
+            })
+
+    except Exception as e:
+        logger.error(f"Error getting model status: {e}")
+        return jsonify({
+            'status': 'offline',
+            'error': str(e),
+            'model_name': 'Unknown',
+            'model_type': 'Unknown',
+            'parameter_size': 'Unknown',
+            'quantization': 'Unknown',
+            'learned_knowledge_count': 0
+        }), 500
 
 @app.route('/health')
 def health_check():

@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "sources": [],
+  "settings": {
+    "auto_scan_enabled": false,
+    "scan_interval_minutes": 60,
+    "default_file_types": [
+      "pdf",
+      "txt",
+      "md",
+      "docx",
+      "py",
+      "js",
+      "json"
+    ],
+    "max_file_size_mb": 100,
+    "enable_notifications": true
+  },
+  "last_updated": "2025-06-08T22:52:19.045038"
+}

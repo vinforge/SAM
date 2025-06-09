@@ -6,35 +6,41 @@ SAM is an open-source AI assistant designed to provide intelligent conversations
 
 ## ✨ Key Features
 
-### 🧠 **Persistent Memory**
-- Remembers conversations across sessions
-- Learns from uploaded documents
-- Builds knowledge over time
-- Smart memory management
+### 🧠 **Advanced Memory System (Phase 3 Enhanced)**
+- **Hybrid Search & Ranking:** Multi-strategy search with configurable weights
+- **Persistent Memory:** Remembers conversations across sessions
+- **Smart Document Learning:** Learns from uploaded documents with enhanced processing
+- **Real-time Memory Management:** Interactive filtering and analytics dashboard
 
-### 📄 **Document Intelligence**
-- Upload PDF documents for analysis
-- Automatic content extraction and indexing
-- Ask questions about your documents
-- Intelligent document summarization
+### 📄 **Intelligent Document Processing**
+- **Enhanced PDF Analysis:** Advanced content extraction and structure preservation
+- **Multi-format Support:** PDF, text, and document intelligence
+- **Source-specific Queries:** Search within specific documents or sources
+- **Intelligent Summarization:** Context-aware document synthesis
 
-### 💭 **Transparent Thinking**
-- See how SAM reasons through problems
-- Toggle "SAM's Thoughts" to view internal reasoning
-- Understand the AI's decision-making process
-- Build trust through transparency
+### 💭 **Transparent AI Reasoning**
+- **SAM's Thoughts Toggle:** View internal reasoning processes
+- **Enhanced Citations:** Granular source attribution with confidence indicators
+- **Decision Transparency:** Understand how conclusions are reached
+- **Quality Metrics:** Real-time confidence and transparency scoring
+
+### 🔍 **Advanced Search & Analytics (Phase 3.2.3)**
+- **Real-time Search:** Search as you type with live results
+- **Multi-mode Filtering:** Enhanced Hybrid, Semantic, Keyword, Recent strategies
+- **Source Analysis Dashboard:** Visual metrics and quality indicators
+- **Interactive Configuration:** Real-time weight adjustment and optimization
 
 ### 🔒 **Privacy First**
-- 100% local processing - no cloud dependencies
-- Your data never leaves your computer
-- Open source - inspect and modify the code
-- No telemetry or data collection
+- **100% Local Processing:** No cloud dependencies or data transmission
+- **Open Source:** Inspect and modify all code
+- **No Telemetry:** Zero data collection or tracking
+- **Secure by Design:** Your data never leaves your computer
 
-### 🌐 **Easy to Use**
-- Clean web interface
-- Memory management dashboard
-- Simple installation process
-- Cross-platform support
+### 🌐 **Professional Interface**
+- **Dual-Interface Design:** Chat (5001) and Memory Control Center (8501)
+- **Memory Management Dashboard:** Advanced filtering and analytics
+- **Cross-platform Support:** Windows, macOS, Linux
+- **Mobile-responsive Design:** Access from any device
 
 ## 🚀 Quick Start
 
@@ -58,6 +64,28 @@ python start_sam.py
 
 That's it! SAM will automatically open in your browser.
 
+## 🚀 Phase 3 Enhancements (2025)
+
+SAM has been significantly enhanced with Phase 3 features that transform it into a production-ready AI assistant:
+
+### **Phase 3.2.1: Enhanced Search & Ranking Engine**
+- **Hybrid Search:** Combines semantic similarity, recency, and confidence scoring
+- **Configurable Weights:** Real-time adjustment of ranking factors
+- **Multi-Strategy Search:** Semantic, keyword, recency, and confidence-based approaches
+- **Performance Analytics:** Detailed scoring breakdown and transparency metrics
+
+### **Phase 3.2.2: Citation System Refactoring**
+- **Direct Metadata Access:** Eliminated legacy lookups for improved performance
+- **Enhanced Citations:** Confidence indicators and granular location metadata
+- **Rich Formatting:** Visual confidence badges and source transparency
+- **Backward Compatibility:** Seamless integration with existing systems
+
+### **Phase 3.2.3: Memory Control Center Enhancement**
+- **Real-time Filtering:** Advanced search with live result updates
+- **Source Analysis Dashboard:** Visual metrics and quality indicators
+- **Interactive Configuration:** Live weight adjustment and optimization
+- **Enhanced UI:** Professional interface with progressive disclosure
+
 ## 📋 Requirements
 
 - **Python 3.8+** (Python 3.9+ recommended)
@@ -67,22 +95,29 @@ That's it! SAM will automatically open in your browser.
 
 ## 🎯 What Can SAM Do?
 
-### Chat & Learn
-- Have natural conversations with an AI assistant
-- Ask questions and get thoughtful responses
-- See SAM's reasoning process with "Thoughts" toggle
+### 💬 **Enhanced Chat & Learning**
+- **Natural Conversations:** Intelligent responses with context awareness
+- **Transparent Reasoning:** Toggle "SAM's Thoughts" to see decision processes
+- **Source Attribution:** Every response includes confidence-scored citations
+- **Continuous Learning:** Builds knowledge from every interaction
 
-### Document Analysis
-- Upload PDF documents
-- Ask questions about document content
-- Get summaries and insights
-- Build a searchable knowledge base
+### 📊 **Advanced Document Analysis**
+- **Multi-format Processing:** PDF, text, and structured document support
+- **Intelligent Questioning:** Ask complex questions about document content
+- **Enhanced Summarization:** Context-aware synthesis with source transparency
+- **Knowledge Base Building:** Searchable, categorized document repository
 
-### Memory Management
-- Browse all stored memories
-- Search through conversation history
-- Manage document uploads
-- View system statistics
+### 🎛️ **Professional Memory Management (Phase 3.2.3)**
+- **Advanced Search Interface:** Real-time filtering with multiple strategies
+- **Source Analysis Dashboard:** Visual analytics and quality metrics
+- **Interactive Configuration:** Real-time weight adjustment and optimization
+- **Memory Analytics:** Comprehensive statistics and performance tracking
+
+### 🔍 **Intelligent Search & Discovery**
+- **Hybrid Search Engine:** Combines semantic, keyword, and recency-based search
+- **Source-specific Queries:** Target specific documents or content types
+- **Similar Content Discovery:** Find related memories with one click
+- **Quality-based Filtering:** Filter by confidence, recency, and source quality
 
 ## 🔧 Configuration
 

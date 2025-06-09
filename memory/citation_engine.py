@@ -166,8 +166,8 @@ class CitationEngine:
                 quote = self._extract_relevant_quote(content, query)
                 
                 if quote:
-                    # Extract enhanced metadata
-                    enhanced_metadata = self._extract_enhanced_metadata(memory)
+                    # Phase 3.2: Direct metadata access (no secondary lookups)
+                    enhanced_metadata = self._get_direct_metadata(memory)
 
                     # Create citation with enhanced tracking
                     citation = Citation(
@@ -178,7 +178,7 @@ class CitationEngine:
                         confidence_score=confidence,
                         citation_label=self._generate_citation_label(source_info, i+1),
                         full_source_path=source_info['full_path'],
-                        # Enhanced metadata
+                        # Enhanced metadata from direct access
                         page_number=enhanced_metadata.get('page_number'),
                         chunk_index=enhanced_metadata.get('chunk_index'),
                         paragraph_number=enhanced_metadata.get('paragraph_number'),
@@ -198,31 +198,49 @@ class CitationEngine:
             return []
     
     def _get_memory_content(self, memory: Any) -> str:
-        """Extract content from memory object."""
+        """Extract content from memory object (Phase 3.2 enhanced)."""
         try:
-            if hasattr(memory, 'chunk') and hasattr(memory.chunk, 'content'):
+            # Phase 3: RankedMemoryResult with direct content access
+            if hasattr(memory, 'content') and hasattr(memory, 'final_score'):
+                return memory.content
+
+            # Legacy: MemorySearchResult with chunk
+            elif hasattr(memory, 'chunk') and hasattr(memory.chunk, 'content'):
                 return memory.chunk.content
+
+            # Fallback: direct content attribute
             elif hasattr(memory, 'content'):
                 return memory.content
+
             return ""
         except Exception:
             return ""
     
     def _get_source_info(self, memory: Any) -> Dict[str, str]:
-        """Extract source information from memory object."""
+        """Extract source information from memory object (Phase 3.2 enhanced)."""
         try:
-            source_info = {}
-            
-            # Get source path
+            # Phase 3: RankedMemoryResult with rich metadata
+            if hasattr(memory, 'metadata') and hasattr(memory, 'final_score'):
+                metadata = memory.metadata
+                return {
+                    'name': metadata.get('source_name', 'Unknown'),
+                    'full_path': metadata.get('source_path', ''),
+                    'block_id': str(metadata.get('chunk_index', 0)),
+                    'page_number': metadata.get('page_number', 1),
+                    'section_title': metadata.get('section_title', ''),
+                    'confidence_indicator': metadata.get('confidence_indicator', '?')
+                }
+
+            # Legacy: MemorySearchResult - parse source string
             source = ""
             if hasattr(memory, 'chunk') and hasattr(memory.chunk, 'source'):
                 source = memory.chunk.source
             elif hasattr(memory, 'source'):
                 source = memory.source
-            
-            source_info['full_path'] = source
-            
-            # Parse source to extract components
+
+            source_info = {'full_path': source}
+
+            # Parse legacy source format
             if source.startswith('document:'):
                 # Format: document:filename:block_id or document:filename
                 parts = source.split(':')
@@ -232,33 +250,42 @@ class CitationEngine:
                     if '/' in filename:
                         filename = filename.split('/')[-1]
                     source_info['name'] = filename
-                    
+
                     if len(parts) >= 3:
                         source_info['block_id'] = parts[2]
             else:
                 source_info['name'] = source
-            
+
             return source_info
-            
+
         except Exception as e:
             logger.debug(f"Error getting source info: {e}")
             return {'name': 'unknown', 'full_path': ''}
     
     def _get_confidence_score(self, memory: Any) -> float:
-        """Get confidence score from memory object."""
+        """Get confidence score from memory object (Phase 3.2 enhanced)."""
         try:
-            # Try similarity score first
-            if hasattr(memory, 'similarity_score'):
+            # Phase 3: RankedMemoryResult with multiple score types
+            if hasattr(memory, 'final_score') and hasattr(memory, 'confidence_score'):
+                # Use final hybrid score for overall confidence
+                return memory.final_score
+            elif hasattr(memory, 'confidence_score'):
+                return memory.confidence_score
+            elif hasattr(memory, 'semantic_score'):
+                return memory.semantic_score
+
+            # Legacy: MemorySearchResult
+            elif hasattr(memory, 'similarity_score'):
                 return memory.similarity_score
-            
-            # Try importance score
-            if hasattr(memory, 'chunk') and hasattr(memory.chunk, 'importance_score'):
+
+            # Legacy: MemoryChunk importance score
+            elif hasattr(memory, 'chunk') and hasattr(memory.chunk, 'importance_score'):
                 return memory.chunk.importance_score
             elif hasattr(memory, 'importance_score'):
                 return memory.importance_score
-            
+
             return 0.5  # Default confidence
-            
+
         except Exception:
             return 0.5
     
@@ -439,13 +466,13 @@ class CitationEngine:
             
             cited_text = response_text
             
-            # Add citations at the end for now (simple approach)
+            # Phase 3.2: Enhanced citation formatting
             if self.config.get('citation_placement', 'end') == 'end':
-                cited_text += "\n\n**Sources:**\n"
-                for citation in citations:
-                    # Enhanced citation with granular metadata and confidence indicators
+                cited_text += "\n\n**📚 Sources:**\n"
+                for i, citation in enumerate(citations, 1):
+                    # Enhanced citation with rich metadata and confidence indicators
                     citation_detail = self._format_enhanced_citation(citation)
-                    cited_text += f"- {citation_detail}\n"
+                    cited_text += f"{i}. {citation_detail}\n"
             
             else:
                 # Inline injection (more complex - would need NLP to find best insertion points)
@@ -493,155 +520,151 @@ class CitationEngine:
             logger.debug(f"Error calculating transparency score: {e}")
             return 0.5
 
-    def _extract_enhanced_metadata(self, memory) -> Dict[str, Any]:
+    def _get_direct_metadata(self, memory) -> Dict[str, Any]:
         """
-        Extract enhanced metadata for granular source tracking.
+        Get metadata directly from memory object (Phase 3.2 - no secondary lookups).
 
-        This implements LongBioBench-inspired metadata extraction while
-        maintaining compatibility with our existing memory system.
+        This eliminates legacy JSON file lookups and uses direct metadata access
+        from RankedMemoryResult objects or legacy MemorySearchResult objects.
         """
         metadata = {}
 
         try:
-            # Get memory metadata
-            memory_metadata = getattr(memory, 'metadata', {})
-            if isinstance(memory_metadata, dict):
-                # Extract page information
-                if 'page' in memory_metadata:
-                    metadata['page_number'] = memory_metadata['page']
-                elif 'page_number' in memory_metadata:
-                    metadata['page_number'] = memory_metadata['page_number']
+            # Phase 3: RankedMemoryResult with rich metadata
+            if hasattr(memory, 'metadata') and hasattr(memory, 'final_score'):
+                memory_metadata = memory.metadata
 
-                # Extract chunk/block information
-                if 'chunk_id' in memory_metadata:
-                    metadata['chunk_index'] = memory_metadata['chunk_id']
-                elif 'block_id' in memory_metadata:
-                    metadata['chunk_index'] = memory_metadata['block_id']
+                # Direct metadata access - no parsing needed
+                metadata = {
+                    'page_number': memory_metadata.get('page_number', 1),
+                    'chunk_index': memory_metadata.get('chunk_index', 0),
+                    'paragraph_number': memory_metadata.get('paragraph_number', 1),
+                    'section_title': memory_metadata.get('section_title', ''),
+                    'document_position': memory_metadata.get('document_position', 0.0),
+                    'confidence_indicator': memory_metadata.get('confidence_indicator', '?'),
+                    'source_name': memory_metadata.get('source_name', 'Unknown'),
+                    'content_type': memory_metadata.get('content_type', 'text')
+                }
 
-                # Extract paragraph information
-                if 'paragraph' in memory_metadata:
-                    metadata['paragraph_number'] = memory_metadata['paragraph']
-                elif 'paragraph_number' in memory_metadata:
-                    metadata['paragraph_number'] = memory_metadata['paragraph_number']
+                logger.debug(f"Direct metadata access: {len(metadata)} fields extracted")
+                return metadata
 
-                # Extract section information
-                if 'section' in memory_metadata:
-                    metadata['section_title'] = memory_metadata['section']
-                elif 'section_title' in memory_metadata:
-                    metadata['section_title'] = memory_metadata['section_title']
+            # Legacy: MemorySearchResult - extract from chunk metadata
+            elif hasattr(memory, 'chunk') and hasattr(memory.chunk, 'metadata'):
+                memory_metadata = memory.chunk.metadata
 
-                # Calculate document position (0.0-1.0)
-                if 'position' in memory_metadata:
-                    metadata['document_position'] = memory_metadata['position']
-                elif metadata.get('page_number') and memory_metadata.get('total_pages'):
+                # Extract available metadata fields
+                metadata = {
+                    'page_number': memory_metadata.get('page_number', memory_metadata.get('page', 1)),
+                    'chunk_index': memory_metadata.get('chunk_index', memory_metadata.get('block_id', 0)),
+                    'paragraph_number': memory_metadata.get('paragraph_number', memory_metadata.get('paragraph', 1)),
+                    'section_title': memory_metadata.get('section_title', memory_metadata.get('section', '')),
+                    'document_position': memory_metadata.get('document_position', memory_metadata.get('position', 0.0))
+                }
+
+                # Calculate document position if not available
+                if not metadata['document_position'] and metadata['page_number'] and memory_metadata.get('total_pages'):
                     metadata['document_position'] = metadata['page_number'] / memory_metadata['total_pages']
 
-            # Fallback: Extract from memory content or source path
-            if not metadata.get('page_number'):
-                metadata.update(self._extract_metadata_from_content(memory))
+                logger.debug(f"Legacy metadata extraction: {len(metadata)} fields extracted")
+                return metadata
+
+            # Fallback: minimal metadata
+            else:
+                logger.debug("Using fallback metadata")
+                return {
+                    'page_number': 1,
+                    'chunk_index': 0,
+                    'paragraph_number': 1,
+                    'section_title': '',
+                    'document_position': 0.0
+                }
 
         except Exception as e:
-            logger.debug(f"Error extracting enhanced metadata: {e}")
+            logger.debug(f"Error getting direct metadata: {e}")
+            return {
+                'page_number': 1,
+                'chunk_index': 0,
+                'paragraph_number': 1,
+                'section_title': '',
+                'document_position': 0.0
+            }
 
-        return metadata
-
-    def _extract_metadata_from_content(self, memory) -> Dict[str, Any]:
-        """Extract metadata from memory content as fallback."""
-        metadata = {}
-
-        try:
-            # Try to extract from source path
-            source = getattr(memory, 'source', '') or ''
-            if isinstance(source, str):
-                # Look for patterns like "document.pdf:page_5:chunk_2"
-                import re
-
-                page_match = re.search(r'page[_\s]*(\d+)', source, re.IGNORECASE)
-                if page_match:
-                    metadata['page_number'] = int(page_match.group(1))
-
-                chunk_match = re.search(r'chunk[_\s]*(\d+)', source, re.IGNORECASE)
-                if chunk_match:
-                    metadata['chunk_index'] = int(chunk_match.group(1))
-
-                block_match = re.search(r'block[_\s]*(\d+)', source, re.IGNORECASE)
-                if block_match:
-                    metadata['chunk_index'] = int(block_match.group(1))
-
-            # Try to extract from content
-            content = self._get_memory_content(memory)
-            if content:
-                # Look for section headers in content
-                section_patterns = [
-                    r'^#+\s*(.+)$',  # Markdown headers
-                    r'^([A-Z][A-Za-z\s]+):',  # Section: format
-                    r'^\d+\.\s*([A-Z][A-Za-z\s]+)',  # 1. Section format
-                ]
-
-                for pattern in section_patterns:
-                    import re
-                    match = re.search(pattern, content, re.MULTILINE)
-                    if match:
-                        metadata['section_title'] = match.group(1).strip()
-                        break
-
-        except Exception as e:
-            logger.debug(f"Error extracting metadata from content: {e}")
-
-        return metadata
+    # Legacy method removed in Phase 3.2 - replaced with _get_direct_metadata()
+    # This eliminates secondary lookups and content parsing
 
     def _format_enhanced_citation(self, citation: Citation) -> str:
         """
-        Format citation with enhanced granular metadata.
+        Format citation with enhanced granular metadata (Phase 3.2 enhanced).
 
-        This implements LongBioBench-style granular citations while
-        maintaining readability and our existing citation styles.
+        Uses rich metadata from RankedMemoryResult for detailed source attribution
+        with confidence indicators and granular location information.
         """
         try:
-            # Start with basic citation
-            citation_parts = [citation.citation_label]
+            # Phase 3.2: Enhanced citation format with rich metadata
+            citation_parts = []
+
+            # Start with source name and confidence visualization
+            source_name = citation.source_name or "Unknown"
+            confidence_score = citation.confidence_score
+
+            # Visual confidence indicator (5-dot scale)
+            filled_dots = min(5, max(1, int(confidence_score * 5)))
+            confidence_dots = "●" * filled_dots + "○" * (5 - filled_dots)
+
+            # Format: 📚 **Source Name** ●●●○○ (85.2%)
+            citation_parts.append(f"📚 **{source_name}** {confidence_dots} ({confidence_score:.1%})")
 
             # Add granular location information
             location_parts = []
 
-            if citation.page_number is not None:
-                location_parts.append(f"page {citation.page_number}")
-
-            if citation.chunk_index is not None:
-                location_parts.append(f"chunk {citation.chunk_index}")
-
-            if citation.paragraph_number is not None:
-                location_parts.append(f"para {citation.paragraph_number}")
+            if citation.page_number and citation.page_number > 1:
+                location_parts.append(f"p.{citation.page_number}")
 
             if citation.section_title:
-                location_parts.append(f"section '{citation.section_title}'")
+                # Truncate long section titles
+                section = citation.section_title
+                if len(section) > 30:
+                    section = section[:27] + "..."
+                location_parts.append(f"§{section}")
+
+            if citation.chunk_index is not None and citation.chunk_index > 0:
+                location_parts.append(f"chunk {citation.chunk_index}")
+
+            # Add document position indicator if available
+            if hasattr(citation, 'document_position') and citation.document_position:
+                position_percent = int(citation.document_position * 100)
+                if position_percent > 0:
+                    location_parts.append(f"{position_percent}% through doc")
 
             # Format location information
             if location_parts:
                 location_str = f"[{', '.join(location_parts)}]"
                 citation_parts.append(location_str)
 
-            # Add quote with confidence indicator
-            confidence_indicator = ""
-            if citation.confidence_score >= 0.8:
-                confidence_indicator = "✓"
-            elif citation.confidence_score >= 0.6:
-                confidence_indicator = "~"
-            else:
-                confidence_indicator = "?"
+            # Add relevant quote with smart truncation
+            quote_text = citation.quote_text.strip()
+            if quote_text:
+                # Smart truncation at sentence boundaries
+                if len(quote_text) > 120:
+                    # Try to truncate at sentence boundary
+                    sentences = quote_text.split('. ')
+                    if len(sentences) > 1 and len(sentences[0]) < 100:
+                        quote_text = sentences[0] + "..."
+                    else:
+                        quote_text = quote_text[:117] + "..."
 
-            quote_text = citation.quote_text
-            if len(quote_text) > 100:
-                quote_text = quote_text[:97] + "..."
+                # Clean up quote formatting
+                quote_text = quote_text.replace('\n', ' ').replace('  ', ' ')
+                citation_parts.append(f"\n   _{quote_text}_")
 
-            citation_parts.append(f"{confidence_indicator} \"{quote_text}\"")
-
-            return " ".join(citation_parts)
+            return "\n".join(citation_parts) if len(citation_parts) > 1 else citation_parts[0]
 
         except Exception as e:
             logger.debug(f"Error formatting enhanced citation: {e}")
             # Fallback to basic format
-            return f"{citation.citation_label}: \"{citation.quote_text}\""
+            confidence_dots = "●○○○○"  # Default low confidence
+            return f"📚 **{citation.source_name or 'Unknown'}** {confidence_dots} (0.0%)\n   _{citation.quote_text or 'No quote available'}_"
 
 # Global citation engine instance
 _citation_engine = None

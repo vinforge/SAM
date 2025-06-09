@@ -307,6 +307,80 @@
             font-size: 14px;
         }
 
+        .model-status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 20px;
+            font-size: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .model-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .model-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.online {
+            background: #4ade80;
+        }
+
+        .status-indicator.offline {
+            background: #ef4444;
+            animation: none;
+        }
+
+        .status-indicator.checking {
+            background: #fbbf24;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .model-details {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .refresh-status {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+
+        .refresh-status:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
         @media (max-width: 768px) {
             .container {
                 height: 95vh;
@@ -641,35 +715,40 @@ How can I assist you today?
             // Try to open the Memory Control Center
             const memoryUrl = 'http://localhost:8501';
 
-            // Show loading message
-            addMessage('🧠 Connecting to Memory Control Center...', 'assistant');
-
             // Check if the Memory Control Center is running
             fetch(memoryUrl)
                 .then(response => {
                     if (response.ok) {
-                        // If running, open it
+                        // If running, open it directly without chat messages
                         window.open(memoryUrl, '_blank');
-                        addMessage('✅ Memory Control Center opened in a new tab!', 'assistant');
                     } else {
                         throw new Error('Memory Control Center not responding');
                     }
                 })
                 .catch(error => {
-                    // If not running, show helpful message
-                    addMessage(`🧠 Memory Control Center is starting up...
+                    // If not running, try to open anyway (user might need to wait)
+                    window.open(memoryUrl, '_blank');
 
-The Memory Control Center should auto-start with SAM. If it's not available:
+                    // Only show message if there's an actual error accessing the service
+                    setTimeout(() => {
+                        fetch(memoryUrl)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Still not responding');
+                                }
+                            })
+                            .catch(() => {
+                                // Only show help message if it's still not working after a delay
+                                addMessage(`🧠 Memory Control Center is starting up...
+
+The Memory Control Center should auto-start with SAM. If the page doesn't load:
 
 **Option 1: Wait a moment**
-The service may still be starting up. Try clicking the 🧠⚙️ Memory Center button again in a few seconds.
+The service may still be starting up. Refresh the Memory Center tab in a few seconds.
 
 **Option 2: Manual start**
 If the auto-start failed, you can manually start it:
 \`python launch_memory_ui.py\`
-
-**Option 3: Direct access**
-Try visiting directly: ${memoryUrl}
 
 **Memory Control Center Features:**
 • 🔍 Interactive memory search and browsing
@@ -679,6 +758,8 @@ Try visiting directly: ${memoryUrl}
 • 💻 Advanced memory commands
 
 The Memory Control Center runs on port 8501 and should be accessible once SAM is fully started.`, 'assistant');
+                            });
+                    }, 3000); // Wait 3 seconds before showing help message
                 });
         }
 
@@ -808,6 +889,73 @@ The Memory Control Center runs on port 8501 and should be accessible once SAM is
                     </div>
                 `;
                 document.getElementById('processBtn').style.display = 'inline-block';
+            }
+        });
+    </script>
+
+    <!-- Model Status Bar -->
+    <div class="model-status-bar" id="modelStatusBar">
+        <div class="model-info">
+            <div class="model-status">
+                <div class="status-indicator checking" id="statusIndicator"></div>
+                <span id="modelName">Checking model...</span>
+            </div>
+            <div class="model-details" id="modelDetails">
+                Verifying Ollama connection and model availability...
+            </div>
+        </div>
+        <button class="refresh-status" onclick="checkModelStatus()" title="Refresh model status">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <!-- Model Status JavaScript -->
+    <script>
+        let modelStatusInterval;
+
+        async function checkModelStatus() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const modelName = document.getElementById('modelName');
+            const modelDetails = document.getElementById('modelDetails');
+
+            // Set checking state
+            statusIndicator.className = 'status-indicator checking';
+            modelName.textContent = 'Checking model...';
+            modelDetails.textContent = 'Verifying Ollama connection and model availability...';
+
+            try {
+                const response = await fetch('/api/model-status');
+                const data = await response.json();
+
+                if (data.status === 'online') {
+                    statusIndicator.className = 'status-indicator online';
+                    modelName.textContent = `🤖 ${data.model_name}`;
+                    modelDetails.textContent = `${data.model_type} | ${data.parameter_size} | ${data.quantization} | Learned: ${data.learned_knowledge_count} docs`;
+                } else {
+                    statusIndicator.className = 'status-indicator offline';
+                    modelName.textContent = '❌ Model Offline';
+                    modelDetails.textContent = data.error || 'Ollama model not available';
+                }
+
+            } catch (error) {
+                statusIndicator.className = 'status-indicator offline';
+                modelName.textContent = '❌ Connection Error';
+                modelDetails.textContent = `Failed to check model status: ${error.message}`;
+            }
+        }
+
+        // Check model status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkModelStatus();
+
+            // Set up periodic status checks every 30 seconds
+            modelStatusInterval = setInterval(checkModelStatus, 30000);
+        });
+
+        // Clean up interval when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (modelStatusInterval) {
+                clearInterval(modelStatusInterval);
             }
         });
     </script>

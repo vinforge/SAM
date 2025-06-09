@@ -308,8 +308,20 @@ class ToolExecutor:
             from memory.memory_vectorstore import get_memory_store
             memory_store = get_memory_store()
 
-            # Search memory store for relevant content
-            memories = memory_store.search_memories(query, top_k=max_results * 2)
+            # Phase 3.2: Use enhanced search for multimodal queries
+            try:
+                if hasattr(memory_store, 'enhanced_search_memories'):
+                    memories = memory_store.enhanced_search_memories(
+                        query=query,
+                        max_results=max_results * 2,
+                        initial_candidates=max_results * 4
+                    )
+                    logger.info(f"Enhanced multimodal search: {len(memories)} results")
+                else:
+                    memories = memory_store.search_memories(query, max_results=max_results * 2)
+            except Exception as e:
+                logger.warning(f"Enhanced search failed in tool executor, using fallback: {e}")
+                memories = memory_store.search_memories(query, max_results=max_results * 2)
 
             search_results = []
             for memory in memories:

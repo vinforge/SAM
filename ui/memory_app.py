@@ -9,6 +9,7 @@ import streamlit as st
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, Any
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -18,6 +19,7 @@ from ui.memory_editor import MemoryEditor
 from ui.memory_graph import MemoryGraphVisualizer
 from ui.memory_commands import MemoryCommandProcessor, get_command_processor
 from ui.role_memory_filter import RoleBasedMemoryFilter, get_role_filter
+from ui.bulk_ingestion_ui import render_bulk_ingestion
 from memory.memory_vectorstore import get_memory_store
 from memory.memory_reasoning import get_memory_reasoning_engine
 from config.agent_mode import get_mode_controller
@@ -66,6 +68,7 @@ def main():
             options=[
                 "💬 Enhanced Chat",
                 "Chat with SAM",
+                "📁 Bulk Ingestion",
                 "Memory Browser",
                 "Memory Editor",
                 "Memory Graph",
@@ -127,6 +130,8 @@ def main():
         render_enhanced_chat_interface()
     elif page == "Chat with SAM":
         render_chat_interface()
+    elif page == "📁 Bulk Ingestion":
+        render_bulk_ingestion()
     elif page == "Memory Browser":
         render_memory_browser()
     elif page == "Memory Editor":
@@ -659,48 +664,100 @@ def render_system_status():
         st.error(f"Error loading system status: {e}")
 
 def render_memory_ranking():
-    """Render the Sprint 15 Memory Ranking interface."""
+    """Render the Enhanced Memory Ranking interface with Phase 3.2.3 features."""
     try:
-        st.subheader("🏆 Memory Ranking Framework")
-        st.markdown("**Sprint 15 Feature:** Intelligent memory prioritization and ranking")
+        st.subheader("🏆 Enhanced Memory Ranking Framework")
+        st.markdown("**Phase 3.2.3:** Real-time ranking controls, weight adjustment, and performance analytics")
 
         from memory.memory_ranking import get_memory_ranking_framework
 
         ranking_framework = get_memory_ranking_framework()
         memory_store = get_memory_store()
 
-        # Configuration section
-        st.subheader("⚙️ Ranking Configuration")
+        # Phase 3.2.3: Interactive Configuration section
+        st.subheader("⚙️ Interactive Ranking Configuration")
+
+        # Real-time weight adjustment
+        st.markdown("**🎛️ Adjust Ranking Weights:**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            semantic_weight = st.slider("Semantic Similarity", 0.0, 1.0, 0.35, 0.05, help="Weight for content similarity")
+            recency_weight = st.slider("Recency", 0.0, 1.0, 0.15, 0.05, help="Weight for temporal relevance")
+
+        with col2:
+            confidence_weight = st.slider("Source Confidence", 0.0, 1.0, 0.25, 0.05, help="Weight for source quality")
+            priority_weight = st.slider("User Priority", 0.0, 1.0, 0.15, 0.05, help="Weight for user-defined priority")
+
+        with col3:
+            usage_weight = st.slider("Usage Frequency", 0.0, 1.0, 0.05, 0.05, help="Weight for access frequency")
+            quality_weight = st.slider("Content Quality", 0.0, 1.0, 0.05, 0.05, help="Weight for content structure")
+
+        # Normalize weights
+        total_weight = semantic_weight + recency_weight + confidence_weight + priority_weight + usage_weight + quality_weight
+        if total_weight > 0:
+            weights = {
+                'similarity': semantic_weight / total_weight,
+                'recency': recency_weight / total_weight,
+                'source_confidence': confidence_weight / total_weight,
+                'user_priority': priority_weight / total_weight,
+                'usage_frequency': usage_weight / total_weight,
+                'content_quality': quality_weight / total_weight
+            }
+        else:
+            weights = ranking_framework.ranking_weights
+
+        # Phase 3.2.3: Real-time settings adjustment
+        st.markdown("**⚙️ Advanced Settings:**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            priority_threshold = st.slider("Priority Threshold", 0.0, 1.0, 0.4, 0.05, help="Minimum score for priority memories")
+
+        with col2:
+            recency_decay = st.slider("Recency Decay (days)", 1, 90, 30, 1, help="Days for recency score decay")
+
+        with col3:
+            max_priority = st.slider("Max Priority Memories", 5, 50, 10, 1, help="Maximum number of priority memories")
+
+        # Apply settings button
+        if st.button("🔄 Apply Settings", type="primary"):
+            # Update ranking framework with new settings
+            ranking_framework.ranking_weights = weights
+            ranking_framework.priority_threshold = priority_threshold
+            ranking_framework.recency_decay_days = recency_decay
+            ranking_framework.config['max_priority_memories'] = max_priority
+            st.success("✅ Ranking settings updated!")
+
+        # Phase 3.2.3: Enhanced testing section with real-time ranking
+        st.subheader("🧪 Real-time Memory Ranking Test")
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("**Current Ranking Weights:**")
-            weights = ranking_framework.ranking_weights
-            for factor, weight in weights.items():
-                st.metric(factor.replace('_', ' ').title(), f"{weight:.2f}")
+            test_query = st.text_input(
+                "Test Query",
+                value="important dates",
+                help="Enter a query to test memory ranking"
+            )
 
         with col2:
-            st.markdown("**Settings:**")
-            st.metric("Priority Threshold", f"{ranking_framework.priority_threshold:.2f}")
-            st.metric("Recency Decay (days)", ranking_framework.recency_decay_days)
-            st.metric("Max Priority Memories", ranking_framework.config.get('max_priority_memories', 10))
+            max_results = st.slider("Max Results", 3, 20, 8)
 
-        # Test ranking section
-        st.subheader("🧪 Test Memory Ranking")
+        # Phase 3.2.3: Real-time ranking toggle
+        real_time_ranking = st.checkbox("🔄 Real-time Ranking", value=False, help="Update ranking as you type")
 
-        test_query = st.text_input(
-            "Test Query",
-            value="important dates",
-            help="Enter a query to test memory ranking"
-        )
-
-        max_results = st.slider("Max Results", 3, 20, 8)
-
-        if st.button("🔍 Rank Memories", type="primary"):
-            with st.spinner("Ranking memories..."):
-                # Search for memories
-                memory_results = memory_store.search_memories(test_query, max_results=max_results)
+        if st.button("🔍 Rank Memories", type="primary") or (real_time_ranking and test_query and len(test_query) > 2):
+            with st.spinner("Ranking memories with current settings..."):
+                # Use enhanced search if available
+                if hasattr(memory_store, 'enhanced_search_memories'):
+                    memory_results = memory_store.enhanced_search_memories(
+                        query=test_query,
+                        max_results=max_results,
+                        initial_candidates=max_results * 3
+                    )
+                else:
+                    memory_results = memory_store.search_memories(test_query, max_results=max_results)
 
                 if memory_results:
                     # Rank the memories
@@ -774,69 +831,162 @@ def render_memory_ranking():
         st.error(f"Error loading memory ranking: {e}")
 
 def render_citation_engine():
-    """Render the Sprint 15 Citation Engine interface."""
+    """Render the Enhanced Citation Engine interface with Phase 3.2.3 features."""
     try:
-        st.subheader("📝 Citation Engine")
-        st.markdown("**Sprint 15 Feature:** Transparent source attribution and quote injection")
+        st.subheader("📝 Enhanced Citation Engine")
+        st.markdown("**Phase 3.2.3:** Source analysis, citation quality metrics, and real-time preview")
 
         from memory.citation_engine import get_citation_engine
 
         citation_engine = get_citation_engine()
         memory_store = get_memory_store()
 
-        # Configuration section
-        st.subheader("⚙️ Citation Configuration")
+        # Phase 3.2.3: Interactive Configuration section
+        st.subheader("⚙️ Interactive Citation Configuration")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("**Citation Style:**")
+            citation_style = st.selectbox(
+                "Style",
+                options=["inline", "footnote", "academic"],
+                index=0,
+                help="Choose citation format style"
+            )
+
+            enable_citations = st.checkbox("Enable Citations", value=True, help="Toggle citation generation")
+
+        with col2:
+            st.markdown("**Quality Thresholds:**")
+            min_confidence = st.slider("Min Confidence", 0.0, 1.0, 0.3, 0.05, help="Minimum confidence for citations")
+            max_quote_length = st.slider("Max Quote Length", 50, 500, 150, 10, help="Maximum quote character length")
+
+        with col3:
+            st.markdown("**Citation Limits:**")
+            max_citations = st.slider("Max Citations", 1, 10, 5, 1, help="Maximum citations per response")
+            transparency_threshold = st.slider("Transparency Threshold", 0.0, 1.0, 0.5, 0.05, help="Minimum transparency score")
+
+        # Phase 3.2.3: Source Analysis Section
+        st.subheader("📊 Source Analysis")
+
+        # Get source statistics
+        source_stats = _get_source_statistics(memory_store)
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("**Current Settings:**")
-            st.metric("Citation Style", citation_engine.citation_style.value)
-            st.metric("Citations Enabled", "✅" if citation_engine.enable_citations else "❌")
-            st.metric("Max Quote Length", citation_engine.max_quote_length)
+            st.markdown("**📚 Source Distribution:**")
+            if source_stats['source_types']:
+                import plotly.express as px
+                fig = px.pie(
+                    values=list(source_stats['source_types'].values()),
+                    names=list(source_stats['source_types'].keys()),
+                    title="Sources by Type"
+                )
+                fig.update_layout(height=300)
+                st.plotly_chart(fig, use_container_width=True)
 
         with col2:
-            st.markdown("**Thresholds:**")
-            st.metric("Min Confidence", f"{citation_engine.min_confidence_threshold:.2f}")
-            st.metric("Max Citations", citation_engine.config.get('max_citations_per_response', 5))
+            st.markdown("**🎯 Citation Quality Metrics:**")
+            st.metric("Total Sources", source_stats['total_sources'])
+            st.metric("High Confidence Sources", source_stats['high_confidence_sources'])
+            st.metric("Average Source Quality", f"{source_stats['avg_quality']:.2f}")
 
-        # Test citation generation
-        st.subheader("🧪 Test Citation Generation")
+            if source_stats['most_cited_source']:
+                st.caption(f"Most Cited: {source_stats['most_cited_source']}")
 
-        test_query = st.text_input(
-            "Test Query",
-            value="Incubator dates",
-            help="Enter a query to test citation generation"
-        )
+        # Apply settings
+        if st.button("🔄 Apply Citation Settings", type="primary"):
+            citation_engine.citation_style = citation_style
+            citation_engine.enable_citations = enable_citations
+            citation_engine.min_confidence_threshold = min_confidence
+            citation_engine.max_quote_length = max_quote_length
+            citation_engine.config['max_citations_per_response'] = max_citations
+            st.success("✅ Citation settings updated!")
+
+        # Phase 3.2.3: Enhanced citation testing with real-time preview
+        st.subheader("🧪 Real-time Citation Testing")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            test_query = st.text_input(
+                "Test Query",
+                value="Incubator dates",
+                help="Enter a query to test citation generation"
+            )
+
+        with col2:
+            citation_mode = st.selectbox(
+                "Citation Mode",
+                options=["Enhanced Search", "Legacy Search", "Source-Specific"],
+                index=0,
+                help="Choose search method for citation sources"
+            )
 
         test_response = st.text_area(
             "Sample Response Text",
             value="Based on the documents, there are several important dates to consider.",
-            help="Enter sample response text to inject citations into"
+            help="Enter sample response text to inject citations into",
+            height=100
         )
 
-        if st.button("📝 Generate Citations", type="primary"):
-            with st.spinner("Generating citations..."):
-                # Search for relevant memories
-                memory_results = memory_store.search_memories(test_query, max_results=5)
+        # Real-time preview toggle
+        real_time_preview = st.checkbox("🔄 Real-time Preview", value=False, help="Update citations as you type")
+
+        if st.button("📝 Generate Citations", type="primary") or (real_time_preview and test_query and test_response):
+            with st.spinner("Generating enhanced citations..."):
+                # Use enhanced search based on mode
+                if citation_mode == "Enhanced Search" and hasattr(memory_store, 'enhanced_search_memories'):
+                    memory_results = memory_store.enhanced_search_memories(
+                        query=test_query,
+                        max_results=max_citations,
+                        initial_candidates=max_citations * 2
+                    )
+                else:
+                    memory_results = memory_store.search_memories(test_query, max_results=max_citations)
 
                 if memory_results:
-                    # Generate citations
+                    # Generate citations with current settings
                     cited_response = citation_engine.inject_citations(test_response, memory_results, test_query)
 
-                    st.success(f"✅ Generated {len(cited_response.citations)} citations")
+                    if not real_time_preview:  # Only show success for manual generation
+                        st.success(f"✅ Generated {len(cited_response.citations)} citations")
 
-                    # Display results
+                    # Phase 3.2.3: Enhanced results display
                     col1, col2 = st.columns([2, 1])
 
                     with col1:
-                        st.markdown("**Response with Citations:**")
+                        st.markdown("**📝 Response with Enhanced Citations:**")
                         st.markdown(cited_response.response_text)
 
+                        # Show individual citations
+                        if cited_response.citations:
+                            st.markdown("**📚 Citation Details:**")
+                            for i, citation in enumerate(cited_response.citations, 1):
+                                with st.expander(f"Citation {i}: {citation.source_name}"):
+                                    st.markdown(f"**Quote:** {citation.quote_text}")
+                                    st.markdown(f"**Confidence:** {citation.confidence_score:.2f}")
+                                    if citation.page_number:
+                                        st.markdown(f"**Location:** Page {citation.page_number}")
+                                    if citation.section_title:
+                                        st.markdown(f"**Section:** {citation.section_title}")
+
                     with col2:
+                        st.markdown("**📊 Citation Metrics:**")
                         st.metric("Transparency Score", f"{cited_response.transparency_score:.1%}")
                         st.metric("Source Count", cited_response.source_count)
+                        st.metric("Citation Count", len(cited_response.citations))
                         st.metric("Citation Style", cited_response.citation_style.value)
+
+                        # Quality indicators
+                        if cited_response.transparency_score >= transparency_threshold:
+                            st.success("🟢 High Transparency")
+                        elif cited_response.transparency_score >= 0.3:
+                            st.warning("🟡 Medium Transparency")
+                        else:
+                            st.error("🔴 Low Transparency")
 
                     # Citation details
                     if cited_response.citations:
@@ -1234,6 +1384,69 @@ def render_thought_settings():
         render_sprint16_settings()
     except Exception as e:
         st.error(f"Error loading thought settings: {e}")
+
+# Phase 3.2.3: Helper functions for enhanced features
+def _get_source_statistics(memory_store) -> Dict[str, Any]:
+    """Get comprehensive source statistics for citation analysis."""
+    try:
+        all_memories = list(memory_store.memory_chunks.values())
+
+        source_types = {}
+        sources = {}
+        total_sources = 0
+        high_confidence_sources = 0
+        quality_scores = []
+
+        for memory in all_memories:
+            source = getattr(memory, 'source', 'Unknown')
+            confidence = getattr(memory, 'importance_score', 0.0)
+
+            # Count source types
+            if '.pdf' in source.lower():
+                source_types['PDF Documents'] = source_types.get('PDF Documents', 0) + 1
+            elif 'http' in source.lower() or 'web' in source.lower():
+                source_types['Web Pages'] = source_types.get('Web Pages', 0) + 1
+            elif 'conversation' in source.lower() or 'chat' in source.lower():
+                source_types['Conversations'] = source_types.get('Conversations', 0) + 1
+            elif 'log' in source.lower():
+                source_types['System Logs'] = source_types.get('System Logs', 0) + 1
+            else:
+                source_types['Other'] = source_types.get('Other', 0) + 1
+
+            # Track individual sources
+            sources[source] = sources.get(source, 0) + 1
+            total_sources += 1
+
+            # Quality metrics
+            if confidence >= 0.7:
+                high_confidence_sources += 1
+            quality_scores.append(confidence)
+
+        # Find most cited source
+        most_cited_source = max(sources.items(), key=lambda x: x[1])[0] if sources else None
+
+        # Calculate average quality
+        avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+
+        return {
+            'source_types': source_types,
+            'total_sources': total_sources,
+            'high_confidence_sources': high_confidence_sources,
+            'avg_quality': avg_quality,
+            'most_cited_source': most_cited_source,
+            'unique_sources': len(sources)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting source statistics: {e}")
+        return {
+            'source_types': {},
+            'total_sources': 0,
+            'high_confidence_sources': 0,
+            'avg_quality': 0.0,
+            'most_cited_source': None,
+            'unique_sources': 0
+        }
 
 def get_learning_history_data(memory_store):
     """Get learning history data from memory store."""
