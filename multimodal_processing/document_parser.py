@@ -376,40 +376,85 @@ class MultimodalDocumentParser:
         return content_blocks
     
     def _process_text_content(self, text: str, location: str) -> List[MultimodalContent]:
-        """Process text content and detect code blocks."""
+        """Process text content with enhanced chunking strategy."""
         content_blocks = []
-        
-        # Split text into paragraphs
-        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
-        
-        for para_num, paragraph in enumerate(paragraphs, 1):
-            # Check if this looks like code
-            if self._is_code_block(paragraph):
-                language = self._detect_language(paragraph)
+
+        try:
+            # Use enhanced chunker for better list detection
+            from multimodal_processing.enhanced_chunker import EnhancedChunker
+            chunker = EnhancedChunker()
+
+            enhanced_chunks = chunker.enhanced_chunk_text(text, location)
+
+            # Convert enhanced chunks to MultimodalContent
+            for chunk in enhanced_chunks:
+                content_type = self._map_chunk_type_to_content_type(chunk.chunk_type)
+
                 content_blocks.append(MultimodalContent(
-                    content_type='code',
-                    content=paragraph,
+                    content_type=content_type,
+                    content=chunk.content,
                     metadata={
-                        'language': language,
-                        'detected': True,
-                        'paragraph_index': para_num
+                        'chunk_type': chunk.chunk_type.value,
+                        'priority_score': chunk.priority_score,
+                        'list_level': chunk.list_level,
+                        'structured_tags': chunk.structured_tags,
+                        'word_count': len(chunk.content.split()),
+                        'char_count': len(chunk.content),
+                        **chunk.metadata
                     },
-                    source_location=f"{location}_code_{para_num}"
+                    source_location=chunk.source_location
                 ))
-            else:
-                # Regular text
-                content_blocks.append(MultimodalContent(
-                    content_type='text',
-                    content=paragraph,
-                    metadata={
-                        'paragraph_index': para_num,
-                        'word_count': len(paragraph.split()),
-                        'char_count': len(paragraph)
-                    },
-                    source_location=f"{location}_text_{para_num}"
-                ))
-        
+
+        except ImportError:
+            logger.warning("Enhanced chunker not available, falling back to basic chunking")
+            # Fallback to original chunking
+            paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+
+            for para_num, paragraph in enumerate(paragraphs, 1):
+                # Check if this looks like code
+                if self._is_code_block(paragraph):
+                    language = self._detect_language(paragraph)
+                    content_blocks.append(MultimodalContent(
+                        content_type='code',
+                        content=paragraph,
+                        metadata={
+                            'language': language,
+                            'detected': True,
+                            'paragraph_index': para_num
+                        },
+                        source_location=f"{location}_code_{para_num}"
+                    ))
+                else:
+                    # Regular text
+                    content_blocks.append(MultimodalContent(
+                        content_type='text',
+                        content=paragraph,
+                        metadata={
+                            'paragraph_index': para_num,
+                            'word_count': len(paragraph.split()),
+                            'char_count': len(paragraph)
+                        },
+                        source_location=f"{location}_text_{para_num}"
+                    ))
+
         return content_blocks
+
+    def _map_chunk_type_to_content_type(self, chunk_type) -> str:
+        """Map enhanced chunk types to MultimodalContent types."""
+        from multimodal_processing.enhanced_chunker import ChunkType
+
+        mapping = {
+            ChunkType.NARRATIVE: 'text',
+            ChunkType.BULLET_LIST: 'list',
+            ChunkType.NUMBERED_LIST: 'list',
+            ChunkType.CAPABILITY: 'capability',
+            ChunkType.REQUIREMENT: 'requirement',
+            ChunkType.HEADER: 'header',
+            ChunkType.TABLE_ROW: 'table',
+            ChunkType.CODE_BLOCK: 'code',
+        }
+
+        return mapping.get(chunk_type, 'text')
     
     def _process_markdown_section(self, section: str, location: str) -> List[MultimodalContent]:
         """Process a markdown section and extract different content types."""
