@@ -48,6 +48,7 @@ class SAMConfig:
     # Server settings
     chat_port: int = 5001
     memory_ui_port: int = 8501
+    streamlit_chat_port: int = 8502
     host: str = "localhost"
     debug_mode: bool = False
     

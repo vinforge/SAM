@@ -12,9 +12,25 @@ from flask import Flask, render_template, request, jsonify, session, send_from_d
 from werkzeug.utils import secure_filename
 import uuid
 
+# Configure logging first
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import SAM components
 import sys
-sys.path.append('..')
+import os
+
+# Add parent directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Debug: Print the paths being used
+logger.info(f"Current directory: {current_dir}")
+logger.info(f"Parent directory: {parent_dir}")
+logger.info(f"Python path: {sys.path[:3]}...")  # Show first 3 entries
 
 try:
     from utils.vector_manager import VectorManager
@@ -25,7 +41,9 @@ try:
         security_middleware, require_unlock, optional_security,
         get_secure_memory_store, create_security_routes, inject_security_context
     )
-except ImportError:
+    logger.info("✅ Successfully imported SAM components")
+except ImportError as e:
+    logger.warning(f"Import error: {e}")
     # Fallback imports for development
     VectorManager = None
     get_multimodal_pipeline = None
@@ -36,10 +54,6 @@ except ImportError:
     get_secure_memory_store = None
     create_security_routes = lambda app: None
     inject_security_context = lambda: {}
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Flask app configuration
 app = Flask(__name__)
@@ -332,6 +346,22 @@ def index():
     """Main chat interface."""
     return render_template('index.html')
 
+@app.route('/api/test')
+def test_endpoint():
+    """Test endpoint to verify basic functionality."""
+    try:
+        return jsonify({
+            'status': 'ok',
+            'message': 'SAM Web UI is running',
+            'sam_model_available': sam_model is not None,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
 @app.route('/api/chat', methods=['POST'])
 @optional_security
 def chat():
@@ -592,8 +622,13 @@ def is_document_query(message):
             if document_memories:
                 logger.info(f"Person/entity query detected with {len(document_memories)} document memories available")
                 return True
+        except ImportError as e:
+            logger.warning(f"Error importing memory store: {e}")
+            # If we can't check for documents, assume it's not a document query
+            return False
         except Exception as e:
             logger.warning(f"Error checking for document memories: {e}")
+            return False
 
     return False
 
@@ -606,12 +641,16 @@ def handle_document_query(message):
         document_name = extract_document_name(message)
 
         # Get memory store for document search (Phase 3.2: Use ChromaDB)
-        from memory.memory_vectorstore import get_memory_store, VectorStoreType
-        memory_store = get_memory_store(
-            store_type=VectorStoreType.CHROMA,
-            storage_directory="web_ui",
-            embedding_dimension=384
-        )
+        try:
+            from memory.memory_vectorstore import get_memory_store, VectorStoreType
+            memory_store = get_memory_store(
+                store_type=VectorStoreType.CHROMA,
+                storage_directory="web_ui",
+                embedding_dimension=384
+            )
+        except ImportError as e:
+            logger.error(f"Failed to import memory store: {e}")
+            return f"I apologize, but I'm having trouble accessing the memory system: {str(e)}"
         all_memories = memory_store.get_all_memories()
 
         if document_name:
@@ -671,12 +710,15 @@ def handle_document_query(message):
                 return response
 
             # Use the new RAG pipeline for document summarization
-            from rag_pipeline.new_rag_pipeline import NewRAGPipeline
-
-            pipeline = NewRAGPipeline(memory_store)
-
-            # Generate summary using the enhanced pipeline
-            summary_result = pipeline.generate_summary(document_name, message)
+            try:
+                from rag_pipeline.new_rag_pipeline import NewRAGPipeline
+                pipeline = NewRAGPipeline(memory_store)
+                # Generate summary using the enhanced pipeline
+                summary_result = pipeline.generate_summary(document_name, message)
+            except ImportError as e:
+                logger.warning(f"RAG pipeline not available: {e}")
+                # Fallback to simple document search
+                summary_result = f"Found {len(document_memories)} memories related to {document_name}. Please check the Memory Control Center for detailed content."
 
             logger.info(f"Generated document summary: {len(summary_result)} chars")
             return summary_result
@@ -734,8 +776,12 @@ def generate_enhanced_document_response(message, document_memories):
         logger.info(f"Generating enhanced document response for: {message}")
 
         # Search for relevant content in document memories
-        from memory.memory_vectorstore import get_memory_store
-        memory_store = get_memory_store()
+        try:
+            from memory.memory_vectorstore import get_memory_store
+            memory_store = get_memory_store()
+        except ImportError as e:
+            logger.error(f"Failed to import memory store: {e}")
+            return f"I apologize, but I'm having trouble accessing the memory system: {str(e)}"
 
         # Phase 3.2: Use enhanced search with hybrid ranking
         try:
@@ -976,9 +1022,19 @@ Answer:"""
                 response = "Based on the uploaded documents, I found relevant information but need more context to provide a complete answer."
 
             # Process thoughts to separate reasoning from answer
-            from utils.thought_processor import get_thought_processor
-            thought_processor = get_thought_processor()
-            processed = thought_processor.process_response(response)
+            try:
+                from utils.thought_processor import get_thought_processor
+                thought_processor = get_thought_processor()
+                processed = thought_processor.process_response(response)
+            except ImportError as e:
+                logger.warning(f"Thought processor not available: {e}")
+                # Create a simple processed object
+                class SimpleProcessed:
+                    def __init__(self, content):
+                        self.visible_content = content
+                        self.has_thoughts = False
+                        self.thought_blocks = []
+                processed = SimpleProcessed(response)
 
             # Use the clean visible content as the response
             response = processed.visible_content
@@ -1003,6 +1059,9 @@ Answer:"""
                 # Use the cited response with enhanced formatting
                 response = cited_response.response_text
 
+            except ImportError as e:
+                logger.warning(f"Citation engine not available: {e}")
+                # Continue with manual citation formatting below
             except Exception as e:
                 logger.warning(f"Citation generation failed, using fallback: {e}")
                 # Continue with manual citation formatting below
@@ -1196,9 +1255,13 @@ def generate_standard_response(message):
             return handle_document_query(message)
 
         # Use enhanced context router for better context assembly
-        from utils.context_router import get_enhanced_context_router
-
-        context_router = get_enhanced_context_router()
+        try:
+            from utils.context_router import get_enhanced_context_router
+            context_router = get_enhanced_context_router()
+        except ImportError as e:
+            logger.error(f"Failed to import context router: {e}")
+            # Fallback to simple response without context
+            return generate_simple_response(message)
 
         # Assemble high-quality context with ranking and citations
         context_assembly = context_router.assemble_context(message, max_context_length=2000)
@@ -1220,13 +1283,13 @@ def generate_standard_response(message):
 
         # Create enhanced system prompt and user message for chat API
         if query_type == "document_specific":
-            system_prompt = f"You are SAM, an intelligent assistant with access to uploaded documents. Answer based on the provided ranked and cited context from their uploaded documents. The context has been intelligently ranked and includes source citations for transparency.{context}"
+            system_prompt = f"You are SAM, an intelligent assistant with access to uploaded documents. Answer based on the provided ranked and cited context from their uploaded documents. The context has been intelligently ranked and includes source citations for transparency.\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.\n\n{context}"
             user_message = message
         elif query_type == "memory_search":
-            system_prompt = f"You are SAM, an intelligent assistant with conversation memory. Use the provided ranked memory context to answer appropriately.{context}"
+            system_prompt = f"You are SAM, an intelligent assistant with conversation memory. Use the provided ranked memory context to answer appropriately.\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.\n\n{context}"
             user_message = message
         else:
-            system_prompt = f"You are SAM, an intelligent multimodal assistant. Answer the user's question helpfully and accurately.{context if context.strip() else ''}"
+            system_prompt = f"You are SAM, an intelligent multimodal assistant. Answer the user's question helpfully and accurately.\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.{context if context.strip() else ''}"
             user_message = message
 
         # Debug: Check which model is being used
@@ -1250,9 +1313,33 @@ def generate_standard_response(message):
             response = response[9:].strip()
 
         # Process thoughts for Sprint 16
-        from utils.thought_processor import get_thought_processor
-        thought_processor = get_thought_processor()
-        processed = thought_processor.process_response(response)
+        try:
+            from utils.thought_processor import get_thought_processor
+            thought_processor = get_thought_processor()
+
+            # Debug: Log the raw response to see if it contains <think> tags
+            logger.info(f"🧠 Raw response length: {len(response)} chars")
+            if '<think>' in response.lower():
+                logger.info("🧠 Response contains <think> tags - processing thoughts")
+            else:
+                logger.info("🧠 Response does not contain <think> tags")
+
+            processed = thought_processor.process_response(response)
+
+            # Debug: Log the processing results
+            logger.info(f"🧠 Processed response - has_thoughts: {processed.has_thoughts}, visible_content length: {len(processed.visible_content)}")
+            if processed.has_thoughts:
+                logger.info(f"🧠 Found {len(processed.thought_blocks)} thought blocks")
+
+        except ImportError as e:
+            logger.warning(f"Thought processor not available: {e}")
+            # Create a simple processed object
+            class SimpleProcessed:
+                def __init__(self, content):
+                    self.visible_content = content
+                    self.has_thoughts = False
+                    self.thought_blocks = []
+            processed = SimpleProcessed(response)
 
         # Use the clean visible content as the response
         clean_response = processed.visible_content
@@ -1286,7 +1373,31 @@ def generate_standard_response(message):
 
     except Exception as e:
         logger.error(f"Error generating standard response: {e}")
-        return f"I apologize, but I encountered an error while processing your request: {str(e)}"
+        return generate_simple_response(message)
+
+def generate_simple_response(message):
+    """Generate a simple response without context routing as a fallback."""
+    try:
+        logger.info(f"Using simple response fallback for: {message[:50]}...")
+
+        # Create a basic prompt without context
+        prompt = f"You are SAM, an intelligent assistant. Answer the user's question helpfully and accurately.\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.\n\nUser: {message}\n\nAssistant:"
+
+        # Generate response using the SAM model
+        if sam_model:
+            response = sam_model.generate(prompt, temperature=0.7, max_tokens=500)
+
+            # Clean up response
+            if response.startswith("Response:"):
+                response = response[9:].strip()
+
+            return response
+        else:
+            return "I apologize, but the SAM model is not available right now. Please try again later."
+
+    except Exception as e:
+        logger.error(f"Error in simple response generation: {e}")
+        return f"I apologize, but I'm having trouble generating a response: {str(e)}"
 
 # Removed old process_response_thoughts function - now using structured format
 

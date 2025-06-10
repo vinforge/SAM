@@ -180,12 +180,36 @@ def render_chat_interface():
         with st.chat_message("assistant"):
             with st.spinner("🤔 SAM is thinking..."):
                 try:
-                    response = generate_secure_response(prompt)
-                    st.markdown(response)
-                    
-                    # Add assistant response to chat history
-                    st.session_state.chat_history.append({"role": "assistant", "content": response})
-                    
+                    raw_response = generate_secure_response(prompt)
+
+                    # Process thoughts using the thought processor
+                    try:
+                        from utils.thought_processor import get_thought_processor
+                        thought_processor = get_thought_processor()
+                        processed = thought_processor.process_response(raw_response)
+
+                        # Display the clean response
+                        st.markdown(processed.visible_content)
+
+                        # Add thought dropdown if thoughts are present
+                        if processed.has_thoughts and processed.thought_blocks:
+                            total_tokens = sum(block.token_count for block in processed.thought_blocks)
+
+                            with st.expander(f"🧠 SAM's Thoughts ({total_tokens} tokens)", expanded=False):
+                                for i, thought_block in enumerate(processed.thought_blocks):
+                                    st.markdown(f"**Thought {i+1}:**")
+                                    st.markdown(thought_block.content)
+                                    if i < len(processed.thought_blocks) - 1:
+                                        st.divider()
+
+                        # Add the clean response to chat history
+                        st.session_state.chat_history.append({"role": "assistant", "content": processed.visible_content})
+
+                    except ImportError:
+                        # Fallback if thought processor is not available
+                        st.markdown(raw_response)
+                        st.session_state.chat_history.append({"role": "assistant", "content": raw_response})
+
                 except Exception as e:
                     error_msg = f"❌ Sorry, I encountered an error: {e}"
                     st.markdown(error_msg)
@@ -384,6 +408,8 @@ def generate_secure_response(prompt: str) -> str:
                 # Prepare the prompt for Ollama
                 system_prompt = """You are SAM, a secure AI assistant. Answer the user's question based on the provided encrypted memory content.
 
+When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.
+
 Be helpful and informative. Extract relevant information from the provided sources to answer the question directly.
 If the information isn't sufficient, say so clearly. Always be concise but thorough.
 
@@ -437,6 +463,38 @@ I'm SAM, your secure AI assistant. How can I help you further?"""
             total_chunks = security_status.get('encrypted_chunk_count', 0)
 
             if total_chunks > 0:
+                # Generate a response using Ollama even without specific context
+                try:
+                    import requests
+
+                    system_prompt = """You are SAM, a helpful AI assistant. When thinking through questions, you can use <think>...</think> tags to show your reasoning process.
+
+Answer the user's question helpfully and accurately based on your general knowledge."""
+
+                    ollama_response = requests.post(
+                        "http://localhost:11434/api/generate",
+                        json={
+                            "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                            "prompt": f"System: {system_prompt}\n\nUser: {prompt}\n\nAssistant:",
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.7,
+                                "top_p": 0.9,
+                                "max_tokens": 500
+                            }
+                        },
+                        timeout=30
+                    )
+
+                    if ollama_response.status_code == 200:
+                        response_data = ollama_response.json()
+                        ai_response = response_data.get('response', '').strip()
+                        if ai_response:
+                            return ai_response
+
+                except Exception as e:
+                    logger.error(f"Fallback Ollama call failed: {e}")
+
                 return f"""I searched through your {total_chunks} encrypted memory chunks but couldn't find relevant information about "{prompt}".
 
 This could be because:

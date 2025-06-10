@@ -156,7 +156,7 @@ class SAMLauncher:
         """Start the memory control center UI."""
         try:
             logger.info(f"Starting Memory Control Center on port {self.config.memory_ui_port}...")
-            
+
             cmd = [
                 sys.executable, "-m", "streamlit", "run",
                 "ui/memory_app.py",
@@ -165,16 +165,16 @@ class SAMLauncher:
                 "--browser.gatherUsageStats", "false",
                 "--server.headless", "true"
             ]
-            
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=str(Path(__file__).parent)
             )
-            
+
             self.processes['memory_ui'] = process
-            
+
             # Wait a moment and check if it started successfully
             time.sleep(5)
             if process.poll() is None:
@@ -183,9 +183,45 @@ class SAMLauncher:
             else:
                 logger.error("Memory Control Center failed to start")
                 return False
-                
+
         except Exception as e:
             logger.error(f"Error starting Memory Control Center: {e}")
+            return False
+
+    def _start_streamlit_chat(self) -> bool:
+        """Start the Streamlit chat interface."""
+        try:
+            logger.info(f"Starting Streamlit Chat Interface on port {self.config.streamlit_chat_port}...")
+
+            cmd = [
+                sys.executable, "-m", "streamlit", "run",
+                "secure_streamlit_app.py",
+                "--server.port", str(self.config.streamlit_chat_port),
+                "--server.address", self.config.host,
+                "--browser.gatherUsageStats", "false",
+                "--server.headless", "true"
+            ]
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(Path(__file__).parent)
+            )
+
+            self.processes['streamlit_chat'] = process
+
+            # Wait a moment and check if it started successfully
+            time.sleep(5)
+            if process.poll() is None:
+                logger.info(f"Streamlit Chat Interface started successfully (PID: {process.pid})")
+                return True
+            else:
+                logger.error("Streamlit Chat Interface failed to start")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error starting Streamlit Chat Interface: {e}")
             return False
     
     def _start_health_monitor(self):
@@ -193,7 +229,8 @@ class SAMLauncher:
         try:
             self.health_monitor = HealthMonitor(
                 chat_port=self.config.chat_port,
-                memory_ui_port=self.config.memory_ui_port
+                memory_ui_port=self.config.memory_ui_port,
+                streamlit_chat_port=self.config.streamlit_chat_port
             )
             
             # Start health monitoring in a separate thread
@@ -216,11 +253,11 @@ class SAMLauncher:
         try:
             # Wait a moment for services to be ready
             time.sleep(2)
-            
-            # Open main chat interface
-            chat_url = f"http://{self.config.host}:{self.config.chat_port}"
-            logger.info(f"Opening browser to {chat_url}")
-            webbrowser.open(chat_url)
+
+            # Open default Streamlit chat interface
+            streamlit_chat_url = f"http://{self.config.host}:{self.config.streamlit_chat_port}"
+            logger.info(f"Opening browser to default chat interface: {streamlit_chat_url}")
+            webbrowser.open(streamlit_chat_url)
             
             # If first launch, also show onboarding info
             if self.onboarding_manager.should_show_welcome():
@@ -241,6 +278,7 @@ class SAMLauncher:
         print()
         print("🌐 Web Interfaces:")
         print(f"  Chat Interface:      http://{self.config.host}:{self.config.chat_port}")
+        print(f"  Streamlit Chat:      http://{self.config.host}:{self.config.streamlit_chat_port} (Default)")
         print(f"  Memory Control:      http://{self.config.host}:{self.config.memory_ui_port}")
         print()
         print("📁 Storage Locations:")
@@ -274,6 +312,12 @@ class SAMLauncher:
                         elif name == 'memory_ui':
                             logger.info(f"Restarting {name}...")
                             if self._start_memory_ui():
+                                logger.info(f"Successfully restarted {name}")
+                            else:
+                                logger.error(f"Failed to restart {name}")
+                        elif name == 'streamlit_chat':
+                            logger.info(f"Restarting {name}...")
+                            if self._start_streamlit_chat():
                                 logger.info(f"Successfully restarted {name}")
                             else:
                                 logger.error(f"Failed to restart {name}")
@@ -347,7 +391,12 @@ class SAMLauncher:
             if not self._start_memory_ui():
                 logger.error("Failed to start Memory Control Center")
                 return False
-            
+
+            # Start Streamlit chat interface
+            if not self._start_streamlit_chat():
+                logger.error("Failed to start Streamlit Chat Interface")
+                return False
+
             # Start health monitoring
             self._start_health_monitor()
             
@@ -363,6 +412,7 @@ class SAMLauncher:
             logger.info("SAM started successfully!")
             print("✅ SAM is now running!")
             print(f"🌐 Chat Interface: http://{self.config.host}:{self.config.chat_port}")
+            print(f"📱 Streamlit Chat: http://{self.config.host}:{self.config.streamlit_chat_port} (Default)")
             print(f"🧠 Memory Control: http://{self.config.host}:{self.config.memory_ui_port}")
             print("\nPress Ctrl+C to stop SAM")
             

@@ -273,8 +273,17 @@ class EnhancedContextRouter:
                 content = self._get_memory_content(memory)
                 source = self._get_memory_source(memory)
                 
-                # Format content preview
-                content_preview = content[:300] if len(content) > 300 else content
+                # Format content - use full content for document memories, preview for others
+                if self._is_document_memory(memory):
+                    # For document memories, use more content (up to 1500 chars) to provide better context
+                    content_preview = content[:1500] if len(content) > 1500 else content
+                    if len(content) > 1500:
+                        content_preview += "... [content continues]"
+                else:
+                    # For conversation memories, use shorter preview
+                    content_preview = content[:300] if len(content) > 300 else content
+                    if len(content) > 300:
+                        content_preview += "..."
                 
                 # Add priority indicator
                 priority_icon = "⭐" if memory_score.is_priority else "🔸" if memory_score.is_pinned else "•"

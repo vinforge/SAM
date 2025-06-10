@@ -52,10 +52,11 @@ class HealthMonitor:
     Monitors system health and provides status API.
     """
     
-    def __init__(self, chat_port: int = 5001, memory_ui_port: int = 8501):
+    def __init__(self, chat_port: int = 5001, memory_ui_port: int = 8501, streamlit_chat_port: int = 8502):
         """Initialize the health monitor."""
         self.chat_port = chat_port
         self.memory_ui_port = memory_ui_port
+        self.streamlit_chat_port = streamlit_chat_port
         
         self.health_status = {}
         self.metrics_history = []
@@ -183,7 +184,64 @@ class HealthMonitor:
                 error_message=str(e),
                 details={"port": self.memory_ui_port}
             )
-    
+
+    def check_streamlit_chat(self) -> HealthStatus:
+        """Check Streamlit Chat Interface health."""
+        try:
+            start_time = time.time()
+            url = f"http://localhost:{self.streamlit_chat_port}/_stcore/health"
+
+            response = requests.get(url, timeout=self.timeout)
+            response_time = (time.time() - start_time) * 1000
+
+            if response.status_code == 200:
+                status = "healthy"
+                error_message = ""
+            else:
+                status = "warning"
+                error_message = f"HTTP {response.status_code}"
+
+            return HealthStatus(
+                name="streamlit_chat",
+                status=status,
+                last_check=datetime.now().isoformat(),
+                response_time_ms=response_time,
+                error_message=error_message,
+                details={
+                    "url": url,
+                    "status_code": response.status_code,
+                    "port": self.streamlit_chat_port
+                }
+            )
+
+        except requests.exceptions.ConnectionError:
+            return HealthStatus(
+                name="streamlit_chat",
+                status="critical",
+                last_check=datetime.now().isoformat(),
+                response_time_ms=0,
+                error_message="Connection refused",
+                details={"port": self.streamlit_chat_port}
+            )
+        except requests.exceptions.Timeout:
+            return HealthStatus(
+                name="streamlit_chat",
+                status="warning",
+                last_check=datetime.now().isoformat(),
+                response_time_ms=self.timeout * 1000,
+                error_message="Request timeout",
+                details={"port": self.streamlit_chat_port}
+            )
+        except Exception as e:
+            return HealthStatus(
+                name="streamlit_chat",
+                status="critical",
+                last_check=datetime.now().isoformat(),
+                response_time_ms=0,
+                error_message=str(e),
+                details={"port": self.streamlit_chat_port}
+            )
+
     def check_memory_store(self) -> HealthStatus:
         """Check memory store health."""
         try:
@@ -330,6 +388,7 @@ class HealthMonitor:
             # Check all components
             self.health_status['web_interface'] = self.check_web_interface()
             self.health_status['memory_ui'] = self.check_memory_ui()
+            self.health_status['streamlit_chat'] = self.check_streamlit_chat()
             self.health_status['memory_store'] = self.check_memory_store()
             self.health_status['agent_mode'] = self.check_agent_mode()
             
