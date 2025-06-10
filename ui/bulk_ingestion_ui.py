@@ -375,7 +375,7 @@ class BulkIngestionUI:
                     help="Preview what will be processed before actual scanning"
                 )
 
-            if st.button("➕ Add Source", type="primary"):
+            if st.button("➕ Add Source", type="primary", key="add_source_button"):
                 if source_path and source_name:
                     # Enhanced cross-platform path validation
                     path_validation = self._validate_path(source_path)
@@ -444,7 +444,7 @@ Error details: {path_validation.get('error_details', 'None')}
             # Quick actions for all sources
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button("🚀 Process All Enabled Sources", type="secondary"):
+                if st.button("🚀 Process All Enabled Sources", type="secondary", key="process_all_sources_button"):
                     enabled_sources = [s for s in sources if s["enabled"]]
                     if enabled_sources:
                         st.session_state.trigger_bulk_scan = True
@@ -453,7 +453,7 @@ Error details: {path_validation.get('error_details', 'None')}
                         st.warning("⚠️ No enabled sources to process")
 
             with col2:
-                if st.button("🔍 Preview All Sources", type="secondary"):
+                if st.button("🔍 Preview All Sources", type="secondary", key="preview_all_sources_button"):
                     enabled_sources = [s for s in sources if s["enabled"]]
                     if enabled_sources:
                         st.session_state.trigger_bulk_preview = True
@@ -462,7 +462,7 @@ Error details: {path_validation.get('error_details', 'None')}
                         st.warning("⚠️ No enabled sources to preview")
 
             with col3:
-                if st.button("📊 View Processing Stats", type="secondary"):
+                if st.button("📊 View Processing Stats", type="secondary", key="view_processing_stats_button"):
                     st.session_state.show_stats_popup = True
 
             # Handle bulk operations
@@ -696,7 +696,7 @@ Error details: {path_validation.get('error_details', 'None')}
             st.success(f"🎉 {successful} source(s) processed successfully! Files have been added to SAM's knowledge base.")
 
             # Trigger knowledge consolidation
-            if st.button("🧠 Consolidate Knowledge", type="primary", help="Run knowledge consolidation to optimize SAM's memory"):
+            if st.button("🧠 Consolidate Knowledge", type="primary", key="consolidate_knowledge_button", help="Run knowledge consolidation to optimize SAM's memory"):
                 self._trigger_knowledge_consolidation()
 
     def _trigger_knowledge_consolidation(self):
@@ -755,16 +755,16 @@ Error details: {path_validation.get('error_details', 'None')}
             
             dry_run_all = st.checkbox("Dry Run (Preview Only)", key="dry_run_all")
             
-            if st.button("🚀 Scan All Sources", type="primary"):
+            if st.button("🚀 Scan All Sources", type="primary", key="scan_all_sources_button"):
                 self._run_scan_all(enabled_sources, dry_run_all)
         
         with col2:
             st.markdown("#### ⚡ Quick Actions")
             
-            if st.button("📊 View Statistics"):
+            if st.button("📊 View Statistics", key="view_statistics_button"):
                 st.session_state.show_stats = True
-            
-            if st.button("📋 View Logs"):
+
+            if st.button("📋 View Logs", key="view_logs_button"):
                 self._show_logs()
         
         # Individual source scanning

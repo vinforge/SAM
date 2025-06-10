@@ -25,15 +25,16 @@ def cleanup_development_files():
         # Development cache and compiled files
         "__pycache__",
         "*.pyc",
-        "*.pyo", 
+        "*.pyo",
         "*.pyd",
         ".pytest_cache",
-        
+
         # Personal/development directories
         "MyStuff",
         "backups",
         "temp_uploads",
-        
+        "uploads",
+
         # Development logs and databases
         "curiosity.log",
         "enrichment.log",
@@ -41,14 +42,19 @@ def cleanup_development_files():
         "logs/retrieval_logs.db",
         "logs/sam_knowledge.db",
         "logs/sam_launcher.log",
-        
+        "logs/bulk_ingest.log",
+        "web_ui/curiosity.log",
+
         # Debug and test files
         "test_*.py",
         "debug_*.py",
         "check_*.py",
         "process_*.py",
         "fix_*.py",
-        
+        "demo_*.py",
+        "clear_*.py",
+        "cleanup_*.py",
+
         # Development documentation
         "steps*.md",
         "SPRINT_*.md",
@@ -57,22 +63,36 @@ def cleanup_development_files():
         "LONGBIOBENCH_*.md",
         "MEMORY_*.md",
         "test_*.md",
-        
+        "PHASE*_TESTING_GUIDE.md",
+        "BETA_RELEASE_CHECKLIST.md",
+        "DEPLOYMENT_CHECKLIST.md",
+
         # Development data and logs
         "execution_logs",
         "task_run_reports",
-        
+        "demo_memory",
+        "test_memory",
+        "test_compat",
+        "test_data",
+
         # User data (will be recreated on first run)
         "memory_store/*.json",
+        "memory_store/*.db",
         "multimodal_output",
         "data/uploads/*",
         "data/documents/*",
         "data/vector_store/*",
+        "data/ingestion_state.db",
         "web_ui/uploads/*",
         "web_ui/data/*",
         "web_ui/memory_store/*",
+        "web_ui/memory_store_backup",
         "web_ui/multimodal_output/*",
-        
+        "web_ui/mem_*.json",
+        "streamlit_data",
+        "chroma_db",
+        "vector_store/enriched_chunks/*",
+
         # Development configs
         "agent_manager_config.json",
         "swarm_config.json",
@@ -83,25 +103,24 @@ def cleanup_development_files():
         "remote_agents.yaml",
         "search_index.json",
         "memory_store.json",
-        
+        "config/collab_key.json",
+        "custom_tools",
+
         # Development scripts
-        "demo_*.py",
         "start_sprint*.py",
         "streamlit_*.py",
         "migrate_*.py",
-        
+        "security_integration_example.py",
+
         # Development prompts and configs
-        "curious_analyst_prompt.txt",
+        "system_prompt/curious_analyst_prompt.txt",
         "sam_tool_augmented_prompt.txt",
-        
-        # Experimental directories (keep core functionality)
-        "DE",  # Data Enrichment experimental
-        "KC",  # Knowledge Consolidation experimental
-        "deepseek_enhanced_learning",  # Experimental learning
-        "knowledge_enrichment",
-        "capsules",
-        "watcher",
-        
+
+        # Docker files (provide separate Docker setup)
+        "Dockerfile",
+        "docker-compose.yml",
+        "sam.service",
+
         # Development utilities
         "enhanced_*.py",
         "gpu_*.py",
@@ -109,17 +128,29 @@ def cleanup_development_files():
         "knowledge_navigator.py",
         "cli_tools.py",
         "main.py",  # Keep start_sam.py and launch_web_ui.py instead
+
+        # Installer artifacts
+        "sam-installer",
     ]
     
     # Keep these essential files
     essential_files = [
         "README.md",
         "requirements.txt",
-        "launch_web_ui.py",  # Main web UI launcher
-        "start_sam.py",      # Main SAM launcher
-        "install.py",        # Installation script
+        "launch_web_ui.py",        # Main web UI launcher
+        "start_sam.py",            # Main SAM launcher
+        "start_sam_secure.py",     # Secure SAM launcher
+        "secure_streamlit_app.py", # Secure Streamlit interface
+        "install.py",              # Installation script
+        "install_sam.py",          # Alternative installer
+        "install.sh",              # Shell installer
+        "install.bat",             # Windows installer
+        "start_sam.sh",            # Shell launcher
+        "start_sam.bat",           # Windows launcher
         "SAM-whitepaper.md",
         "DEPLOYMENT.md",
+        "README_SECURE_INSTALLATION.md",
+        "SETUP_GUIDE.md",
         "Makefile",
         ".gitignore",
         "LICENSE",

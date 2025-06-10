@@ -25,6 +25,17 @@ except ImportError:
     MemoryRankingEngine = None
     RankedMemoryResult = None
 
+# Import Phase 3 dimension-aware retrieval
+try:
+    from .dimension_aware_retrieval import DimensionAwareRetrieval, DimensionAwareResult, RetrievalStrategy
+    DIMENSION_AWARE_RETRIEVAL_AVAILABLE = True
+except ImportError:
+    DIMENSION_AWARE_RETRIEVAL_AVAILABLE = False
+    DimensionAwareRetrieval = None
+    DimensionAwareResult = None
+    RetrievalStrategy = None
+    logging.warning("Dimension-aware retrieval not available")
+
 logger = logging.getLogger(__name__)
 
 class VectorStoreType(Enum):
@@ -115,6 +126,16 @@ class MemoryVectorStore:
             except Exception as e:
                 logger.warning(f"Could not initialize ranking engine: {e}")
                 self.ranking_engine = None
+
+        # Initialize Phase 3 dimension-aware retrieval
+        self.dimension_aware_retrieval = None
+        if DIMENSION_AWARE_RETRIEVAL_AVAILABLE:
+            try:
+                self.dimension_aware_retrieval = DimensionAwareRetrieval(self, self.ranking_engine)
+                logger.info("Dimension-Aware Retrieval initialized for conceptual understanding")
+            except Exception as e:
+                logger.warning(f"Could not initialize dimension-aware retrieval: {e}")
+                self.dimension_aware_retrieval = None
         
         # Initialize vector store
         self._initialize_vector_store()
@@ -331,6 +352,94 @@ class MemoryVectorStore:
         except Exception as e:
             logger.error(f"Error in enhanced search: {e}")
             return []
+
+    def dimension_aware_search(self,
+                             query: str,
+                             max_results: int = 5,
+                             profile: str = "general",
+                             dimension_weights: Optional[Dict[str, float]] = None,
+                             strategy: str = "hybrid",
+                             natural_language_filters: Optional[str] = None) -> List[DimensionAwareResult]:
+        """
+        Revolutionary Phase 3 dimension-aware search that combines semantic similarity
+        with human-like conceptual understanding for unprecedented search accuracy.
+
+        Args:
+            query: Search query
+            max_results: Number of results to return
+            profile: Reasoning profile (general, researcher, business, legal)
+            dimension_weights: Custom dimension weights (overrides profile defaults)
+            strategy: Retrieval strategy (hybrid, vector_only, dimension_only, adaptive)
+            natural_language_filters: Natural language filters like "high-utility, low-risk"
+
+        Returns:
+            List of DimensionAwareResult objects with comprehensive scoring and explanations
+        """
+        try:
+            if not self.dimension_aware_retrieval:
+                logger.warning("Dimension-aware retrieval not available, falling back to enhanced search")
+                # Convert enhanced search results to DimensionAwareResult format
+                enhanced_results = self.enhanced_search_memories(query, max_results)
+                return self._convert_to_dimension_aware_results(enhanced_results)
+
+            # Convert strategy string to enum
+            if isinstance(strategy, str):
+                strategy_enum = RetrievalStrategy(strategy.lower())
+            else:
+                strategy_enum = strategy
+
+            # Execute dimension-aware search
+            results = self.dimension_aware_retrieval.dimension_aware_search(
+                query=query,
+                max_results=max_results,
+                profile=profile,
+                dimension_weights=dimension_weights,
+                strategy=strategy_enum,
+                natural_language_filters=natural_language_filters
+            )
+
+            logger.info(f"Dimension-aware search completed: {len(results)} results with profile '{profile}'")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error in dimension-aware search: {e}")
+            # Fallback to enhanced search
+            enhanced_results = self.enhanced_search_memories(query, max_results)
+            return self._convert_to_dimension_aware_results(enhanced_results)
+
+    def _convert_to_dimension_aware_results(self, enhanced_results: List[RankedMemoryResult]) -> List[DimensionAwareResult]:
+        """Convert enhanced search results to DimensionAwareResult format for fallback."""
+        if not DimensionAwareResult:
+            return []
+
+        dimension_results = []
+        for result in enhanced_results:
+            try:
+                dim_result = DimensionAwareResult(
+                    chunk_id=result.chunk_id,
+                    content=result.content,
+                    metadata=result.metadata,
+                    semantic_score=result.semantic_score,
+                    recency_score=result.recency_score,
+                    confidence_score=result.confidence_score,
+                    dimension_alignment_score=0.0,
+                    dimension_confidence_boost=0.0,
+                    profile_relevance_bonus=0.0,
+                    final_score=result.final_score,
+                    score_breakdown={
+                        'semantic_similarity': result.semantic_score,
+                        'recency_score': result.recency_score,
+                        'confidence_score': result.confidence_score
+                    },
+                    dimension_explanation="Fallback search (dimension-aware retrieval unavailable)",
+                    ranking_reason="Enhanced hybrid search without dimension analysis"
+                )
+                dimension_results.append(dim_result)
+            except Exception as e:
+                logger.warning(f"Error converting result to dimension-aware format: {e}")
+                continue
+
+        return dimension_results
 
     def _search_chroma_candidates(self, query: str, n_candidates: int,
                                 where_filter: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:

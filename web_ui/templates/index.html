@@ -381,6 +381,95 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
+        /* Phase 6 Feedback Controls */
+        .feedback-controls {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #007bff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .feedback-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .feedback-btn {
+            background: none;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .feedback-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .feedback-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .feedback-btn.positive.active {
+            background: #28a745;
+            border-color: #28a745;
+        }
+
+        .feedback-btn.negative.active {
+            background: #dc3545;
+            border-color: #dc3545;
+        }
+
+        .feedback-text {
+            color: #6c757d;
+            font-size: 12px;
+        }
+
+        .correction-input {
+            margin-top: 8px;
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 12px;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .correction-submit {
+            margin-top: 6px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .correction-submit:hover {
+            background: #0056b3;
+        }
+
+        .feedback-submitted {
+            color: #28a745;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
         @media (max-width: 768px) {
             .container {
                 height: 95vh;
@@ -424,10 +513,10 @@
                 <p>Multimodal AI Assistant</p>
             </div>
             <div class="header-right">
-                <button class="memory-control-btn" onclick="openMemoryControlCenter()" title="Open Memory Control Center">
+                <button class="memory-control-btn" title="Open Memory Control Center">
                     🧠⚙️ Memory Center
                 </button>
-                <button class="upload-btn" onclick="openUploadModal()">📄 Upload Document</button>
+                <button class="upload-btn">📄 Upload Document</button>
             </div>
         </div>
         
@@ -470,8 +559,8 @@ How can I assist you today?
             </div>
             
             <div class="input-container">
-                <input type="text" class="input-field" id="messageInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                <input type="text" class="input-field" id="messageInput" placeholder="Type your message...">
+                <button class="send-btn" id="sendBtn">Send</button>
             </div>
         </div>
     </div>
@@ -482,19 +571,19 @@ How can I assist you today?
             <h3>📄 Upload Document</h3>
             <p>Upload a document to process and add to SAM's knowledge base</p>
             
-            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-area" id="uploadArea">
                 <p>🔄 Click to select file or drag & drop</p>
                 <p style="font-size: 14px; color: #666; margin-top: 10px;">
                     Supported: PDF, DOCX, MD, HTML, TXT, PY, JS, JAVA, CPP, C
                 </p>
             </div>
-            
-            <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.md,.html,.htm,.txt,.py,.js,.java,.cpp,.c" onchange="handleFileSelect(event)">
-            
+
+            <input type="file" id="fileInput" style="display: none;" accept=".pdf,.docx,.md,.html,.htm,.txt,.py,.js,.java,.cpp,.c">
+
             <div id="uploadStatus" style="margin: 15px 0;"></div>
-            
-            <button class="process-btn" id="processBtn" onclick="uploadFile()" style="display: none;">Process Document</button>
-            <button class="close-modal" onclick="closeUploadModal()">Close</button>
+
+            <button class="process-btn" id="processBtn" style="display: none;">Process Document</button>
+            <button class="close-modal">Close</button>
         </div>
     </div>
 
@@ -502,24 +591,32 @@ How can I assist you today?
         let selectedFile = null;
 
         function handleKeyPress(event) {
+            console.log('Key pressed:', event.key);
             if (event.key === 'Enter') {
+                console.log('Enter key pressed, calling sendMessage()');
                 sendMessage();
             }
         }
 
         async function sendMessage() {
+            console.log('sendMessage() called');
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
-            
-            if (!message) return;
-            
+
+            console.log('Message:', message);
+
+            if (!message) {
+                console.log('Empty message, returning');
+                return;
+            }
+
             // Add user message to chat
             addMessage(message, 'user');
             input.value = '';
-            
+
             // Show typing indicator
             showTypingIndicator();
-            
+
             // Disable send button
             const sendBtn = document.getElementById('sendBtn');
             sendBtn.disabled = true;
@@ -534,13 +631,13 @@ How can I assist you today?
                 });
                 
                 const data = await response.json();
-                
+
                 if (data.error) {
                     addMessage(`Error: ${data.error}`, 'assistant');
                 } else {
-                    addMessage(data.response, 'assistant');
+                    addMessage(data.response, 'assistant', data.message_id, data.has_thoughts, data.thought_blocks);
                 }
-                
+
             } catch (error) {
                 addMessage(`Error: ${error.message}`, 'assistant');
             } finally {
@@ -549,10 +646,13 @@ How can I assist you today?
             }
         }
 
-        function addMessage(content, sender) {
+        function addMessage(content, sender, messageId = null, hasThoughts = false, thoughtBlocks = []) {
             const chatContainer = document.getElementById('chatContainer');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender} chat-container`;
+            if (messageId) {
+                messageDiv.setAttribute('data-message-id', messageId);
+            }
 
             const avatar = document.createElement('div');
             avatar.className = 'message-avatar';
@@ -561,50 +661,25 @@ How can I assist you today?
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
 
-            // Handle thought processing for assistant messages
-            if (sender === 'assistant' && content.includes('[THOUGHT_TOGGLE]')) {
-                console.log('Processing assistant message with thoughts');
-                console.log('Full content:', content);
+            // Apply basic formatting to content
+            const htmlContent = content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
+                .replace(/\n/g, '<br>')                            // Line breaks
+                .replace(/- (.*?)(<br>|$)/g, '• $1$2');           // Bullet points
 
-                // Split main content and thought data
-                const parts = content.split('[THOUGHT_TOGGLE]');
-                const mainContent = parts[0].trim();
-                const thoughtSection = parts[1] || '';
+            messageContent.innerHTML = htmlContent;
 
-                console.log('Main content extracted:', `"${mainContent}"`);
-                console.log('Thought section:', thoughtSection);
+            // Handle thought blocks for assistant messages
+            if (sender === 'assistant' && hasThoughts && thoughtBlocks && thoughtBlocks.length > 0) {
+                console.log('Adding thought blocks:', thoughtBlocks);
 
-                // Make sure we have main content
-                if (!mainContent) {
-                    console.error('No main content found!');
-                    messageContent.innerHTML = '<em>Error: No response content</em>';
-                    return;
-                }
+                // Create thought toggle container
+                const thoughtContainer = document.createElement('div');
+                thoughtContainer.style.cssText = 'margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;';
 
-                // Apply basic formatting to main content
-                const htmlContent = mainContent
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
-                    .replace(/\n/g, '<br>')                            // Line breaks
-                    .replace(/- (.*?)(<br>|$)/g, '• $1$2');           // Bullet points
-
-                console.log('HTML content for main response:', `"${htmlContent}"`);
-
-                // Set the main content FIRST
-                messageContent.innerHTML = htmlContent;
-
-                // Verify it was set
-                console.log('Content actually set in DOM:', messageContent.innerHTML);
-
-                // Extract thought data
-                const thoughtMatches = thoughtSection.match(/\[THOUGHT_DATA:(\d+)\](.*?)\[\/THOUGHT_DATA:\1\]/g);
-
-                if (thoughtMatches && thoughtMatches.length > 0) {
-                    // Create thought toggle button
-                    const thoughtContainer = document.createElement('div');
-                    thoughtContainer.style.cssText = 'margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;';
-
-                    const toggleButton = document.createElement('button');
+                // Create toggle button
+                const toggleButton = document.createElement('button');
                     toggleButton.style.cssText = `
                         background: #ffffff;
                         border: 1px solid #dee2e6;
@@ -618,12 +693,10 @@ How can I assist you today?
                         transition: all 0.2s ease;
                     `;
 
-                    const tokenCount = thoughtMatches.reduce((total, match) => {
-                        const content = match.replace(/\[THOUGHT_DATA:\d+\](.*?)\[\/THOUGHT_DATA:\d+\]/, '$1');
-                        return total + content.trim().split(' ').length;
-                    }, 0);
+                    // Calculate total token count from thought blocks
+                    const totalTokens = thoughtBlocks.reduce((total, block) => total + block.token_count, 0);
 
-                    toggleButton.innerHTML = `🧠 SAM's Thoughts (${tokenCount} tokens)`;
+                    toggleButton.innerHTML = `🧠 SAM's Thoughts (${totalTokens} tokens) ▶`;
 
                     const thoughtContent = document.createElement('div');
                     thoughtContent.style.cssText = `
@@ -640,12 +713,11 @@ How can I assist you today?
                         white-space: pre-wrap;
                     `;
 
-                    // Extract and display thought content
+                    // Combine all thought blocks
                     let allThoughts = '';
-                    thoughtMatches.forEach((match, index) => {
-                        const content = match.replace(/\[THOUGHT_DATA:\d+\](.*?)\[\/THOUGHT_DATA:\d+\]/, '$1').trim();
+                    thoughtBlocks.forEach((block, index) => {
                         if (index > 0) allThoughts += '\n\n---\n\n';
-                        allThoughts += content;
+                        allThoughts += block.content;
                     });
 
                     thoughtContent.textContent = allThoughts;
@@ -655,7 +727,7 @@ How can I assist you today?
                     toggleButton.addEventListener('click', () => {
                         isExpanded = !isExpanded;
                         thoughtContent.style.display = isExpanded ? 'block' : 'none';
-                        toggleButton.innerHTML = `🧠 SAM's Thoughts (${tokenCount} tokens) ${isExpanded ? '▼' : '▶'}`;
+                        toggleButton.innerHTML = `🧠 SAM's Thoughts (${totalTokens} tokens) ${isExpanded ? '▼' : '▶'}`;
                         toggleButton.style.backgroundColor = isExpanded ? '#f8f9fa' : '#ffffff';
                     });
 
@@ -670,25 +742,17 @@ How can I assist you today?
 
                     thoughtContainer.appendChild(toggleButton);
                     thoughtContainer.appendChild(thoughtContent);
-                    messageDiv.appendChild(thoughtContainer);
-                }
-
-            } else {
-                // Regular message processing
-                console.log('Adding regular message:', sender, content);
-
-                // Apply basic formatting
-                const htmlContent = content
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
-                    .replace(/\n/g, '<br>')                            // Line breaks
-                    .replace(/- (.*?)(<br>|$)/g, '• $1$2');           // Bullet points
-
-                messageContent.innerHTML = htmlContent;
+                    messageContent.appendChild(thoughtContainer);
             }
 
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(messageContent);
+
+            // Add feedback controls for assistant messages
+            if (sender === 'assistant' && messageId) {
+                const feedbackDiv = createFeedbackControls(messageId);
+                messageDiv.appendChild(feedbackDiv);
+            }
 
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -709,6 +773,131 @@ How can I assist you today?
 
         function hideTypingIndicator() {
             document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        // Phase 6 Feedback System Functions
+        function createFeedbackControls(messageId) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-controls';
+            feedbackDiv.innerHTML = `
+                <span class="feedback-text">How was this response?</span>
+                <div class="feedback-buttons">
+                    <button class="feedback-btn positive" onclick="submitFeedback('${messageId}', 'positive')" title="Good response">
+                        👍 Helpful
+                    </button>
+                    <button class="feedback-btn negative" onclick="submitFeedback('${messageId}', 'negative')" title="Needs improvement">
+                        👎 Not helpful
+                    </button>
+                    <button class="feedback-btn" onclick="showCorrectionInput('${messageId}')" title="Provide specific feedback">
+                        ✏️ Suggest improvement
+                    </button>
+                </div>
+            `;
+            return feedbackDiv;
+        }
+
+        async function submitFeedback(messageId, type) {
+            const rating = type === 'positive' ? 0.8 : 0.2;
+
+            try {
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message_id: messageId,
+                        rating: rating,
+                        feedback_type: type
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update feedback controls to show submitted state
+                    const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+                    const feedbackControls = messageDiv.querySelector('.feedback-controls');
+
+                    feedbackControls.innerHTML = `
+                        <span class="feedback-submitted">✅ Thank you for your feedback! SAM is learning from this.</span>
+                    `;
+
+                    // Show learning notification
+                    if (data.learning_applied) {
+                        addMessage(`🧠 **Learning Update:** I've noted your feedback and will adjust my responses accordingly. ${data.learning_insight || ''}`, 'assistant');
+                    }
+                } else {
+                    console.error('Feedback submission failed:', data.error);
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+            }
+        }
+
+        function showCorrectionInput(messageId) {
+            const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+            const feedbackControls = messageDiv.querySelector('.feedback-controls');
+
+            feedbackControls.innerHTML = `
+                <span class="feedback-text">What could be improved?</span>
+                <textarea class="correction-input" id="correction-${messageId}" placeholder="Please describe what could be better about this response..."></textarea>
+                <button class="correction-submit" onclick="submitCorrection('${messageId}')">Submit Feedback</button>
+                <button class="feedback-btn" onclick="cancelCorrection('${messageId}')" style="margin-left: 8px;">Cancel</button>
+            `;
+        }
+
+        async function submitCorrection(messageId) {
+            const correctionText = document.getElementById(`correction-${messageId}`).value.trim();
+
+            if (!correctionText) {
+                alert('Please provide some feedback before submitting.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message_id: messageId,
+                        rating: 0.4, // Neutral rating for corrections
+                        feedback_type: 'correction',
+                        correction_text: correctionText
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+                    const feedbackControls = messageDiv.querySelector('.feedback-controls');
+
+                    feedbackControls.innerHTML = `
+                        <span class="feedback-submitted">✅ Thank you for the detailed feedback! SAM is learning from your suggestions.</span>
+                    `;
+
+                    // Show learning notification with specific insights
+                    if (data.learning_applied) {
+                        addMessage(`🧠 **Learning Update:** I've analyzed your feedback: "${correctionText.substring(0, 100)}${correctionText.length > 100 ? '...' : ''}" and will improve my responses. ${data.learning_insight || ''}`, 'assistant');
+                    }
+                } else {
+                    console.error('Correction submission failed:', data.error);
+                    alert('Failed to submit feedback. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error submitting correction:', error);
+                alert('Error submitting feedback. Please try again.');
+            }
+        }
+
+        function cancelCorrection(messageId) {
+            const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+            const feedbackDiv = createFeedbackControls(messageId);
+            const oldFeedbackControls = messageDiv.querySelector('.feedback-controls');
+            messageDiv.replaceChild(feedbackDiv, oldFeedbackControls);
         }
 
         function openMemoryControlCenter() {
@@ -864,6 +1053,57 @@ The Memory Control Center runs on port 8501 and should be accessible once SAM is
             }
         }
 
+        // Add event listeners to avoid CSP issues with inline onclick
+        document.addEventListener('DOMContentLoaded', function() {
+            // Send button event listener
+            const sendBtn = document.getElementById('sendBtn');
+            if (sendBtn) {
+                sendBtn.addEventListener('click', sendMessage);
+            }
+
+            // Input field event listener for Enter key
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                messageInput.addEventListener('keypress', handleKeyPress);
+            }
+
+            // Upload modal buttons
+            const uploadBtn = document.querySelector('.upload-btn');
+            if (uploadBtn) {
+                uploadBtn.addEventListener('click', openUploadModal);
+            }
+
+            const closeModalBtn = document.querySelector('.close-modal');
+            if (closeModalBtn) {
+                closeModalBtn.addEventListener('click', closeUploadModal);
+            }
+
+            const processBtn = document.getElementById('processBtn');
+            if (processBtn) {
+                processBtn.addEventListener('click', uploadFile);
+            }
+
+            // Memory control center button
+            const memoryBtn = document.querySelector('.memory-control-btn');
+            if (memoryBtn) {
+                memoryBtn.addEventListener('click', openMemoryControlCenter);
+            }
+
+            // File input change event
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) {
+                fileInput.addEventListener('change', handleFileSelect);
+            }
+
+            // Upload area click event
+            const uploadAreaClick = document.getElementById('uploadArea');
+            if (uploadAreaClick) {
+                uploadAreaClick.addEventListener('click', function() {
+                    document.getElementById('fileInput').click();
+                });
+            }
+        });
+
         // Drag and drop functionality
         const uploadArea = document.getElementById('uploadArea');
         
@@ -904,7 +1144,7 @@ The Memory Control Center runs on port 8501 and should be accessible once SAM is
                 Verifying Ollama connection and model availability...
             </div>
         </div>
-        <button class="refresh-status" onclick="checkModelStatus()" title="Refresh model status">
+        <button class="refresh-status" title="Refresh model status">
             🔄 Refresh
         </button>
     </div>
@@ -950,6 +1190,12 @@ The Memory Control Center runs on port 8501 and should be accessible once SAM is
 
             // Set up periodic status checks every 30 seconds
             modelStatusInterval = setInterval(checkModelStatus, 30000);
+
+            // Add event listener for refresh button
+            const refreshBtn = document.querySelector('.refresh-status');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', checkModelStatus);
+            }
         });
 
         // Clean up interval when page unloads

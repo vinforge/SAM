@@ -189,7 +189,7 @@ class MemoryBrowserUI:
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🗑️ Clear Filters"):
+                if st.button("🗑️ Clear Filters", key="clear_filters_button"):
                     st.session_state.filter_settings = {
                         'memory_types': [],
                         'tags': [],
@@ -205,7 +205,7 @@ class MemoryBrowserUI:
                     st.rerun()
 
             with col2:
-                if st.button("💾 Save Preset"):
+                if st.button("💾 Save Preset", key="save_preset_button"):
                     self._save_filter_preset()
 
             # Filter presets
@@ -239,7 +239,7 @@ class MemoryBrowserUI:
             real_time_search = st.checkbox("🔄 Real-time", value=False, help="Search as you type")
 
         with col3:
-            search_button = st.button("🔍 Search", type="primary")
+            search_button = st.button("🔍 Search", type="primary", key="main_search_button")
 
         # Phase 3.2.3: Source-specific search
         st.markdown("**🎯 Source-Specific Search:**")

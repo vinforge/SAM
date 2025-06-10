@@ -20,11 +20,22 @@ try:
     from utils.vector_manager import VectorManager
     from multimodal_processing.multimodal_pipeline import get_multimodal_pipeline
     from utils.embedding_utils import get_embedding_manager
+    # Import security middleware
+    from web_ui.security_middleware import (
+        security_middleware, require_unlock, optional_security,
+        get_secure_memory_store, create_security_routes, inject_security_context
+    )
 except ImportError:
     # Fallback imports for development
     VectorManager = None
     get_multimodal_pipeline = None
     get_embedding_manager = None
+    security_middleware = None
+    require_unlock = lambda f: f
+    optional_security = lambda f: f
+    get_secure_memory_store = None
+    create_security_routes = lambda app: None
+    inject_security_context = lambda: {}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -322,8 +333,9 @@ def index():
     return render_template('index.html')
 
 @app.route('/api/chat', methods=['POST'])
+@optional_security
 def chat():
-    """Handle chat messages."""
+    """Handle chat messages with optional security."""
     try:
         data = request.get_json()
         message = data.get('message', '').strip()
@@ -340,13 +352,30 @@ def chat():
             return handle_command(message)
         
         # Generate response using SAM
-        response = generate_sam_response(message)
-        
-        return jsonify({
-            'response': response,
-            'timestamp': datetime.now().isoformat(),
-            'conversation_id': session['conversation_id']
-        })
+        response_data = generate_sam_response(message)
+
+        # Generate unique message ID for feedback tracking
+        message_id = str(uuid.uuid4())
+
+        # Handle both string responses and dict responses with thought blocks
+        if isinstance(response_data, dict):
+            return jsonify({
+                'response': response_data['response'],
+                'message_id': message_id,
+                'timestamp': datetime.now().isoformat(),
+                'conversation_id': session['conversation_id'],
+                'has_thoughts': response_data.get('has_thoughts', False),
+                'thought_blocks': response_data.get('thought_blocks', [])
+            })
+        else:
+            return jsonify({
+                'response': response_data,
+                'message_id': message_id,
+                'timestamp': datetime.now().isoformat(),
+                'conversation_id': session['conversation_id'],
+                'has_thoughts': False,
+                'thought_blocks': []
+            })
         
     except Exception as e:
         logger.error(f"Error in chat: {e}")
@@ -718,11 +747,11 @@ def generate_enhanced_document_response(message, document_memories):
                 )
                 logger.info(f"Enhanced document search returned {len(relevant_memories)} ranked results")
             else:
-                relevant_memories = memory_store.search_memories(message, max_results=10, min_similarity=0.1)
+                relevant_memories = memory_store.search_memories(message, max_results=10, min_similarity=0.2)
                 logger.info(f"Fallback document search returned {len(relevant_memories)} results")
         except Exception as e:
             logger.warning(f"Enhanced document search failed, using fallback: {e}")
-            relevant_memories = memory_store.search_memories(message, max_results=10, min_similarity=0.1)
+            relevant_memories = memory_store.search_memories(message, max_results=10, min_similarity=0.2)
 
         # Filter to only document memories and get the most relevant ones
         # DEBUG: Log source formats to understand filtering issue
@@ -746,7 +775,7 @@ def generate_enhanced_document_response(message, document_memories):
                 memory_type = getattr(m, 'memory_type', 'NO_TYPE')
             logger.info(f"DEBUG Memory {i}: source='{source}', content='{content_preview}...', type='{memory_type}'")
 
-        # More flexible filtering - check for document indicators
+        # More flexible filtering - check for document indicators with relevance check
         document_relevant = []
         for m in relevant_memories:
             # Phase 3.2: Handle both RankedMemoryResult and MemorySearchResult
@@ -754,33 +783,58 @@ def generate_enhanced_document_response(message, document_memories):
                 # RankedMemoryResult
                 source = str(m.metadata.get('source_path', ''))
                 memory_type = str(m.metadata.get('memory_type', ''))
+                content = str(m.content)
             elif hasattr(m, 'chunk'):
                 # MemorySearchResult
                 chunk = m.chunk
                 source = str(getattr(chunk, 'source', ''))
                 memory_type = str(getattr(chunk, 'memory_type', ''))
+                content = str(getattr(chunk, 'content', ''))
             else:
                 # Fallback
                 source = str(getattr(m, 'source', ''))
                 memory_type = str(getattr(m, 'memory_type', ''))
+                content = str(getattr(m, 'content', ''))
 
             # Check for document type or document indicators in source
-            if (memory_type.lower() == 'document' or
-                any(indicator in source.lower() for indicator in ['document:', 'uploads/', '.pdf', '.txt', '.docx'])):
-                document_relevant.append(m)
+            is_document = (memory_type.lower() == 'document' or
+                          any(indicator in source.lower() for indicator in ['document:', 'uploads/', '.pdf', '.txt', '.docx']))
+
+            # Additional relevance check for person queries
+            if is_document:
+                # For "Who is X" queries, check if the content actually mentions the person
+                query_lower = message.lower()
+                if any(phrase in query_lower for phrase in ['who is', 'about', 'tell me about']):
+                    # Extract the person/entity name from the query
+                    import re
+                    query_terms = [word.strip() for word in re.findall(r'\b[A-Z][a-z]+\b', message)]
+                    if query_terms:
+                        content_lower = content.lower()
+                        # Check if any query terms appear in the content
+                        content_relevant = any(term.lower() in content_lower for term in query_terms)
+                        if content_relevant:
+                            document_relevant.append(m)
+                        else:
+                            logger.info(f"Filtering out irrelevant document: {extract_clean_source_name(source)} - no mention of {query_terms}")
+                    else:
+                        document_relevant.append(m)  # Fallback if no terms extracted
+                else:
+                    # For other document queries, include all documents
+                    document_relevant.append(m)
 
         logger.info(f"Found {len(document_relevant)} document memories out of {len(relevant_memories)} total memories")
 
         if not document_relevant:
-            # Try a broader search with key terms from the query
+            # Try a broader search with key terms from the query, but with better relevance filtering
             import re
             # Extract potential names or key terms
             words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', message)
             if words:
                 broader_query = ' '.join(words)
                 logger.info(f"Trying broader search with: {broader_query}")
-                relevant_memories = memory_store.search_memories(broader_query, max_results=10, min_similarity=0.05)
-                # Use same flexible filtering for broader search
+                relevant_memories = memory_store.search_memories(broader_query, max_results=10, min_similarity=0.15)  # Increased threshold
+
+                # Apply stricter relevance filtering for broader search
                 document_relevant = []
                 for m in relevant_memories:
                     # Handle MemorySearchResult objects
@@ -788,14 +842,38 @@ def generate_enhanced_document_response(message, document_memories):
                         chunk = m.chunk
                         source = str(getattr(chunk, 'source', ''))
                         memory_type = str(getattr(chunk, 'memory_type', ''))
+                        content = str(getattr(chunk, 'content', ''))
                     else:
                         source = str(getattr(m, 'source', ''))
                         memory_type = str(getattr(m, 'memory_type', ''))
+                        content = str(getattr(m, 'content', ''))
 
-                    # Check for document type or document indicators in source
-                    if (memory_type.lower() == 'document' or
-                        any(indicator in source.lower() for indicator in ['document:', 'uploads/', '.pdf', '.txt', '.docx'])):
+                    # Enhanced relevance check: document type AND content relevance
+                    is_document = (memory_type.lower() == 'document' or
+                                 any(indicator in source.lower() for indicator in ['document:', 'uploads/', '.pdf', '.txt', '.docx']))
+
+                    # Check if content is actually relevant to the query
+                    content_relevant = False
+                    if is_document:
+                        # For person queries, check if the content mentions the person
+                        query_lower = message.lower()
+                        content_lower = content.lower()
+
+                        # Extract names from query
+                        if any(word in query_lower for word in ['who is', 'about', 'tell me about']):
+                            # This is likely a person/entity query
+                            query_terms = [word.strip() for word in re.findall(r'\b[A-Z][a-z]+\b', message)]
+                            if query_terms:
+                                # Check if any query terms appear in content
+                                content_relevant = any(term.lower() in content_lower for term in query_terms)
+                        else:
+                            # For other queries, use basic keyword matching
+                            content_relevant = True  # Allow other document queries through
+
+                    if is_document and content_relevant:
                         document_relevant.append(m)
+
+                logger.info(f"Broader search found {len(document_relevant)} relevant documents after filtering")
 
         if document_relevant:
             logger.info(f"Found {len(document_relevant)} relevant document memories")
@@ -844,32 +922,77 @@ def generate_enhanced_document_response(message, document_memories):
 
             context_text = "\n\n".join(context_parts)
 
-            # Create concise prompt to reduce processing time
-            prompt = f"""Based on the uploaded documents, answer: {message}
+            # Create comprehensive prompt for detailed responses
+            prompt = f"""You are SAM, an intelligent assistant. Answer the user's question based on the provided document context.
 
-Context:
+User question: {message}
+
+Context from documents:
 {context_text}
 
-Instructions: Answer using only the provided context. Include source citations. Be concise and accurate."""
+Instructions:
+- If you need to think through the problem, put your reasoning inside <think></think> tags
+- After your thinking, provide a comprehensive, detailed answer based on the provided context
+- Include relevant details, background information, and specific facts from the documents
+- Be thorough and informative while remaining professional
+- Your final answer should not include reasoning steps or thinking process
 
-            response = sam_model.generate(prompt, temperature=0.3, max_tokens=300, use_learned_knowledge=False)
+Example format:
+<think>
+Let me analyze the context... [your reasoning here]
+</think>
 
-            # Clean up response - remove think blocks for document queries
+[Comprehensive answer with details here]
+
+Answer:"""
+
+            response = sam_model.generate(prompt, temperature=0.3, max_tokens=800, use_learned_knowledge=False)
+
+            # Clean up response - remove think blocks and internal reasoning
             import re
             response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE)
             response = response.strip()
 
-            # Clean up response
+            # Clean up response prefixes
             if response.startswith("Response:"):
                 response = response[9:].strip()
+            if response.startswith("Answer:"):
+                response = response[7:].strip()
 
-            # Phase 3.2: Inject enhanced citations with rich metadata
+            # Remove only the most obvious internal reasoning patterns (less aggressive)
+            reasoning_patterns = [
+                r'Okay, let me think.*?(?=\n\n|\Z)',  # "Okay, let me think..."
+                r'📚 Sources:\s*\d+\..*?(?=\n\n|\Z)',          # Duplicate source sections only
+                r'I should focus.*?(?=\n\n|\Z)',               # "I should focus..."
+            ]
+
+            for pattern in reasoning_patterns:
+                response = re.sub(pattern, '', response, flags=re.DOTALL | re.IGNORECASE)
+
+            response = response.strip()
+
+            # If response is empty or too short after cleaning, provide a fallback
+            if len(response.strip()) < 20:
+                response = "Based on the uploaded documents, I found relevant information but need more context to provide a complete answer."
+
+            # Process thoughts to separate reasoning from answer
+            from utils.thought_processor import get_thought_processor
+            thought_processor = get_thought_processor()
+            processed = thought_processor.process_response(response)
+
+            # Use the clean visible content as the response
+            response = processed.visible_content
+
+            # Store thought blocks for potential "Show Thoughts" feature
+            if processed.has_thoughts:
+                logger.info(f"Extracted {len(processed.thought_blocks)} thought blocks from response")
+
+            # Phase 3.2: Try to inject enhanced citations with rich metadata
             try:
                 from memory.citation_engine import get_citation_engine
                 citation_engine = get_citation_engine()
 
                 logger.info(f"Attempting citation generation with {len(document_relevant)} memories")
-                logger.info(f"Memory types: {[type(m).__name__ for m in document_relevant[:3]]}")
 
                 # Generate citations from the memories used
                 cited_response = citation_engine.inject_citations(response, document_relevant, message)
@@ -881,43 +1004,54 @@ Instructions: Answer using only the provided context. Include source citations. 
                 response = cited_response.response_text
 
             except Exception as e:
-                logger.error(f"Citation generation failed: {e}")
-                import traceback
-                logger.error(f"Citation error traceback: {traceback.format_exc()}")
-
-                # Fallback: add basic source list
-                if document_relevant and len(document_relevant) > 0:
-                    response += f"\n\n**Sources:** {len(document_relevant)} document(s) referenced"
+                logger.warning(f"Citation generation failed, using fallback: {e}")
+                # Continue with manual citation formatting below
 
             # Calculate overall confidence
             overall_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
 
-            # Add enhanced source transparency with detailed citations
-            response += f"\n\n**📚 Sources:**"
+            # Add clean, formatted source citations
+            if source_details:
+                response += f"\n\n**📚 Sources:**"
 
-            # Add detailed source citations with confidence indicators
-            for i, source_detail in enumerate(source_details, 1):
-                similarity_pct = source_detail['similarity'] * 100
+                # Add detailed source citations with confidence indicators
+                for i, source_detail in enumerate(source_details, 1):
+                    similarity_pct = source_detail['similarity'] * 100
 
-                # Create confidence indicator dots
-                confidence_dots = "●" * min(5, int(similarity_pct / 20)) + "○" * (5 - min(5, int(similarity_pct / 20)))
+                    # Create confidence indicator dots
+                    confidence_dots = "●" * min(5, int(similarity_pct / 20)) + "○" * (5 - min(5, int(similarity_pct / 20)))
 
-                response += f"\n{i}. 📚 **{source_detail['name']}** {confidence_dots} ({similarity_pct:.1f}%)"
-                response += f"\n   _{source_detail['content_preview']}_"
+                    response += f"\n{i}. 📚 **{source_detail['name']}** {confidence_dots} ({similarity_pct:.1f}%)"
 
-            # Add overall confidence score with color coding
-            confidence_pct = overall_confidence * 100
-            if confidence_pct >= 70:
-                confidence_emoji = "🟢"
-            elif confidence_pct >= 50:
-                confidence_emoji = "🟡"
+                # Add overall confidence score with color coding
+                confidence_pct = overall_confidence * 100
+                if confidence_pct >= 70:
+                    confidence_emoji = "🟢"
+                elif confidence_pct >= 50:
+                    confidence_emoji = "🟡"
+                else:
+                    confidence_emoji = "🔴"
+
+                response += f"\n\n{confidence_emoji} **Confidence:** {confidence_pct:.1f}%"
+
+            logger.info(f"Clean document response generated: {len(response)} chars")
+
+            # Return response with thought blocks if available
+            if processed.has_thoughts:
+                return {
+                    'response': response,
+                    'has_thoughts': True,
+                    'thought_blocks': [
+                        {
+                            'content': block.content,
+                            'token_count': block.token_count,
+                            'block_id': block.block_id
+                        }
+                        for block in processed.thought_blocks
+                    ]
+                }
             else:
-                confidence_emoji = "🔴"
-
-            response += f"\n\n{confidence_emoji} **Confidence:** {confidence_pct:.1f}%"
-
-            logger.info(f"Enhanced document response generated: {len(response)} chars")
-            return response
+                return response
         else:
             # No relevant content found
             available_docs = set()
@@ -1029,16 +1163,18 @@ def generate_general_document_response(message):
 
             context = "\n\n".join(context_parts)
 
-            prompt = f"""You are SAM, an intelligent assistant. The user is asking about documents. Based on the following context from uploaded documents, provide a helpful response.
+            prompt = f"""You are SAM, an intelligent assistant. The user is asking about documents. Based on the following context from uploaded documents, provide a comprehensive and detailed response.
 
 User question: {message}
 
 Context from documents:
 {context}
 
+Please provide a thorough answer with relevant details from the documents.
+
 Response:"""
 
-            response = sam_model.generate(prompt, temperature=0.7, max_tokens=500)
+            response = sam_model.generate(prompt, temperature=0.7, max_tokens=800)
 
             # Clean up response
             if response.startswith("Response:"):
@@ -1103,75 +1239,61 @@ def generate_standard_response(message):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
             ]
-            response = sam_model.chat(messages, temperature=0.7, max_tokens=500)
+            response = sam_model.chat(messages, temperature=0.7, max_tokens=800)
         else:
             # Fallback to generate method with proper prompt structure
             prompt = f"{system_prompt}\n\nUser: {user_message}\n\nAssistant:"
-            response = sam_model.generate(prompt, temperature=0.7, max_tokens=500)
+            response = sam_model.generate(prompt, temperature=0.7, max_tokens=800)
 
         # Clean up response
         if response.startswith("Response:"):
             response = response[9:].strip()
 
         # Process thoughts for Sprint 16
-        processed_response = process_response_thoughts(response)
+        from utils.thought_processor import get_thought_processor
+        thought_processor = get_thought_processor()
+        processed = thought_processor.process_response(response)
+
+        # Use the clean visible content as the response
+        clean_response = processed.visible_content
 
         # Add transparency information if high transparency score
         if transparency_score > 0.7:
-            processed_response += f"\n\n*✅ High transparency: {transparency_score:.1%} source coverage*"
+            clean_response += f"\n\n*✅ High transparency: {transparency_score:.1%} source coverage*"
         elif transparency_score > 0.4:
-            processed_response += f"\n\n*🔸 Moderate transparency: {transparency_score:.1%} source coverage*"
+            clean_response += f"\n\n*🔸 Moderate transparency: {transparency_score:.1%} source coverage*"
 
         # Add routing information for debugging (only in debug mode)
         if app.debug:
-            processed_response += f"\n\n*Debug: {routing_explanation}*"
+            clean_response += f"\n\n*Debug: {routing_explanation}*"
 
-        return processed_response
+        # Return response with thought blocks if available
+        if processed.has_thoughts:
+            return {
+                'response': clean_response,
+                'has_thoughts': True,
+                'thought_blocks': [
+                    {
+                        'content': block.content,
+                        'token_count': block.token_count,
+                        'block_id': block.block_id
+                    }
+                    for block in processed.thought_blocks
+                ]
+            }
+        else:
+            return clean_response
 
     except Exception as e:
         logger.error(f"Error generating standard response: {e}")
         return f"I apologize, but I encountered an error while processing your request: {str(e)}"
 
-def process_response_thoughts(response):
-    """Process response for Sprint 16 thought transparency."""
-    try:
-        from utils.thought_processor import get_thought_processor
-
-        thought_processor = get_thought_processor()
-
-        # Check if thoughts should be shown
-        if not thought_processor.show_thoughts:
-            # Remove all <think> blocks
-            import re
-            cleaned_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE)
-            return cleaned_response.strip()
-
-        # Process thoughts for web UI
-        processed = thought_processor.process_response(response)
-
-        if not processed.has_thoughts:
-            return response
-
-        # Use the format that the frontend JavaScript expects
-        result = processed.visible_content
-
-        if processed.thought_blocks:
-            # Add thought toggle marker
-            result += "\n\n[THOUGHT_TOGGLE]"
-
-            # Add thought data in the format the frontend expects
-            for i, block in enumerate(processed.thought_blocks):
-                result += f"\n[THOUGHT_DATA:{i}]{block.content}[/THOUGHT_DATA:{i}]"
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Error processing thoughts: {e}")
-        return response  # Return original response on error
+# Removed old process_response_thoughts function - now using structured format
 
 @app.route('/api/upload', methods=['POST'])
+@require_unlock
 def upload_file():
-    """Handle file uploads for processing."""
+    """Handle file uploads for processing with encryption."""
     try:
         logger.info("File upload request received")
 
@@ -1701,6 +1823,98 @@ def status_endpoint():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """Handle user feedback for Phase 6 personalization learning."""
+    try:
+        data = request.get_json()
+        message_id = data.get('message_id')
+        rating = data.get('rating', 0.5)
+        feedback_type = data.get('feedback_type', 'rating')
+        correction_text = data.get('correction_text', '')
+
+        logger.info(f"Feedback received: {feedback_type} for message {message_id}, rating: {rating}")
+
+        # Try to integrate with Phase 6 feedback system
+        try:
+            from personalization.phase6_integration import get_phase6_engine
+
+            engine = get_phase6_engine()
+            user_id = "default_user"  # In production, get from session/auth
+
+            # Submit feedback to Phase 6 system
+            success = engine.submit_feedback(
+                memory_id=message_id,
+                user_id=user_id,
+                rating=rating,
+                correction=correction_text if correction_text else None
+            )
+
+            # Generate learning insights
+            learning_applied = success
+            learning_insight = ""
+
+            if success and correction_text:
+                learning_insight = "I've noted your specific feedback and will adjust my communication style accordingly."
+            elif success and rating > 0.7:
+                learning_insight = "Thank you for the positive feedback! I'll remember what worked well."
+            elif success and rating < 0.4:
+                learning_insight = "I'll work on improving responses like this one."
+
+            return jsonify({
+                'success': True,
+                'learning_applied': learning_applied,
+                'learning_insight': learning_insight,
+                'message': 'Feedback processed successfully'
+            })
+
+        except ImportError:
+            logger.warning("Phase 6 system not available, storing feedback locally")
+            # Fallback: store feedback locally
+            feedback_data = {
+                'message_id': message_id,
+                'rating': rating,
+                'feedback_type': feedback_type,
+                'correction_text': correction_text,
+                'timestamp': datetime.now().isoformat(),
+                'user_id': 'default_user'
+            }
+
+            # Store in simple JSON file for now
+            feedback_file = Path('web_ui/feedback_log.json')
+            feedback_log = []
+
+            if feedback_file.exists():
+                try:
+                    with open(feedback_file, 'r') as f:
+                        feedback_log = json.load(f)
+                except:
+                    feedback_log = []
+
+            feedback_log.append(feedback_data)
+
+            # Keep only last 1000 feedback entries
+            if len(feedback_log) > 1000:
+                feedback_log = feedback_log[-1000:]
+
+            with open(feedback_file, 'w') as f:
+                json.dump(feedback_log, f, indent=2)
+
+            return jsonify({
+                'success': True,
+                'learning_applied': False,
+                'learning_insight': 'Feedback stored for future learning improvements.',
+                'message': 'Feedback recorded successfully'
+            })
+
+    except Exception as e:
+        logger.error(f"Error processing feedback: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to process feedback'
+        }), 500
+
 @app.route('/api/learning-history')
 def learning_history():
     """Get SAM's learning history from processed documents."""
@@ -1761,14 +1975,19 @@ def uploaded_file(filename):
     """Serve uploaded files."""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+# Initialize security routes and context
+create_security_routes(app)
+app.context_processor(inject_security_context)
+
 if __name__ == '__main__':
     # Create upload directory
     Path(app.config['UPLOAD_FOLDER']).mkdir(exist_ok=True)
 
     # Initialize SAM components
     if initialize_sam():
-        print("🚀 SAM Web UI starting...")
+        print("🚀 SAM Web UI starting with security integration...")
         print("🌐 Access the interface at: http://localhost:5001")
+        print("🔒 Security features: Setup/unlock, encrypted storage, session management")
         print("💡 For full SAM suite with Memory Control Center, use: python start_sam.py")
         app.run(debug=True, host='0.0.0.0', port=5001)
     else:

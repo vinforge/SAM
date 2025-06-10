@@ -11,6 +11,23 @@ from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+# Import dimension probing v2
+try:
+    from .dimension_prober_v2 import EnhancedDimensionProberV2, DimensionScoresV2
+    from .dimension_explainer import DimensionExplainer
+    DIMENSION_PROBING_V2_AVAILABLE = True
+except ImportError:
+    DIMENSION_PROBING_V2_AVAILABLE = False
+    logging.warning("Dimension probing v2 not available. Enhanced chunker will work without conceptual dimensions.")
+
+# Fallback to v1 if v2 not available
+if not DIMENSION_PROBING_V2_AVAILABLE:
+    try:
+        from .dimension_prober import DimensionProber, DimensionScores
+        DIMENSION_PROBING_V1_AVAILABLE = True
+    except ImportError:
+        DIMENSION_PROBING_V1_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 class ChunkType(Enum):
@@ -45,12 +62,83 @@ class EnhancedChunk:
     page_number: Optional[int] = None  # Source page tracking
     section_name: Optional[str] = None  # Section identification
 
+    # NEW: Conceptual dimension scores (v2 - profile-aware)
+    dimension_scores: Dict[str, float] = None  # Dynamic dimensions based on profile
+    dimension_profile: str = "general"  # Active profile used for scoring
+    dimension_confidence: Dict[str, float] = None
+    dimension_reasoning: Dict[str, str] = None
+    dimension_summary: str = ""
+    dimension_explanation: str = ""  # Human-readable explanation
+
+    # Legacy v1 fields (for backward compatibility)
+    danger_score: float = 0.0
+    complexity_score: float = 0.0
+    utility_score: float = 0.0
+    sensitivity_score: float = 0.0
+    moral_weight_score: float = 0.0
+    classification_level: float = 0.0
+    itar_sensitivity: float = 0.0
+    operational_impact: float = 0.0
+    innovation_potential: float = 0.0
+    technical_readiness: float = 0.0
+
+    def __post_init__(self):
+        if self.structured_tags is None:
+            self.structured_tags = []
+        if self.dimension_scores is None:
+            self.dimension_scores = {}
+        if self.dimension_confidence is None:
+            self.dimension_confidence = {}
+        if self.dimension_reasoning is None:
+            self.dimension_reasoning = {}
+
+    def get_dimension_score(self, dimension: str) -> float:
+        """Get score for a specific dimension."""
+        return self.dimension_scores.get(dimension, 0.0)
+
+    def get_high_dimensions(self, threshold: float = 0.6) -> List[Tuple[str, float]]:
+        """Get dimensions above threshold."""
+        return [(dim, score) for dim, score in self.dimension_scores.items() if score > threshold]
+
 class EnhancedChunker:
     """Enhanced chunking strategy with intelligent list detection and advanced strategies."""
 
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 150):
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 150,
+                 enable_dimension_probing: bool = True, dimension_profile: str = "general"):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.dimension_profile = dimension_profile
+        self.enable_dimension_probing = enable_dimension_probing
+
+        # Initialize dimension prober v2 if available
+        if self.enable_dimension_probing and DIMENSION_PROBING_V2_AVAILABLE:
+            try:
+                self.dimension_prober = EnhancedDimensionProberV2()
+                self.dimension_prober.set_profile(dimension_profile)
+                self.dimension_explainer = DimensionExplainer()
+                self.probing_version = "v2"
+                logging.info(f"Dimension probing v2 enabled with profile: {dimension_profile}")
+            except Exception as e:
+                logging.warning(f"Failed to initialize dimension prober v2: {e}")
+                self.enable_dimension_probing = False
+                self.dimension_prober = None
+                self.dimension_explainer = None
+        elif self.enable_dimension_probing and DIMENSION_PROBING_V1_AVAILABLE:
+            try:
+                from .dimension_prober import DimensionProber
+                self.dimension_prober = DimensionProber()
+                self.dimension_explainer = None
+                self.probing_version = "v1"
+                logging.info("Dimension probing v1 enabled (fallback)")
+            except Exception as e:
+                logging.warning(f"Failed to initialize dimension prober v1: {e}")
+                self.enable_dimension_probing = False
+                self.dimension_prober = None
+                self.dimension_explainer = None
+        else:
+            self.dimension_prober = None
+            self.dimension_explainer = None
+            self.probing_version = None
 
         self.capability_patterns = [
             # Defense/cyber capability patterns
@@ -218,7 +306,11 @@ class EnhancedChunker:
         
         # Post-process for capability detection and tagging
         chunks = self._post_process_capabilities(chunks)
-        
+
+        # Apply dimension probing if enabled
+        if self.enable_dimension_probing:
+            chunks = self._apply_dimension_probing(chunks)
+
         return chunks
 
     def _detect_chunk_type(self, line: str) -> Tuple[ChunkType, Dict[str, Any], int]:
@@ -376,6 +468,163 @@ class EnhancedChunker:
         
         return capabilities
 
+    def _apply_dimension_probing(self, chunks: List[EnhancedChunk]) -> List[EnhancedChunk]:
+        """Apply conceptual dimension probing to chunks (v2 with profile awareness)."""
+        if not self.dimension_prober:
+            return chunks
+
+        for chunk in chunks:
+            try:
+                # Create context for dimension probing
+                context = {
+                    'chunk_type': chunk.chunk_type.value,
+                    'source_location': chunk.source_location,
+                    'section_title': chunk.section_title,
+                    'has_capabilities': chunk.metadata.get('has_capabilities', False),
+                    'has_requirements': chunk.metadata.get('has_requirements', False)
+                }
+
+                if self.probing_version == "v2":
+                    # Use v2 dimension probing with profiles
+                    probe_result = self.dimension_prober.probe_chunk(
+                        chunk.content, context, profile=self.dimension_profile
+                    )
+
+                    # Apply v2 dimension scores
+                    chunk.dimension_scores = probe_result.scores.scores
+                    chunk.dimension_profile = probe_result.scores.profile
+                    chunk.dimension_confidence = probe_result.scores.confidence
+                    chunk.dimension_reasoning = probe_result.scores.reasoning
+                    chunk.dimension_summary = self.dimension_prober.get_dimension_summary(probe_result.scores)
+
+                    # Generate human-readable explanation
+                    if self.dimension_explainer:
+                        profile_config = self.dimension_prober.profile_manager.get_profile(self.dimension_profile)
+                        explanation_result = self.dimension_explainer.explain_scores(
+                            probe_result.scores, chunk.content, profile_config
+                        )
+                        chunk.dimension_explanation = explanation_result.summary
+
+                    # Update legacy fields for backward compatibility
+                    self._update_legacy_dimension_fields(chunk, probe_result.scores)
+
+                    # Calculate priority boost using v2 method
+                    dimension_boost = self.dimension_prober.calculate_priority_boost(probe_result.scores)
+
+                    # Update metadata with v2 information
+                    chunk.metadata.update({
+                        'dimension_probe_method': probe_result.scores.processing_method,
+                        'dimension_processing_time_ms': probe_result.processing_time_ms,
+                        'dimension_profile': probe_result.scores.profile,
+                        'dimension_summary': chunk.dimension_summary,
+                        'dimension_explanation': chunk.dimension_explanation,
+                        'high_dimensions': [dim for dim, score in chunk.dimension_scores.items() if score > 0.6]
+                    })
+
+                else:
+                    # Use v1 dimension probing (fallback)
+                    probe_result = self.dimension_prober.probe_chunk(chunk.content, context)
+                    scores = probe_result.scores
+
+                    # Apply v1 dimension scores to legacy fields
+                    chunk.danger_score = scores.danger
+                    chunk.complexity_score = scores.complexity
+                    chunk.utility_score = scores.utility
+                    chunk.sensitivity_score = scores.sensitivity
+                    chunk.moral_weight_score = scores.moral_weight
+                    chunk.classification_level = scores.classification_level
+                    chunk.itar_sensitivity = scores.itar_sensitivity
+                    chunk.operational_impact = scores.operational_impact
+                    chunk.innovation_potential = scores.innovation_potential
+                    chunk.technical_readiness = scores.technical_readiness
+
+                    # Store v1 metadata
+                    chunk.dimension_confidence = scores.confidence
+                    chunk.dimension_reasoning = probe_result.reasoning
+                    chunk.dimension_summary = self.dimension_prober.get_dimension_summary(scores)
+
+                    # Calculate priority boost using v1 method
+                    dimension_boost = self._calculate_dimension_priority_boost_v1(scores)
+
+                    # Update metadata with v1 information
+                    chunk.metadata.update({
+                        'dimension_probe_method': probe_result.probe_method,
+                        'dimension_processing_time_ms': probe_result.processing_time_ms,
+                        'dimension_summary': chunk.dimension_summary,
+                        'high_danger': scores.danger > 0.6,
+                        'high_complexity': scores.complexity > 0.6,
+                        'high_sensitivity': scores.sensitivity > 0.6,
+                        'high_innovation': scores.innovation_potential > 0.6
+                    })
+
+                # Apply priority boost
+                chunk.priority_score = min(3.0, chunk.priority_score * dimension_boost)
+
+            except Exception as e:
+                logging.warning(f"Failed to apply dimension probing to chunk: {e}")
+                # Continue without dimension scores
+
+        return chunks
+
+    def _update_legacy_dimension_fields(self, chunk: EnhancedChunk, scores_v2: 'DimensionScoresV2'):
+        """Update legacy dimension fields for backward compatibility."""
+        # Map v2 scores to v1 fields where possible
+        chunk.utility_score = scores_v2.get_score('utility')
+        chunk.complexity_score = scores_v2.get_score('complexity') or scores_v2.get_score('technical_depth')
+        chunk.sensitivity_score = scores_v2.get_score('sensitivity') or scores_v2.get_score('compliance_risk')
+
+        # Map profile-specific dimensions to legacy fields
+        if scores_v2.profile == "researcher":
+            chunk.innovation_potential = scores_v2.get_score('novelty')
+            chunk.technical_readiness = scores_v2.get_score('methodology')
+        elif scores_v2.profile == "business":
+            chunk.operational_impact = scores_v2.get_score('market_impact')
+            chunk.innovation_potential = scores_v2.get_score('roi_potential')
+        elif scores_v2.profile == "legal":
+            chunk.sensitivity_score = max(chunk.sensitivity_score, scores_v2.get_score('liability'))
+            chunk.operational_impact = scores_v2.get_score('contractual_impact')
+
+    def _calculate_dimension_priority_boost_v1(self, scores: 'DimensionScores') -> float:
+        """Calculate priority boost based on v1 dimension scores."""
+        boost = 1.0
+
+        # High-value dimensions increase priority
+        if scores.danger > 0.6:
+            boost *= 1.2  # Security-critical content
+        if scores.complexity > 0.6:
+            boost *= 1.15  # Technical complexity
+        if scores.utility > 0.6:
+            boost *= 1.1  # High utility
+        if scores.innovation_potential > 0.6:
+            boost *= 1.25  # Innovation value for SBIR
+        if scores.operational_impact > 0.6:
+            boost *= 1.2  # Mission-critical content
+
+        return min(boost, 1.5)  # Cap boost at 1.5x
+
+    def set_dimension_profile(self, profile: str):
+        """Change the dimension profile for future chunking operations."""
+        if self.dimension_prober and self.probing_version == "v2":
+            self.dimension_profile = profile
+            self.dimension_prober.set_profile(profile)
+            logging.info(f"Dimension profile changed to: {profile}")
+        else:
+            logging.warning("Profile switching only available with dimension probing v2")
+
+    def get_available_profiles(self) -> List[str]:
+        """Get list of available dimension profiles."""
+        if self.dimension_prober and self.probing_version == "v2":
+            return self.dimension_prober.profile_manager.list_profiles()
+        else:
+            return []
+
+    def get_profile_description(self, profile: str) -> str:
+        """Get description of a dimension profile."""
+        if self.dimension_prober and self.probing_version == "v2":
+            return self.dimension_prober.profile_manager.get_profile_description(profile)
+        else:
+            return f"Profile: {profile} (description not available)"
+
     def hierarchical_chunk_text(self, text: str, source_location: str, page_number: int = None) -> List[EnhancedChunk]:
         """
         Advanced hierarchical chunking with title+body fusion and overlapping windows.
@@ -400,6 +649,10 @@ class EnhancedChunker:
 
         # Fourth pass: Add embedding prefixes
         chunks = self._add_embedding_prefixes(chunks)
+
+        # Fifth pass: Apply dimension probing if enabled
+        if self.enable_dimension_probing:
+            chunks = self._apply_dimension_probing(chunks)
 
         return chunks
 

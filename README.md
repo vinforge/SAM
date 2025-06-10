@@ -1,6 +1,10 @@
-# SAM Community Edition Beta
+# 🧠 SAM (Secure AI Memory) - Community Edition
 
-**Smart Assistant Memory** - A privacy-focused AI assistant that learns and remembers.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
+
+**SAM** is an advanced AI assistant with secure memory capabilities, designed to provide personalized, context-aware interactions while maintaining enterprise-grade security and privacy.
 
 SAM is an open-source AI assistant designed to provide intelligent conversations while maintaining complete privacy. Everything runs locally on your computer - no data is sent to external servers.
 
@@ -46,7 +50,8 @@ SAM is an open-source AI assistant designed to provide intelligent conversations
 
 ### 1. Install SAM
 ```bash
-# Download SAM (or clone the repository)
+# Clone the repository
+git clone http://172.16.20.246:3000/Forge/SAM.git
 cd SAM
 
 # Run the installer

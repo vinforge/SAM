@@ -5,6 +5,10 @@ Integrated Streamlit app for interactive memory control and visualization.
 Sprint 12: Interactive Memory Control & Visualization
 """
 
+import os
+# Suppress PyTorch/Streamlit compatibility warnings
+os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
+
 import streamlit as st
 import sys
 from pathlib import Path
@@ -102,11 +106,11 @@ def main():
         # Quick actions
         st.subheader("⚡ Quick Actions")
         
-        if st.button("🔄 Refresh Data"):
+        if st.button("🔄 Refresh Data", key="sidebar_refresh_data"):
             st.cache_data.clear()
             st.rerun()
-        
-        if st.button("📊 Memory Stats"):
+
+        if st.button("📊 Memory Stats", key="sidebar_memory_stats"):
             st.session_state.show_stats = True
         
         # Memory command input
@@ -117,7 +121,7 @@ def main():
             help="Enter a memory command (type !memhelp for help)"
         )
         
-        if st.button("Execute") and quick_command:
+        if st.button("Execute", key="sidebar_execute_command") and quick_command:
             result = command_processor.process_command(quick_command)
             if result.success:
                 st.success("Command executed successfully!")
@@ -301,7 +305,7 @@ def render_chat_interface():
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            if st.button("🗑️ Clear Chat History"):
+            if st.button("🗑️ Clear Chat History", key="clear_chat_history_button"):
                 st.session_state.chat_history = []
                 st.rerun()
 
@@ -395,7 +399,7 @@ def render_command_interface():
             output_format = st.selectbox("Output", ["text", "json"])
         
         # Execute button
-        if st.button("🚀 Execute Command", type="primary") and command_text:
+        if st.button("🚀 Execute Command", type="primary", key="execute_command_button") and command_text:
             with st.spinner("Executing command..."):
                 result = command_processor.process_command(
                     command_text=command_text,
@@ -1072,7 +1076,7 @@ def render_smart_summaries():
                 default=[]
             )
 
-        if st.button("📊 Generate Summary", type="primary"):
+        if st.button("📊 Generate Summary", type="primary", key="generate_summary_button"):
             with st.spinner("Generating smart summary..."):
                 # Create summary request
                 request = SummaryRequest(
@@ -1328,7 +1332,7 @@ def render_memory_insights():
         # Memory health check
         st.subheader("🏥 Memory Health Check")
 
-        if st.button("🔍 Run Health Check"):
+        if st.button("🔍 Run Health Check", key="run_health_check_button"):
             with st.spinner("Analyzing memory health..."):
                 health_issues = []
 

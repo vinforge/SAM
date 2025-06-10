@@ -14,7 +14,14 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
-import faiss
+
+# Try to import FAISS, fall back to simple vector search if not available
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
+    faiss = None
 
 logger = logging.getLogger(__name__)
 
@@ -35,84 +42,129 @@ class VectorManager:
     def __init__(self, vector_store_path: str = "data/vector_store", embedding_dim: int = 384):
         """
         Initialize the vector manager.
-        
+
         Args:
             vector_store_path: Path to store vector index and metadata
             embedding_dim: Dimension of embedding vectors (384 for all-MiniLM-L6-v2)
         """
         self.vector_store_path = Path(vector_store_path)
         self.vector_store_path.mkdir(parents=True, exist_ok=True)
-        
+
         self.embedding_dim = embedding_dim
-        self.index_path = self.vector_store_path / "faiss_index.bin"
-        self.metadata_path = self.vector_store_path / "metadata.json"
-        
-        # Initialize FAISS index
-        self.index = faiss.IndexFlatIP(embedding_dim)  # Inner product for cosine similarity
-        self.metadata_store = {}  # chunk_id -> metadata mapping
-        self.id_to_chunk_id = {}  # FAISS ID -> chunk_id mapping
-        self.chunk_id_to_id = {}  # chunk_id -> FAISS ID mapping
-        self.next_id = 0
-        
+        self.use_faiss = FAISS_AVAILABLE
+
+        if self.use_faiss:
+            self.index_path = self.vector_store_path / "faiss_index.bin"
+            self.metadata_path = self.vector_store_path / "metadata.json"
+
+            # Initialize FAISS index
+            self.index = faiss.IndexFlatIP(embedding_dim)  # Inner product for cosine similarity
+            self.metadata_store = {}  # chunk_id -> metadata mapping
+            self.id_to_chunk_id = {}  # FAISS ID -> chunk_id mapping
+            self.chunk_id_to_id = {}  # chunk_id -> FAISS ID mapping
+            self.next_id = 0
+        else:
+            # Fallback to simple vector storage
+            self.vectors_path = self.vector_store_path / "vectors.pkl"
+            self.metadata_path = self.vector_store_path / "metadata.json"
+
+            self.vectors = []  # List of (chunk_id, vector) tuples
+            self.metadata_store = {}  # chunk_id -> metadata mapping
+            logger.warning("FAISS not available, using simple vector storage (slower)")
+
         # Load existing index if available
         self.load_index()
-        
-        logger.info(f"Vector manager initialized with {self.index.ntotal} vectors")
+
+        total_vectors = self.index.ntotal if self.use_faiss else len(self.vectors)
+        backend = "FAISS" if self.use_faiss else "Simple"
+        logger.info(f"Vector manager initialized with {total_vectors} vectors using {backend} backend")
     
     def load_index(self):
-        """Load existing FAISS index and metadata from disk."""
+        """Load existing vector index and metadata from disk."""
         try:
-            if self.index_path.exists() and self.metadata_path.exists():
+            if self.use_faiss:
                 # Load FAISS index
-                self.index = faiss.read_index(str(self.index_path))
-                
-                # Load metadata
-                with open(self.metadata_path, 'r') as f:
-                    data = json.load(f)
-                    self.metadata_store = data.get('metadata_store', {})
-                    self.id_to_chunk_id = {int(k): v for k, v in data.get('id_to_chunk_id', {}).items()}
-                    self.chunk_id_to_id = data.get('chunk_id_to_id', {})
-                    self.next_id = data.get('next_id', 0)
-                
-                logger.info(f"Loaded existing vector index with {self.index.ntotal} vectors")
+                if self.index_path.exists() and self.metadata_path.exists():
+                    self.index = faiss.read_index(str(self.index_path))
+
+                    # Load metadata
+                    with open(self.metadata_path, 'r') as f:
+                        data = json.load(f)
+                        self.metadata_store = data.get('metadata_store', {})
+                        self.id_to_chunk_id = {int(k): v for k, v in data.get('id_to_chunk_id', {}).items()}
+                        self.chunk_id_to_id = data.get('chunk_id_to_id', {})
+                        self.next_id = data.get('next_id', 0)
+
+                    logger.info(f"Loaded existing FAISS index with {self.index.ntotal} vectors")
+                else:
+                    logger.info("No existing FAISS index found, starting fresh")
             else:
-                logger.info("No existing vector index found, starting fresh")
-                
+                # Load simple vector storage
+                if self.vectors_path.exists() and self.metadata_path.exists():
+                    with open(self.vectors_path, 'rb') as f:
+                        self.vectors = pickle.load(f)
+
+                    with open(self.metadata_path, 'r') as f:
+                        data = json.load(f)
+                        self.metadata_store = data.get('metadata_store', {})
+
+                    logger.info(f"Loaded existing simple vector store with {len(self.vectors)} vectors")
+                else:
+                    logger.info("No existing vector store found, starting fresh")
+
         except Exception as e:
             logger.error(f"Error loading vector index: {e}")
             logger.info("Starting with fresh index")
-            self.index = faiss.IndexFlatIP(self.embedding_dim)
-            self.metadata_store = {}
-            self.id_to_chunk_id = {}
-            self.chunk_id_to_id = {}
-            self.next_id = 0
+            if self.use_faiss:
+                self.index = faiss.IndexFlatIP(self.embedding_dim)
+                self.metadata_store = {}
+                self.id_to_chunk_id = {}
+                self.chunk_id_to_id = {}
+                self.next_id = 0
+            else:
+                self.vectors = []
+                self.metadata_store = {}
     
     def save_index(self):
-        """Save FAISS index and metadata to disk."""
+        """Save vector index and metadata to disk."""
         try:
-            # Save FAISS index
-            faiss.write_index(self.index, str(self.index_path))
-            
-            # Save metadata
-            metadata_data = {
-                'metadata_store': self.metadata_store,
-                'id_to_chunk_id': {str(k): v for k, v in self.id_to_chunk_id.items()},
-                'chunk_id_to_id': self.chunk_id_to_id,
-                'next_id': self.next_id
-            }
-            
-            with open(self.metadata_path, 'w') as f:
-                json.dump(metadata_data, f, indent=2)
-            
-            logger.debug(f"Saved vector index with {self.index.ntotal} vectors")
-            
+            if self.use_faiss:
+                # Save FAISS index
+                faiss.write_index(self.index, str(self.index_path))
+
+                # Save metadata
+                metadata_data = {
+                    'metadata_store': self.metadata_store,
+                    'id_to_chunk_id': {str(k): v for k, v in self.id_to_chunk_id.items()},
+                    'chunk_id_to_id': self.chunk_id_to_id,
+                    'next_id': self.next_id
+                }
+
+                with open(self.metadata_path, 'w') as f:
+                    json.dump(metadata_data, f, indent=2)
+
+                logger.debug(f"Saved FAISS index with {self.index.ntotal} vectors")
+            else:
+                # Save simple vector storage
+                with open(self.vectors_path, 'wb') as f:
+                    pickle.dump(self.vectors, f)
+
+                metadata_data = {
+                    'metadata_store': self.metadata_store
+                }
+
+                with open(self.metadata_path, 'w') as f:
+                    json.dump(metadata_data, f, indent=2)
+
+                logger.debug(f"Saved simple vector store with {len(self.vectors)} vectors")
+
         except Exception as e:
             logger.error(f"Error saving vector index: {e}")
     
     def add_chunk(self, chunk_id: str, chunk_text: str, vector: np.ndarray, metadata: Dict[str, Any]):
         """
         Add a new chunk to the vector store.
-        
+
         Args:
             chunk_id: Unique identifier for the chunk
             chunk_text: Text content of the chunk
@@ -120,71 +172,23 @@ class VectorManager:
             metadata: Metadata dictionary for the chunk
         """
         try:
-            # Check if chunk already exists
-            if chunk_id in self.chunk_id_to_id:
-                logger.warning(f"Chunk {chunk_id} already exists, skipping")
-                return
-            
             # Normalize vector for cosine similarity
             vector = vector.astype(np.float32)
             if np.linalg.norm(vector) > 0:
                 vector = vector / np.linalg.norm(vector)
-            
-            # Add to FAISS index
-            vector_2d = vector.reshape(1, -1)
-            self.index.add(vector_2d)
-            
-            # Store metadata
-            faiss_id = self.next_id
-            self.metadata_store[chunk_id] = {
-                'text': chunk_text,
-                'metadata': metadata,
-                'faiss_id': faiss_id
-            }
-            self.id_to_chunk_id[faiss_id] = chunk_id
-            self.chunk_id_to_id[chunk_id] = faiss_id
-            self.next_id += 1
-            
-            logger.debug(f"Added chunk {chunk_id} to vector store")
-            
-        except Exception as e:
-            logger.error(f"Error adding chunk {chunk_id}: {e}")
-    
-    def add_chunks_batch(self, chunks: List[Tuple[str, str, np.ndarray, Dict[str, Any]]]):
-        """
-        Add multiple chunks in batch for efficiency.
-        
-        Args:
-            chunks: List of (chunk_id, chunk_text, vector, metadata) tuples
-        """
-        try:
-            vectors_to_add = []
-            chunk_ids_to_add = []
-            
-            for chunk_id, chunk_text, vector, metadata in chunks:
+
+            if self.use_faiss:
+                # Check if chunk already exists
                 if chunk_id in self.chunk_id_to_id:
                     logger.warning(f"Chunk {chunk_id} already exists, skipping")
-                    continue
-                
-                # Normalize vector
-                vector = vector.astype(np.float32)
-                if np.linalg.norm(vector) > 0:
-                    vector = vector / np.linalg.norm(vector)
-                
-                vectors_to_add.append(vector)
-                chunk_ids_to_add.append((chunk_id, chunk_text, metadata))
-            
-            if not vectors_to_add:
-                logger.info("No new chunks to add")
-                return
-            
-            # Add vectors to FAISS index
-            vectors_array = np.vstack(vectors_to_add)
-            self.index.add(vectors_array)
-            
-            # Store metadata
-            for i, (chunk_id, chunk_text, metadata) in enumerate(chunk_ids_to_add):
-                faiss_id = self.next_id + i
+                    return
+
+                # Add to FAISS index
+                vector_2d = vector.reshape(1, -1)
+                self.index.add(vector_2d)
+
+                # Store metadata
+                faiss_id = self.next_id
                 self.metadata_store[chunk_id] = {
                     'text': chunk_text,
                     'metadata': metadata,
@@ -192,11 +196,83 @@ class VectorManager:
                 }
                 self.id_to_chunk_id[faiss_id] = chunk_id
                 self.chunk_id_to_id[chunk_id] = faiss_id
-            
-            self.next_id += len(chunk_ids_to_add)
-            
-            logger.info(f"Added {len(chunk_ids_to_add)} chunks to vector store")
-            
+                self.next_id += 1
+            else:
+                # Check if chunk already exists
+                if chunk_id in self.metadata_store:
+                    logger.warning(f"Chunk {chunk_id} already exists, skipping")
+                    return
+
+                # Add to simple vector storage
+                self.vectors.append((chunk_id, vector))
+                self.metadata_store[chunk_id] = {
+                    'text': chunk_text,
+                    'metadata': metadata
+                }
+
+            logger.debug(f"Added chunk {chunk_id} to vector store")
+
+        except Exception as e:
+            logger.error(f"Error adding chunk {chunk_id}: {e}")
+    
+    def add_chunks_batch(self, chunks: List[Tuple[str, str, np.ndarray, Dict[str, Any]]]):
+        """
+        Add multiple chunks in batch for efficiency.
+
+        Args:
+            chunks: List of (chunk_id, chunk_text, vector, metadata) tuples
+        """
+        try:
+            if self.use_faiss:
+                # FAISS batch processing
+                vectors_to_add = []
+                chunk_ids_to_add = []
+
+                for chunk_id, chunk_text, vector, metadata in chunks:
+                    if chunk_id in self.chunk_id_to_id:
+                        logger.warning(f"Chunk {chunk_id} already exists, skipping")
+                        continue
+
+                    # Normalize vector
+                    vector = vector.astype(np.float32)
+                    if np.linalg.norm(vector) > 0:
+                        vector = vector / np.linalg.norm(vector)
+
+                    vectors_to_add.append(vector)
+                    chunk_ids_to_add.append((chunk_id, chunk_text, metadata))
+
+                if not vectors_to_add:
+                    logger.info("No new chunks to add")
+                    return
+
+                # Add vectors to FAISS index
+                vectors_array = np.vstack(vectors_to_add)
+                self.index.add(vectors_array)
+
+                # Store metadata
+                for i, (chunk_id, chunk_text, metadata) in enumerate(chunk_ids_to_add):
+                    faiss_id = self.next_id + i
+                    self.metadata_store[chunk_id] = {
+                        'text': chunk_text,
+                        'metadata': metadata,
+                        'faiss_id': faiss_id
+                    }
+                    self.id_to_chunk_id[faiss_id] = chunk_id
+                    self.chunk_id_to_id[chunk_id] = faiss_id
+
+                self.next_id += len(chunk_ids_to_add)
+
+                logger.info(f"Added {len(chunk_ids_to_add)} chunks to vector store")
+            else:
+                # Simple backend: add chunks one by one
+                added_count = 0
+                for chunk_id, chunk_text, vector, metadata in chunks:
+                    if chunk_id not in self.metadata_store:
+                        self.add_chunk(chunk_id, chunk_text, vector, metadata)
+                        added_count += 1
+
+                logger.info(f"Added {added_count} chunks to simple vector store")
+
         except Exception as e:
             logger.error(f"Error adding chunks in batch: {e}")
 
@@ -291,52 +367,82 @@ class VectorManager:
     def search(self, query_vector: np.ndarray, top_k: int = 5, score_threshold: float = 0.0) -> List[Dict[str, Any]]:
         """
         Search for similar chunks using vector similarity.
-        
+
         Args:
             query_vector: Query embedding vector
             top_k: Number of top results to return
             score_threshold: Minimum similarity score threshold
-            
+
         Returns:
             List of search results with metadata
         """
         try:
-            if self.index.ntotal == 0:
+            # Check if vector store is empty
+            total_vectors = self.index.ntotal if self.use_faiss else len(self.vectors)
+            if total_vectors == 0:
                 logger.warning("Vector store is empty")
                 return []
-            
+
             # Normalize query vector
             query_vector = query_vector.astype(np.float32)
             if np.linalg.norm(query_vector) > 0:
                 query_vector = query_vector / np.linalg.norm(query_vector)
-            
-            # Search FAISS index
-            query_2d = query_vector.reshape(1, -1)
-            scores, indices = self.index.search(query_2d, min(top_k, self.index.ntotal))
-            
-            # Format results
+
             results = []
-            for score, idx in zip(scores[0], indices[0]):
-                if idx == -1:  # FAISS returns -1 for invalid indices
-                    continue
-                
-                if score < score_threshold:
-                    continue
-                
-                chunk_id = self.id_to_chunk_id.get(idx)
-                if chunk_id and chunk_id in self.metadata_store:
-                    chunk_data = self.metadata_store[chunk_id]
-                    result = {
-                        'chunk_id': chunk_id,
-                        'text': chunk_data['text'],
-                        'metadata': chunk_data['metadata'],
-                        'similarity_score': float(score)
-                    }
-                    results.append(result)
-            
+
+            if self.use_faiss:
+                # Search FAISS index
+                query_2d = query_vector.reshape(1, -1)
+                scores, indices = self.index.search(query_2d, min(top_k, self.index.ntotal))
+
+                # Format results
+                for score, idx in zip(scores[0], indices[0]):
+                    if idx == -1:  # FAISS returns -1 for invalid indices
+                        continue
+
+                    if score < score_threshold:
+                        continue
+
+                    chunk_id = self.id_to_chunk_id.get(idx)
+                    if chunk_id and chunk_id in self.metadata_store:
+                        chunk_data = self.metadata_store[chunk_id]
+                        result = {
+                            'chunk_id': chunk_id,
+                            'text': chunk_data['text'],
+                            'metadata': chunk_data['metadata'],
+                            'similarity_score': float(score)
+                        }
+                        results.append(result)
+            else:
+                # Simple vector search using cosine similarity
+                similarities = []
+                for chunk_id, vector in self.vectors:
+                    # Calculate cosine similarity
+                    similarity = np.dot(query_vector, vector)
+                    similarities.append((similarity, chunk_id))
+
+                # Sort by similarity and take top_k
+                similarities.sort(key=lambda x: x[0], reverse=True)
+                top_similarities = similarities[:top_k]
+
+                # Format results
+                for similarity, chunk_id in top_similarities:
+                    if similarity < score_threshold:
+                        continue
+
+                    if chunk_id in self.metadata_store:
+                        chunk_data = self.metadata_store[chunk_id]
+                        result = {
+                            'chunk_id': chunk_id,
+                            'text': chunk_data['text'],
+                            'metadata': chunk_data['metadata'],
+                            'similarity_score': float(similarity)
+                        }
+                        results.append(result)
+
             logger.debug(f"Found {len(results)} results for query")
             return results
-            
+
         except Exception as e:
             logger.error(f"Error searching vector store: {e}")
             return []
@@ -354,12 +460,22 @@ class VectorManager:
     
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the vector store."""
-        return {
-            'total_chunks': self.index.ntotal,
-            'embedding_dimension': self.embedding_dim,
-            'index_size_mb': os.path.getsize(self.index_path) / (1024 * 1024) if self.index_path.exists() else 0,
-            'metadata_size_mb': os.path.getsize(self.metadata_path) / (1024 * 1024) if self.metadata_path.exists() else 0
-        }
+        if self.use_faiss:
+            return {
+                'total_chunks': self.index.ntotal,
+                'embedding_dimension': self.embedding_dim,
+                'backend': 'FAISS',
+                'index_size_mb': os.path.getsize(self.index_path) / (1024 * 1024) if self.index_path.exists() else 0,
+                'metadata_size_mb': os.path.getsize(self.metadata_path) / (1024 * 1024) if self.metadata_path.exists() else 0
+            }
+        else:
+            return {
+                'total_chunks': len(self.vectors),
+                'embedding_dimension': self.embedding_dim,
+                'backend': 'Simple',
+                'vectors_size_mb': os.path.getsize(self.vectors_path) / (1024 * 1024) if self.vectors_path.exists() else 0,
+                'metadata_size_mb': os.path.getsize(self.metadata_path) / (1024 * 1024) if self.metadata_path.exists() else 0
+            }
     
     def filter_by_tags(self, results: List[Dict[str, Any]], required_tags: List[str] = None, 
                       preferred_tags: List[str] = None) -> List[Dict[str, Any]]:
