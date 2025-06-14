@@ -29,6 +29,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Import entitlement system
+try:
+    from sam.entitlements.feature_manager import get_feature_manager, is_feature_available, is_pro_unlocked
+    ENTITLEMENTS_AVAILABLE = True
+    logger.info("Entitlement system loaded successfully")
+except ImportError as e:
+    ENTITLEMENTS_AVAILABLE = False
+    logger.warning(f"Entitlement system not available: {e}")
+
 def main():
     """Main Streamlit application with security integration."""
     
@@ -164,11 +173,110 @@ def initialize_secure_sam():
         except Exception as e:
             logger.warning(f"⚠️ Tool-augmented reasoning not available: {e}")
 
+def render_pro_features_activation():
+    """Render SAM Pro features activation section."""
+    if not ENTITLEMENTS_AVAILABLE:
+        return
+
+    try:
+        feature_manager = get_feature_manager()
+        pro_status = feature_manager.get_pro_status()
+
+        with st.expander("🚀 Activate SAM Pro Features", expanded=not pro_status["is_pro_unlocked"]):
+            if pro_status["is_pro_unlocked"]:
+                # Pro features are activated
+                st.success("✅ **SAM Pro Activated!**")
+
+                # Show activation date if available
+                if pro_status["activation_date"]:
+                    from datetime import datetime
+                    activation_date = datetime.fromtimestamp(pro_status["activation_date"])
+                    st.info(f"🗓️ Activated: {activation_date.strftime('%Y-%m-%d %H:%M')}")
+
+                # Show available features
+                st.markdown("**🎉 Unlocked Features:**")
+                for feature in pro_status["available_features"]:
+                    if feature["required_tier"] == "pro":
+                        st.markdown(f"• ✅ **{feature['ui_label']}**: {feature['description']}")
+
+            else:
+                # Pro features are locked - show activation interface
+                st.markdown("**🔓 Unlock Premium Features**")
+                st.markdown("Enter your SAM Pro activation key to unlock advanced features:")
+
+                # Show locked features
+                locked_features = pro_status["locked_features"]
+                if locked_features:
+                    st.markdown("**🔒 Locked Features:**")
+                    for feature in locked_features:
+                        st.markdown(f"• 🔒 **{feature['ui_label']}**: {feature['description']}")
+
+                # Activation key input
+                activation_key = st.text_input(
+                    "Activation Key",
+                    type="password",
+                    placeholder="Enter your SAM Pro activation key...",
+                    help="Enter the activation key provided to you"
+                )
+
+                # Activation button
+                if st.button("🚀 Activate SAM Pro", type="primary"):
+                    if activation_key.strip():
+                        with st.spinner("🔐 Validating activation key..."):
+                            result = feature_manager.validate_key(activation_key)
+
+                        if result["success"]:
+                            st.success(result["message"])
+                            st.balloons()
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(result["message"])
+
+                            # Show specific error guidance
+                            if result.get("invalid_format"):
+                                st.info("💡 **Tip**: Activation keys are in UUID format (e.g., 12345678-1234-1234-1234-123456789abc)")
+                            elif result.get("rate_limited"):
+                                st.warning("⏳ Please wait before trying again to prevent abuse.")
+                    else:
+                        st.warning("⚠️ Please enter an activation key")
+
+                # Help section
+                with st.expander("❓ Need Help?", expanded=False):
+                    st.markdown("""
+                    **How to get SAM Pro:**
+                    1. Contact the SAM development team
+                    2. Receive your unique activation key
+                    3. Enter the key above to unlock premium features
+
+                    **Activation Key Format:**
+                    - 36 characters in UUID format
+                    - Example: `12345678-1234-1234-1234-123456789abc`
+
+                    **Security:**
+                    - Keys are validated locally (no internet required)
+                    - One-time activation per installation
+                    - All data remains encrypted and secure
+                    """)
+
+    except Exception as e:
+        logger.error(f"Error rendering pro features activation: {e}")
+        st.error("❌ Pro features activation system unavailable")
+
 def render_tpv_control_sidebar():
     """Render TPV control sidebar for Phase 4 deployment."""
     with st.sidebar:
+        # SAM Pro Features Activation Section
+        render_pro_features_activation()
+
         st.header("🧠 Active Reasoning Control")
         st.markdown("*Phase 4: Production Deployment*")
+
+        # Check if TPV feature is available
+        if ENTITLEMENTS_AVAILABLE and not is_feature_available("tpv_active_control"):
+            st.warning("🔒 **TPV Active Control** requires SAM Pro activation")
+            st.markdown("Activate SAM Pro above to unlock advanced reasoning control features.")
+            return
 
         # Initialize TPV integration if not already done
         if 'tpv_integration' not in st.session_state:
@@ -796,6 +904,27 @@ def render_document_interface():
 
     else:  # Bulk Folder Processing
         st.markdown("### 📁 Bulk Folder Processing")
+
+        # Check if bulk processing feature is available
+        if ENTITLEMENTS_AVAILABLE and not is_feature_available("bulk_document_processing"):
+            st.warning("🔒 **Bulk Document Processing** requires SAM Pro activation")
+            st.markdown("This premium feature allows you to process entire folders of documents at once.")
+
+            with st.expander("🚀 Learn More About SAM Pro", expanded=False):
+                st.markdown("""
+                **SAM Pro Bulk Processing Features:**
+
+                ✅ **Process entire folders** - Upload hundreds of documents at once
+                ✅ **Recursive folder scanning** - Include subfolders automatically
+                ✅ **Advanced file filtering** - Choose specific file types
+                ✅ **Batch processing controls** - Set limits and error handling
+                ✅ **Progress monitoring** - Real-time processing status
+                ✅ **Cross-platform support** - Works on Windows, Mac, and Linux
+
+                **Activate SAM Pro** in the sidebar to unlock this feature!
+                """)
+            return
+
         st.info("💡 **Cross-platform folder processing**: Works on Windows, Mac, and Linux systems")
 
         # Folder path input

@@ -1,0 +1,77 @@
+inalized Plan & Requirements for the AI Dev
+Objective: Implement a local feature entitlement system using 100 pre-generated, hashed keys to unlock the TPV and Bulk Ingestion features.
+Backend Requirements:
+Key Generation Script (scripts/generate_feature_keys.py):
+Must generate 100 UUIDv4 keys.
+Must hash each key using SHA-256.
+Must output two lists: one of the raw keys (for distribution) and one of the hex-encoded hashes (for the application).
+Entitlement Configuration:
+Create sam/config/entitlements.json. This file will contain a single key, "valid_key_hashes", with the list of 100 hashed keys.
+State Management:
+Create or modify a persistent state file (e.g., sam_state.json) that can store the flag {"pro_features_unlocked": boolean}. This file must be outside the main source code directory and be writable by the application.
+Validation Logic:
+Create a function validate_and_activate_key(user_key).
+This function will hash the user_key, check it against the list in entitlements.json, and if it matches, set pro_features_unlocked to true in the state file.
+Frontend/UI Requirements (Secure Streamlit App - Port 8502):
+New Sidebar Section: Create a new expandable section in the sidebar titled "Activate Pro Features."
+Conditional UI:
+If pro_features_unlocked is false, display the key entry field and "Activate" button.
+If pro_features_unlocked is true, display a success message like "✅ SAM Pro Activated."
+Feature Gating:
+The TPV Active Control settings (if any are user-facing) should be disabled/hidden if the feature is locked.
+The Bulk Ingestion UI/tab should be disabled/hidden if the feature is locked.
+This revised plan is now perfectly aligned with your stated goals. It's secure, entirely offline, and focused on unlocking specific local features. Your AI Dev will have a very clear and actionable path forward.Workflow 1: The Administrator's Role (Your Role)
+This is a one-time setup process that you perform on your secure development machine before you release a new version of SAM.
+Run the Script: You execute the scripts/generate_feature_keys.py script locally.
+Get Two Outputs: The script produces two crucial pieces of information:
+A) The list of distributable_keys: These are the 100 raw, human-readable UUIDs.
+B) The list of hashed_keys: These are the 100 corresponding SHA-256 hashes.
+Securely Store the Distributable Keys: You take the list of 100 raw keys and store them in a secure place (e.g., a password manager, an encrypted spreadsheet). This is your "inventory" of keys to give out to the community. These raw keys never touch the SAM application's source code.
+Embed the Hashes into SAM: You take the list of 100 hashed keys and paste them into the sam/config/entitlements.json file. This file is part of the SAM application that you will package and distribute.
+Build and Distribute SAM: You then build the final SAM application. This version now contains the "lock" (the list of valid hashes) but has no knowledge of the "keys" (the raw UUIDs).
+Workflow 2: The End-User's Experience
+This is what happens on the user's machine after they have installed SAM.
+Receive a Key: You give one user one key from your secure inventory (e.g., a1b2c3d4-....).
+Enter the Key: The user opens SAM, navigates to the "Activate Pro Features" section, and pastes in the key you gave them.
+Local Validation: The SAM application performs the following steps locally and offline:
+a. Takes the user's entered key (a1b2c3d4-....).
+b. Hashes it using the exact same SHA-256 algorithm.
+c. Checks if the resulting hash exists in its internal list of 100 valid hashes (from entitlements.json).
+Unlock Features: If a match is found, SAM flips the pro_features_unlocked flag to true and the features are unlocked permanently for that user's installation.
+Visualizing the Separation
+Here is a simple diagram illustrating this crucial boundary:
++---------------------------------+          +--------------------------------------+
+|   YOUR SECURE DEV ENVIRONMENT   |          |    SAM APPLICATION (ON USER'S PC)    |
+|       (Administrator Role)      |          |          (End-User Role)           |
++---------------------------------+          +--------------------------------------+
+                |                                                  |
+                v                                                  |
+1. Run `generate_feature_keys.py`                                  |
+                |                                                  |
+   +------------+------------+                                     |
+   |                         |                                     |
+   v                         v                                     |
+[List of 100              [List of 100                             |
+ Distributable Keys]         Hashed Keys]                          |
+   |                         |                                     |
+   |  (Store Securely)       | 2. Embed into SAM's config file      |
+   |                         +-------------------------------------> [sam/config/entitlements.json]
+   v                                                               |   (The "Locks")
+                                                                   |
+3. Give ONE key to User --> [User receives key: 'a1b2c3d4...'] ---> 4. User enters key into UI
+                                                                   |
+                                                                   v
+                                                        5. SAM hashes the entered key
+                                                                   |
+                                                                   v
+                                                        6. Compares hash against its
+                                                           internal list of "Locks"
+                                                                   |
+                                                                   v
+                                                        7. If match -> Unlock Features
+Use code with caution.
+Why This Separation is Non-Negotiable
+Security: If the raw, distributable keys were included in the SAM application, anyone could easily find the entire list of 100 keys, defeating the purpose of controlled distribution.
+Control: This model gives you, the administrator, sole control over the generation and distribution of valid keys.
+Simplicity: The SAM application's only job is to validate, not to create. This keeps the application logic clean and secure.
+So, to confirm your question: Yes, the key generation is done via a separate script that you run. The script's output (the hashes) is then supplied to that specific installation or version of SAM before you distribute it.
