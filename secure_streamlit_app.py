@@ -715,16 +715,16 @@ def render_document_interface():
 
                         # Enhanced analytics display
                         col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("📊 Chunks Created", result.get('chunks_created', 0))
-                    with col2:
-                        st.metric("📁 File Size", f"{result.get('file_size', 0) / 1024:.1f} KB")
-                    with col3:
-                        consolidation_status = "✅ Yes" if result.get('knowledge_consolidated') else "❌ No"
-                        st.metric("🧠 Consolidated", consolidation_status)
-                    with col4:
-                        sync_status = "✅ Yes" if result.get('synced_to_regular_store') else "❌ No"
-                        st.metric("🔄 Synced", sync_status)
+                        with col1:
+                            st.metric("📊 Chunks Created", result.get('chunks_created', 0))
+                        with col2:
+                            st.metric("📁 File Size", f"{result.get('file_size', 0) / 1024:.1f} KB")
+                        with col3:
+                            consolidation_status = "✅ Yes" if result.get('knowledge_consolidated') else "❌ No"
+                            st.metric("🧠 Consolidated", consolidation_status)
+                        with col4:
+                            sync_status = "✅ Yes" if result.get('synced_to_regular_store') else "❌ No"
+                            st.metric("🔄 Synced", sync_status)
 
                     # Show enrichment scores and analytics
                     if result.get('knowledge_consolidated'):
@@ -785,14 +785,14 @@ def render_document_interface():
                     if result.get('consolidation_summary', 0) > 0:
                         st.info(f"📝 Generated {result.get('consolidation_summary')} character summary")
 
-                    # Show processing details
-                    with st.expander("📋 Technical Processing Details"):
-                        st.json(result)
-                else:
-                    st.error(f"❌ Document processing failed: {result.get('error', 'Unknown error')}")
-                    
-            except Exception as e:
-                st.error(f"❌ Document processing error: {e}")
+                        # Show processing details
+                        with st.expander("📋 Technical Processing Details"):
+                            st.json(result)
+                    else:
+                        st.error(f"❌ Document processing failed: {result.get('error', 'Unknown error')}")
+
+                except Exception as e:
+                    st.error(f"❌ Document processing error: {e}")
 
     else:  # Bulk Folder Processing
         st.markdown("### 📁 Bulk Folder Processing")
