@@ -244,13 +244,66 @@ class SAMSecurityUI:
         - Corrupted keystore file
         - File permission issues
         - System configuration problems
-        
+
         Please check the logs and restart the application.
         """)
-        
-        if st.button("🔄 Retry Initialization", key="security_retry_init_button"):
-            st.rerun()
-        
+
+        # Debug information
+        with st.expander("🔧 Debug Information", expanded=False):
+            try:
+                current_state = self.state_manager.get_state()
+                st.write(f"**Current State:** {current_state}")
+
+                session_info = self.state_manager.get_session_info()
+                st.write("**Session Info:**")
+                st.json(session_info)
+
+                # Check keystore
+                import os
+                keystore_path = "security/keystore.json"
+                if os.path.exists(keystore_path):
+                    st.write(f"**Keystore exists:** ✅ {keystore_path}")
+                    stat = os.stat(keystore_path)
+                    st.write(f"**Keystore size:** {stat.st_size} bytes")
+                    st.write(f"**Keystore permissions:** {oct(stat.st_mode)[-3:]}")
+                else:
+                    st.write(f"**Keystore exists:** ❌ {keystore_path}")
+
+            except Exception as e:
+                st.write(f"**Debug Error:** {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Retry Initialization", key="security_retry_init_button"):
+                st.rerun()
+
+        with col2:
+            if st.button("🔧 Reset Security System", key="security_reset_button"):
+                st.warning("⚠️ This will delete all encrypted data!")
+                if st.button("⚠️ Confirm Reset", key="security_reset_confirm"):
+                    try:
+                        # Reset security system
+                        import shutil
+                        from pathlib import Path
+
+                        # Remove keystore
+                        keystore_path = Path("security/keystore.json")
+                        if keystore_path.exists():
+                            keystore_path.unlink()
+
+                        # Remove encrypted data directories
+                        for dir_name in ["memory_store", "chroma_db", "sam_secure_memory"]:
+                            dir_path = Path(dir_name)
+                            if dir_path.exists():
+                                shutil.rmtree(dir_path)
+
+                        st.success("✅ Security system reset! Please refresh the page.")
+
+                    except Exception as e:
+                        st.error(f"❌ Reset failed: {e}")
+
         return False
     
     def render_security_dashboard(self) -> None:

@@ -77,7 +77,7 @@ class OllamaModel:
                         "num_predict": max_tokens
                     }
                 },
-                timeout=60  # Longer timeout for consolidation tasks
+                timeout=180  # Extended timeout for complex document processing
             )
             if response.status_code == 200:
                 return response.json().get("response", "No response generated")

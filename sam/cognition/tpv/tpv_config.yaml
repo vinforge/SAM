@@ -1,0 +1,32 @@
+control_params:
+  completion_threshold: 0.92
+  max_tokens: 500
+  min_steps: 2
+  plateau_patience: 3
+  plateau_threshold: 0.005
+deployment_params:
+  allow_user_override: true
+  collect_feedback: true
+  deployment_timestamp: 1749870278.14906
+  deployment_version: 4.0.0
+  enable_optimizations: true
+  enable_telemetry: true
+  log_interventions: true
+  production_deployment: true
+  show_performance_warning: true
+  tpv_enabled_by_default: false
+  use_model_quantization: false
+  use_onnx_runtime: false
+model_params:
+  architecture: qwen3-8b
+  discovered_at: '2025-06-13T16:57:30Z'
+  hidden_dimension: 4096
+  model_name: hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M
+runtime_params:
+  batch_size: 1
+  device: auto
+  dtype: float32
+tpv_params:
+  activation: gelu
+  dropout: 0.1
+  num_heads: 8

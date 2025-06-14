@@ -820,8 +820,8 @@ Generate a synthesized summary following the instructions above."""
                 }
             }
 
-            # Increased timeout for better reliability
-            response = requests.post(ollama_url, json=payload, timeout=60)
+            # Extended timeout for complex document queries
+            response = requests.post(ollama_url, json=payload, timeout=180)
 
             if response.status_code == 200:
                 result = response.json()
