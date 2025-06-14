@@ -1,0 +1,51 @@
+{
+  "query": "Debug test query - 20250612_182700",
+  "result": {
+    "success": true,
+    "tool_used": "debug_test_tool",
+    "data": {
+      "articles": [
+        {
+          "title": "Debug Test Article 1",
+          "content": "This is test content for debugging the quarantine save functionality.",
+          "source": "debug-test.com",
+          "url": "https://debug-test.com/article1"
+        },
+        {
+          "title": "Debug Test Article 2",
+          "content": "Another test article to verify multiple articles are saved correctly.",
+          "source": "debug-test2.com",
+          "url": "https://debug-test2.com/article2"
+        }
+      ]
+    },
+    "metadata": {
+      "query_time": "2025-06-12T18:27:00.104063",
+      "test_run": true
+    }
+  },
+  "timestamp": "2025-06-12T18:27:00.106076",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "debug_test_tool",
+    "content_count": 2,
+    "sources": [
+      "debug-test.com",
+      "debug-test2.com"
+    ],
+    "quarantine_timestamp": "2025-06-12T18:27:00.106080",
+    "debug_info": {
+      "saved_from": "save_intelligent_web_to_quarantine",
+      "cwd": "/Users/vinsoncornejo/Downloads/augment-projects/SAM",
+      "python_path": "NOT_SET"
+    }
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T18:31:32.702006"
+  },
+  "approved_at": "2025-06-12T18:31:32.702008",
+  "vetting_action": "PASS"
+}

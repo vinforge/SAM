@@ -1,0 +1,40 @@
+{
+  "query": "Persistence test query - 20250612_183805",
+  "result": {
+    "success": true,
+    "tool_used": "persistence_test_tool",
+    "data": {
+      "articles": [
+        {
+          "title": "Persistence Test Article",
+          "content": "This article tests if files stay in quarantine after the fix.",
+          "source": "persistence-test.com",
+          "url": "https://persistence-test.com/article"
+        }
+      ]
+    }
+  },
+  "timestamp": "2025-06-12T18:38:05.033047",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "persistence_test_tool",
+    "content_count": 1,
+    "sources": [
+      "persistence-test.com"
+    ],
+    "quarantine_timestamp": "2025-06-12T18:38:05.033051",
+    "debug_info": {
+      "saved_from": "save_intelligent_web_to_quarantine",
+      "cwd": "/Users/vinsoncornejo/Downloads/augment-projects/SAM",
+      "python_path": "NOT_SET"
+    }
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T18:40:22.337290"
+  },
+  "approved_at": "2025-06-12T18:40:22.337292",
+  "vetting_action": "PASS"
+}

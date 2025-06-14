@@ -1,0 +1,236 @@
+{
+  "query": "latest breakthrough in quantum computing 2025",
+  "result": {
+    "success": true,
+    "query": "latest breakthrough in quantum computing 2025",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": null,
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "What could have caused Air India plane to crash in 30 seconds?",
+          "description": "Experts told the BBC that a flap issue, engine failure or a bird strike are among the possible causes of the crash.",
+          "url": "https://www.bbc.com/news/articles/c626y121rxxo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 20:20:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181011"
+        },
+        {
+          "title": "British man in seat 11A is only passenger to survive India plane crash",
+          "description": "Vishwashkumar Ramesh is only passenger to survive the Air India crash that killed 241 people.",
+          "url": "https://www.bbc.com/news/articles/ce3v6drp96zo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 21:29:13 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181022"
+        },
+        {
+          "title": "Who are the victims of the Air India plane crash?",
+          "description": "Details are still emerging, but these are the people so far confirmed by the BBC to have died.",
+          "url": "https://www.bbc.com/news/articles/cdd28legnzvo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 22:07:12 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181025"
+        },
+        {
+          "title": "Air India plane crash - how the day unfolded",
+          "description": "London-bound flight carrying 242 people crashed shortly after take-off in Ahmedabad, western India.",
+          "url": "https://www.bbc.com/news/videos/cx2q3z716v9o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 20:29:52 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181027"
+        },
+        {
+          "title": "What we know so far about Air India flight AI171",
+          "description": "Air India confirms that 241 passengers and crew died, and one British man survived, when the plane crashed moments after take off.",
+          "url": "https://www.bbc.com/news/articles/c5y5nq170z4o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 17:26:05 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181029"
+        },
+        {
+          "title": "Masonry thrown at police in Portadown in fourth night of NI disorder",
+          "description": "There have been three days of violence in Ballymena and other towns, leading to 13 arrests.",
+          "url": "https://www.bbc.com/news/articles/c20xrq9vzz7o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 22:32:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181031"
+        },
+        {
+          "title": "Legal win for son tricked into moving to Africa by parents",
+          "description": "The boy travelled to Ghana from London in March 2024 after being told a relative was ill.",
+          "url": "https://www.bbc.com/news/articles/clyg0p88z83o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:18:59 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181039"
+        },
+        {
+          "title": "Thunderstorm warnings in place as drought declared for millions",
+          "description": "Temperatures on Friday will likely match the previous hottest day of 2025 so far.",
+          "url": "https://www.bbc.com/news/articles/c14k6vp62zxo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:35:48 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181045"
+        },
+        {
+          "title": "US senator dragged out of LA immigration news conference",
+          "description": "California senator Alex Padilla was pushed out of the news conference by authorities after he interrupted Noem.",
+          "url": "https://www.bbc.com/news/articles/c5ygn48djrko",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 22:05:22 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181050"
+        },
+        {
+          "title": "Reeves refuses to rule out tax rises after economy shrinks",
+          "description": "The chancellor highlights \"uncertainty\" in the world as economists warn of tax rises if the economy fails to grow.",
+          "url": "https://www.bbc.com/news/articles/cy5e6ly9qq3o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:38:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.181052"
+        },
+        {
+          "title": "Air India Crash Survivor: ‘I Don’t Know How I Am Alive’",
+          "description": "Viswash Kumar Ramesh, 38, who sustained multiple injuries, a doctor said, was the only passenger out of 242 people on board the plane to walk away.",
+          "url": "https://www.nytimes.com/2025/06/12/world/asia/viswash-kumar-ramesh-air-india-survivor.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 22:03:39 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239609"
+        },
+        {
+          "title": "What Caused the Air India Plane Crash?",
+          "description": "Safety experts said investigators would be looking at why and how the plane started descending during its take off.",
+          "url": "https://www.nytimes.com/2025/06/12/business/india-plane-crash-causes.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 18:59:51 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239624"
+        },
+        {
+          "title": "Chaos at Site of Air India Plane Crash",
+          "description": "“We didn’t know what to do — it was like our brains stopped working,” said one intern who escaped the building after an Air India jet crashed, killing at least 260 people.",
+          "url": "https://www.nytimes.com/2025/06/12/world/asia/air-india-plane-crash-site.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:46:43 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239628"
+        },
+        {
+          "title": "Trump Administration Sues New York Over Law Barring ICE From Courthouses",
+          "description": "State lawmakers passed the ban in 2020 when President Trump in his first term escalated arrests of undocumented immigrants at state and local courts.",
+          "url": "https://www.nytimes.com/2025/06/12/nyregion/trump-ny-lawsuit-ice-courthouses.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 21:15:32 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239631"
+        },
+        {
+          "title": "How the 2020 George Floyd Protests Are Haunting Democrats in 2025",
+          "description": "No longer demanding cuts to police budgets or straining to show solidarity with protesters, Democrats are taking a far more cautious approach.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/democrats-california-protests-trump.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 19:21:32 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239633"
+        },
+        {
+          "title": "Republicans in Congress Grill Democratic Governors on Immigration",
+          "description": "Amid unrest in California, Republicans pressed the governors of other blue states on their immigration policies, including on limiting cooperation with federal enforcement efforts.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/republicans-governors-hochul-walz-immigration.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 18:45:50 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239636"
+        },
+        {
+          "title": "G.O.P. Senators Want Fewer Cuts to Food Aid, Teeing Up a Fight with the House",
+          "description": "Republicans whose constituents rely on nutritional assistance worry that cuts to those programs approved by the House will saddle their states with huge costs and harm low-income children.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/republican-senators-food-aid.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:39:52 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239638"
+        },
+        {
+          "title": "Russian Scientist Released After Four Months in Federal Custody",
+          "description": "Kseniia Petrova, a Harvard researcher, still faces criminal charges for failing to declare scientific samples she was carrying in her suitcase.",
+          "url": "https://www.nytimes.com/2025/06/12/science/russian-scientist-harvard-release.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 19:23:36 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239640"
+        },
+        {
+          "title": "The Real-Life Dating Boot Camp That Inspired ‘Love on the Spectrum’",
+          "description": "When U.C.L.A. psychologists first proposed teaching adults with autism how to date, funders wouldn’t go near it. Now we are in a new world.",
+          "url": "https://www.nytimes.com/2025/06/12/health/autism-dating-ucla-love-on-the-spectrum.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 13:07:18 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239643"
+        },
+        {
+          "title": "Trump’s Immigration P.R. Campaign Enters a New Militarized Phase",
+          "description": "The government’s visuals appear intended to persuade migrants without legal status to leave the country, while also making clear the administration will not tolerate resistance.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/trump-immigration-pr-campaign.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:25:01 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T18:38:57.239646"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T18:38:57.369846"
+    },
+    "timestamp": "2025-06-12T18:38:57.370037"
+  },
+  "timestamp": "2025-06-12T18:38:57.490552",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://feeds.bbci.co.uk/news/rss.xml",
+      "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T18:38:57.490562",
+    "debug_info": {
+      "saved_from": "save_intelligent_web_to_quarantine",
+      "cwd": "/Users/vinsoncornejo/Downloads/augment-projects/SAM",
+      "python_path": "NOT_SET"
+    }
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T18:40:22.336521"
+  },
+  "approved_at": "2025-06-12T18:40:22.336530",
+  "vetting_action": "PASS"
+}

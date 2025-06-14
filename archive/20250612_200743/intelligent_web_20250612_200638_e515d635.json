@@ -1,0 +1,237 @@
+{
+  "query": "What is the latest US political news?",
+  "result": {
+    "success": true,
+    "query": "What is the latest US political news?",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": "politics",
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "How many people have been arrested in the nationwide anti-ICE protests?",
+          "description": "Police have arrested more than 1,000 people in the past week as civil unrest that began after immigration sweeps in Los Angeles spread to cities across the country.",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/how-many-people-have-been-arrested-in-the-nationwide-anti-ice-protests",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 23:27:13 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809070"
+        },
+        {
+          "title": "Missouri joins Texas in assembling National Guard troops.",
+          "description": "Texas activated its National Guard earlier this week ahead of protests there. Missouri is following suit, “taking a proactive approach,” its governor says.",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/missouri-joins-texas-in-assembling-national-guard-troops",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 23:44:47 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809095"
+        },
+        {
+          "title": "Judge Signals Doubt About Trump’s Use of National Guard to Deal With Protesters",
+          "description": "But Judge Charles Breyer also suggested he was unlikely at this point to restrict the use of active-duty Marines in California.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/california-trump-lawsuit-protests.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 23:28:42 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809100"
+        },
+        {
+          "title": "Curfews Have Calmed Some Immigration Protests, but They Can Have Mixed Results",
+          "description": "Los Angeles and Spokane, Wash., have turned to curfews to control unrest, but past measures, especially in 2020, have not always been effective.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/curfew-protests-la-spokane.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 23:07:09 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809105"
+        },
+        {
+          "title": "Trump Steel Tariffs Expand to Hit Home Appliances Like Refrigerators and Dishwashers",
+          "description": "The move is one of the first times this year that consumer products were specifically targeted with higher import taxes.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/trump-tariffs-steel-home-appliances.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 23:01:56 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809108"
+        },
+        {
+          "title": "Trump Tells Farmers ‘Changes Are Coming’ to Immigration Crackdown",
+          "description": "President Trump’s statement suggested his sweeping policies were alienating industries he wants to keep in his corner.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/trump-farmers-hotels-immigration.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 22:31:24 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809113"
+        },
+        {
+          "title": "Gov. Ron DeSantis Promises a Crackdown Against Unruly Protesters",
+          "description": "Gov. Ron DeSantis promised a “zero tolerance policy.” One sheriff in the state said that officers would kill protesters who throw bricks or point weapons at deputies.",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/florida-leaders-promise-a-crackdown-against-unruly-protesters",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 23:18:16 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809117"
+        },
+        {
+          "title": "California Democrats Express Outrage at Padilla’s Treatment",
+          "description": "Senator Alex Padilla, Democrat of California, was forced to the ground and handcuffed at an event held by the homeland security secretary, Kristi Noem.",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/democrats-in-california-expressed-outrage-at-a-senators-treatment-by-law-enforcement-officers",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 22:20:19 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809127"
+        },
+        {
+          "title": "Padilla’s scuffle stirs painful memories of a childhood spent proving his worth.",
+          "description": "",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/padillas-scuffle-stirs-painful-memories-of-a-childhood-spent-proving-his-worth",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 22:11:11 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809132"
+        },
+        {
+          "title": "Federal agents, joined by Secretary Noem, descend on a California community.",
+          "description": "",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/federal-agents-joined-by-secretary-noem-descend-on-a-california-community",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 21:59:07 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.809136"
+        },
+        {
+          "title": "Chris Mason: Reeves and Starmer can't escape sluggish economy",
+          "description": "The PM and chancellor badged their Spending Review as start of a new chapter but the economic backdrop is inescapable.",
+          "url": "https://www.bbc.com/news/articles/cy8d343g381o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 09:49:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941644"
+        },
+        {
+          "title": "Bangladesh leader declines to meet Tulip Siddiq",
+          "description": "Muhammad Yunus says he has confidence in the Bangladeshi authorities investigating the Labour MP.",
+          "url": "https://www.bbc.com/news/articles/cly30pgldewo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 15:17:56 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941673"
+        },
+        {
+          "title": "Labour must tell its working class story, says minister",
+          "description": "Business Secretary Jonathan Reynolds says his party must get better at countering Nigel Farage's message.",
+          "url": "https://www.bbc.com/news/articles/c0lnd25zkk5o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:59:30 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941680"
+        },
+        {
+          "title": "Peers criticise £9.6m House of Lords front door",
+          "description": "Upgrades to the Peers' Entrance have been branded a \"white elephant and a disaster\".",
+          "url": "https://www.bbc.com/news/articles/cj427p80vvxo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 18:20:59 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941686"
+        },
+        {
+          "title": "Reeves refuses to rule out tax rises after economy shrinks",
+          "description": "The chancellor highlights \"uncertainty\" in the world as economists warn of tax rises if the economy fails to grow.",
+          "url": "https://www.bbc.com/news/articles/cy5e6ly9qq3o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:38:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941692"
+        },
+        {
+          "title": "No threat to British sovereignty over Gibraltar deal, says Lammy",
+          "description": "It comes after the UK agreed a deal with the European Union over the territory's post-Brexit future.",
+          "url": "https://www.bbc.com/news/articles/c2490dz4z3po",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 14:16:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941697"
+        },
+        {
+          "title": "Data bill opposed by Sir Elton John and Dua Lipa finally passes",
+          "description": "Leading artists said the bill needed to be changed to protect them from having their work copied by AI.",
+          "url": "https://www.bbc.com/news/articles/c8e6z590wweo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:13:32 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941703"
+        },
+        {
+          "title": "Council tax expected to rise by 5% a year",
+          "description": "Council tax is expected to rise by 5% a year to pay for local services, documents in the Spending Review suggest.",
+          "url": "https://www.bbc.com/news/articles/cvgnd10n941o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 10:12:13 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941709"
+        },
+        {
+          "title": "Drakeford loses temper with Plaid leader",
+          "description": "Drakeford accuses Rhun ap Iorwerth of being \"very bad at listening\" as he is heckled.",
+          "url": "https://www.bbc.com/news/videos/clyg0xnxl7vo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:47:10 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941715"
+        },
+        {
+          "title": "Lyons dismisses resignation calls over  Larne attack Facebook post",
+          "description": "A crowd attacked the leisure centre hours after a minister revealed that migrants were being temporarily housed there.",
+          "url": "https://www.bbc.com/news/articles/cn056gwdjyxo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 15:06:36 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:06:37.941720"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T20:06:38.100890"
+    },
+    "timestamp": "2025-06-12T20:06:38.100974"
+  },
+  "timestamp": "2025-06-12T20:06:38.102719",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+      "https://feeds.bbci.co.uk/news/politics/rss.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T20:06:38.102731",
+    "debug_info": {
+      "saved_from": "save_intelligent_web_to_quarantine",
+      "cwd": "/Users/vinsoncornejo/Downloads/augment-projects/SAM",
+      "python_path": "NOT_SET"
+    }
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T20:07:33.409861"
+  },
+  "approved_at": "2025-06-12T20:07:33.409874",
+  "vetting_action": "PASS"
+}

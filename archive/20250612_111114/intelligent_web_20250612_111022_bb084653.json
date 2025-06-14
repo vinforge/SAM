@@ -1,0 +1,231 @@
+{
+  "query": "Provide me the latest news on Elon Musk",
+  "result": {
+    "success": true,
+    "query": "Provide me the latest news on Elon Musk",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": null,
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "British passenger in seat 11A survives plane crash, reports say",
+          "description": "The London-bound Air India plane carrying 242 people crashed shortly after take-off in western India.",
+          "url": "https://www.bbc.com/news/articles/ce3v6drp96zo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 14:57:22 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206023"
+        },
+        {
+          "title": "Verified video shows Air India plane descending and moment of crash",
+          "description": "A plane bound for London Gatwick carrying 242 people has crashed after taking off from Ahmedabad in India.",
+          "url": "https://www.bbc.com/news/videos/cy4kxq9e9gqo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:48:16 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206036"
+        },
+        {
+          "title": "What we know so far about Air India flight AI171",
+          "description": "More than 200 people were on board the flight to London Gatwick when it crashed shortly after take-off.",
+          "url": "https://www.bbc.com/news/articles/c5y5nq170z4o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 14:48:27 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206039"
+        },
+        {
+          "title": "Watch: BBC correspondent reports from crash site as rescuers work among wreckage",
+          "description": "Air India say there were 169 Indian nationals on board the flight, as-well as 53 Britons, one Canadian national and seven Portuguese nationals.",
+          "url": "https://www.bbc.com/news/videos/c74qpwg7pwno",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 10:51:25 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206042"
+        },
+        {
+          "title": "Reeves refuses to rule out tax rises after economy shrinks",
+          "description": "The chancellor highlights \"uncertainty\" in the world as economists warn of tax rises if the economy fails to grow.",
+          "url": "https://www.bbc.com/news/articles/cy5e6ly9qq3o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:38:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206044"
+        },
+        {
+          "title": "These touts made millions - and claimed staff at big ticketing firms helped",
+          "description": "The touts alleged staff at resale sites Ticketmaster once owned helped them trade in bulk, the BBC reveals.",
+          "url": "https://www.bbc.com/news/articles/ce3vrw4v3q2o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 05:14:50 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206047"
+        },
+        {
+          "title": "Global watchdog finds Iran failing to meet nuclear obligations for first time in 20 years",
+          "description": "Iran condemns the resolution passed by the IAEA's board of governors as \"political\" and says it will open a new uranium enrichment facility.",
+          "url": "https://www.bbc.com/news/articles/ce3v6w2qr12o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 13:48:53 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206049"
+        },
+        {
+          "title": "Poundland sold for £1 with shops set to close",
+          "description": "The BBC understands up to 100 of the brand's 825 UK stores could close as the new owners shake up the business.",
+          "url": "https://www.bbc.com/news/articles/c36594lr29ko",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 10:19:24 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206051"
+        },
+        {
+          "title": "Thunderstorm warnings in place as drought declared for millions",
+          "description": "Temperatures on Friday will likely match the previous hottest day of 2025 so far.",
+          "url": "https://www.bbc.com/news/articles/c14k6vp62zxo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:35:48 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206053"
+        },
+        {
+          "title": "Jesús polished luxury vehicles at an LA car wash for years. Then ICE showed up",
+          "description": "The BBC obtained CCTV of the raid that shows how President Trump's immigration crackdown has ramped up.",
+          "url": "https://www.bbc.com/news/articles/czxylvq392xo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 02:19:16 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.206055"
+        },
+        {
+          "title": "Boeing 787 Crash in India Brings Fresh Scrutiny to Plane Maker’s Safety Record",
+          "description": "The accident happened just weeks after the company cut a deal with the U.S. government to avoid taking criminal responsibility for a pair of deadly crashes in 2018 and 2019.",
+          "url": "https://www.nytimes.com/2025/06/12/business/boeing-787-dreamliner-crash-safety-record.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 14:42:36 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298024"
+        },
+        {
+          "title": "Plane Crashes in India, Israel Appears Ready to Attack Iran, Chaos in an Immigration Courthouse",
+          "description": "Plus, remembering the Beach Boys’ Brian Wilson.",
+          "url": "https://www.nytimes.com/2025/06/12/podcasts/the-headlines/immigration-courthouse-israel-iran.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 11:12:38 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298038"
+        },
+        {
+          "title": "Inside a Courthouse, Chaos and Tears as Trump Accelerates Deportations",
+          "description": "Immigration courtrooms in New York City have emerged as a flashpoint, with masked agents making surprise arrests of immigrants who have appeared for routine hearings and check-ins.",
+          "url": "https://www.nytimes.com/2025/06/12/nyregion/immigration-courthouse-arrests-trump-deportation.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 07:00:17 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298041"
+        },
+        {
+          "title": "New China Trade ‘Deal’ Takes U.S. Back to Where It Started",
+          "description": "If a handshake agreement holds, it will merely undo some of the damage from the trade war that President Trump started.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/us-china-trade-deal-trump.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 06:55:34 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298044"
+        },
+        {
+          "title": "The Art of the Stall: China’s Strategy for Dealing With Trump",
+          "description": "Beijing has gained time to build up its own strengths by drawing out negotiations with the United States, using its chokehold over critical minerals.",
+          "url": "https://www.nytimes.com/2025/06/12/world/asia/trump-china-trade-deal.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 10:11:23 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298047"
+        },
+        {
+          "title": "Republicans to Press Hochul, Walz and Pritzker on Immigration in Hearing",
+          "description": "Amid unrest in California, Republicans pressed the governors of other blue states on their immigration policies, including on limiting cooperation with federal enforcement efforts.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/republicans-governors-hochul-walz-immigration.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 15:06:47 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298049"
+        },
+        {
+          "title": "Supreme Court Revives Suit From Victims of Botched F.B.I. Raid",
+          "description": "Lower courts ruled in favor of agents who had used a battering ram and a flash-bang grenade in mistakenly raiding the home of an Atlanta couple.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/supreme-court-fbi-raid.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 14:28:34 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298052"
+        },
+        {
+          "title": "Brian Wilson and Sly Stone: Pop World Builders Dogged by Darkness",
+          "description": "Two of music’s powerful visionaries died this week. The songs they meticulously constructed offered an escape their makers struggled to realize in their own lives.",
+          "url": "https://www.nytimes.com/2025/06/12/arts/music/brian-wilson-sly-stone.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 12:33:53 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298054"
+        },
+        {
+          "title": "How “Pet Sounds” Became the Beach Boys Masterpiece",
+          "description": "Brian Wilson’s 1966 masterpiece is now considered a crowning achievement of music. The album’s reputation grew over time.",
+          "url": "https://www.nytimes.com/2025/06/11/arts/music/brian-wilson-pet-sounds.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 12:39:01 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298057"
+        },
+        {
+          "title": "After a Wild Day in Court, Weinstein Jurors Will Resume Deliberations",
+          "description": "On Wednesday, the jury convicted Harvey Weinstein of one felony sex crime. The judge sent jurors home to cool off after their discussions devolved into threats and yelling.",
+          "url": "https://www.nytimes.com/2025/06/12/nyregion/harvey-weinstein-sex-crimes-trial.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 07:00:22 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T11:10:22.298059"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T11:10:22.497532"
+    },
+    "timestamp": "2025-06-12T11:10:22.497666"
+  },
+  "timestamp": "2025-06-12T11:10:22.497844",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://feeds.bbci.co.uk/news/rss.xml",
+      "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T11:10:22.497855"
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T11:11:03.616171"
+  },
+  "approved_at": "2025-06-12T11:11:03.616181",
+  "vetting_action": "PASS"
+}

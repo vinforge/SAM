@@ -1,0 +1,86 @@
+{
+  "url": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+  "content": "**RSS News Feed**\n\n**Reeves boosts NHS and housing as some budgets squeezed**\nSome departments, including the Home Office and Foreign Office, have lost out in the government's Spending Review.\n\n---\n\n**Key points at a glance from the Spending Review**\nChancellor Rachel Reeves unveils how the government plans to spend money in the coming years.\n\n---\n\n**UK agrees post-Brexit deal over Gibraltar**\nTalks on rules governing the border of Spain and Gibraltar have been ongoing since Britain left the EU.\n\n---\n\n**UK will end use of asylum hotels by 2029, Reeves says**\nThe Chancellor pledged £200m to \"cut the asylum backlog\" and speed up deportations.\n\n---\n\n**Spending Review: Where key money is being spent... in 99 seconds**\nChancellor Rachel Reeves has delivered her Spending Review, setting out budgets for government departments.\n\n---\n\n**Tories accuse PM of funding tax cuts for Mauritians**\nSir Keir Starmer defends the UK's £3.4bn Chagos islands deal after Kemi Badenoch says it is bad value for money.\n\n---\n\n**Rough sleeping to be decriminalised in England and Wales**\nThe government plans to scrap the Vagrancy Act and bring in laws to focus on crimes like organised begging by gangs.\n\n---\n\n**Scrap Chagos Islands deal and agree new one, UN panel urges UK**\nA UN human rights panel says the deal \"fails to guarantee\" the rights of Chagossians.\n\n---\n\n**UK sanctions far-right Israeli ministers for 'inciting violence' against Palestinians**\nFive countries place travel bans on Security Minister Itamar Ben-Gvir and Finance Minister Bezalel Smotrich.\n\n---\n\n**Ban on 'no ball games' signs suggested to get kids off screens**\nExperts say outdoor play in England has declined by 50% and are calling for urgent change.\n\n---\n\n**TV presenter David Bull named new Reform chairman**\nThe TalkTV host replaces Zia Yusuf, who quit last week after clashing with Reform UK colleagues.\n\n---\n\n**Sizewell C pledged to lower bills but will take at least 10 years**\nSir Keir Starmer says the development of Sizewell C on the Suffolk coastline will create 10,000 jobs over the next decade.\n\n---\n\n**Watch: Reform UK's Sarah Pochin defends call for burka ban**\nWatch: Reform UK's Sarah Pochin defends call for burka ban\n\n---\n\n**PM denies bowing to political pressure over winter fuel**\nSir Keir Starmer says his decision to give more pensioners the payment was the result of an improving economy.\n\n---\n\n**MPs set to vote on decriminalising abortion in England and Wales**\nWomen would never be prosecuted for terminating a pregnancy under proposed new laws.",
+  "timestamp": "2025-06-11T18:54:21.096400",
+  "error": null,
+  "metadata": {
+    "content_type": "rss_feed",
+    "items_count": 15,
+    "feed_title": "RSS News Feed",
+    "source": "secure_web_search",
+    "original_query": "what is the latest political news for today?",
+    "fetch_method": "SAM_WebFetcher",
+    "quarantine_timestamp": "2025-06-11T18:54:21.096712"
+  },
+  "vetting_results": {
+    "status": "completed",
+    "timestamp": "2025-06-11T20:05:39.614114",
+    "processing_time": 0.0009212493896484375,
+    "recommendation": "FAIL",
+    "confidence": 0.52912,
+    "reason": "Low overall quality score (0.43); Content lacks credible sources and evidence (credibility: 0.00)",
+    "overall_score": 0.435,
+    "scores": {
+      "credibility": 0.0,
+      "persuasion": 0.3,
+      "speculation": 0.0,
+      "purity": 0.8,
+      "source_reputation": 0.6
+    },
+    "source_reputation": {
+      "domain": "feeds.bbci.co.uk",
+      "tld": ".uk",
+      "base_score": 0.5,
+      "trusted_bonus": 0.0,
+      "suspicious_penalty": 0.0,
+      "factor_adjustments": -0.05,
+      "final_score": 0.45,
+      "risk_category": "medium_risk",
+      "https_used": true
+    },
+    "risk_assessment": {
+      "overall_score": 0.435,
+      "risk_factors": [
+        {
+          "dimension": "credibility",
+          "score": 0.0,
+          "threshold": 0.4,
+          "severity": "high",
+          "description": "Content lacks credible sources and evidence"
+        }
+      ],
+      "confidence": 0.52912,
+      "analysis_mode": "balanced",
+      "weights_used": {
+        "credibility": 0.3,
+        "persuasion": 0.25,
+        "speculation": 0.2,
+        "purity": 0.15,
+        "source_reputation": 0.1
+      }
+    },
+    "sanitization": {
+      "removed_elements": [],
+      "suspicious_patterns": [],
+      "purity_score": 0.9,
+      "encoding_issues": [
+        "non_ascii_characters",
+        "excessive_control_chars"
+      ],
+      "content_stats": {
+        "original_length": 2539,
+        "clean_length": 2510,
+        "reduction_ratio": 0.011421819614021222,
+        "word_count": 409,
+        "line_count": 1,
+        "non_ascii_ratio": 0.0007968127490039841
+      }
+    },
+    "metadata": {
+      "profile_used": "web_vetting",
+      "analysis_mode": "balanced",
+      "evaluator_version": "1.0",
+      "safety_threshold": 0.7
+    }
+  }
+}

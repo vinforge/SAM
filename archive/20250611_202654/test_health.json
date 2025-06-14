@@ -1,0 +1,1 @@
+{"query": "test health news", "result": {"data": {"articles": [{"title": "Test Health Article", "description": "This is a test health article about medical research.", "url": "https://example.com/test", "source": "test_source"}]}}}

@@ -14,7 +14,6 @@ import sys
 import subprocess
 import argparse
 import time
-from pathlib import Path
 
 # Suppress PyTorch/Streamlit compatibility warnings
 os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
@@ -231,7 +230,7 @@ def launch_full_suite():
         for name, process in processes:
             try:
                 process.terminate()
-            except:
+            except Exception:
                 pass
 
 def main():

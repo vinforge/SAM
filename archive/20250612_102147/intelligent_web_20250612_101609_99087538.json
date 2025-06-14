@@ -1,0 +1,232 @@
+{
+  "query": "What is the latest in US political news for today?",
+  "result": {
+    "success": true,
+    "query": "What is the latest in US political news for today?",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": "politics",
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "Here’s the latest.",
+          "description": "",
+          "url": "https://www.nytimes.com/live/2025/06/12/us/la-protests-trump-marines-ice/heres-the-latest",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 12:37:43 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271957"
+        },
+        {
+          "title": "6 Takeaways From Gavin Newsom’s Appearance on ‘The Daily’",
+          "description": "The governor bragged about working with ICE in California but said that President Trump was “trying to gin things up to create problems” at protests.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/gavin-newsom-the-daily-takeaways.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 10:21:36 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271969"
+        },
+        {
+          "title": "Republicans to Press Hochul, Walz and Pritzker on Immigration in Hearing",
+          "description": "Amid unrest in California, Republicans plan to press the governors of other blue states on their immigration policies, including on limiting cooperation with federal enforcement efforts.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/republicans-governors-hochul-walz-immigration.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 13:12:03 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271972"
+        },
+        {
+          "title": "Charging Your EV May Be Getting Easier, Even if It’s Not a Tesla",
+          "description": "It is becoming easier to find fast chargers for electric vehicles, and they are more likely to work — and not just for Teslas.",
+          "url": "https://www.nytimes.com/2025/06/12/business/electric-vehicle-charging-tesla.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 09:02:26 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271975"
+        },
+        {
+          "title": "Defense Lawyers for Kilmar Abrego Garcia Ask Judge to Release Him Pretrial",
+          "description": "The request came as lawyers in Kilmar Armando Abrego Garcia’s separate civil case were poised to ask a different judge to hold the Trump administration in contempt for sidestepping one of her orders.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/abrego-garcia-release-pretrial.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 00:55:09 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271978"
+        },
+        {
+          "title": "Duffy Backs Safety Audit After Deadly Crash Near National Airport",
+          "description": "An investigation will examine what could have prevented an Army Black Hawk helicopter from ramming into an American Airlines flight on Jan. 29, killing all on board both aircraft.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/dca-helicopter-crash-audits.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 00:08:05 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271980"
+        },
+        {
+          "title": "David Hogg to Exit DNC After Backlash to His Primary Plan",
+          "description": "Mr. Hogg said he would not run again for vice chair after the party voted for a new election. Democrats have been furious at his plan to challenge the party’s sitting lawmakers in primary races.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/david-hogg-dnc-democrats.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 00:05:39 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271983"
+        },
+        {
+          "title": "New China Trade ‘Deal’ Takes U.S. Back to Where It Started",
+          "description": "If a handshake agreement holds, it will merely undo some of the damage from the trade war that President Trump started.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/us-china-trade-deal-trump.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 06:55:34 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271989"
+        },
+        {
+          "title": "In Trump’s Washington, ‘You Don’t Leave Home Without Your Lawyer’",
+          "description": "There’s a lot of work for lawyers in the nation’s capital these days: Over 400 lawsuits have been filed against President Trump’s administration since the start of his second term.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/trump-lawsuits-lawyers.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Thu, 12 Jun 2025 13:20:18 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271993"
+        },
+        {
+          "title": "Trump Bends Military’s Role, Suggesting More Troops in More Cities",
+          "description": "President Trump has expanded domestic use of the armed forces, testing the limits on involving troops at protests and the border.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/trump-domestic-military-expansion.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+          "published_at": "Wed, 11 Jun 2025 22:36:15 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.271995"
+        },
+        {
+          "title": "Chris Mason: Reeves and Starmer can't escape sluggish economy",
+          "description": "The PM and chancellor badged their Spending Review as start of a new chapter but the economic backdrop is inescapable.",
+          "url": "https://www.bbc.com/news/articles/cy8d343g381o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 09:49:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533469"
+        },
+        {
+          "title": "Reeves refuses to rule out tax rises after economy shrinks",
+          "description": "The chancellor highlights \"uncertainty\" in the world as economists warn of tax rises if the economy fails to grow.",
+          "url": "https://www.bbc.com/news/articles/cy5e6ly9qq3o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:38:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533493"
+        },
+        {
+          "title": "UK agrees post-Brexit deal over Gibraltar",
+          "description": "Talks on rules governing the border of Spain and Gibraltar have been ongoing since Britain left the EU.",
+          "url": "https://www.bbc.com/news/articles/cd903neydwjo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 21:24:08 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533500"
+        },
+        {
+          "title": "Council tax expected to rise by 5% a year",
+          "description": "Council tax is expected to rise by 5% a year to pay for local services, documents in the Spending Review suggest.",
+          "url": "https://www.bbc.com/news/articles/cvgnd10n941o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 10:12:13 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533505"
+        },
+        {
+          "title": "Reeves boosts NHS and housing as some budgets squeezed",
+          "description": "Some departments, including the Home Office and Foreign Office, have lost out in the government's Spending Review.",
+          "url": "https://www.bbc.com/news/articles/c331xnrn3dzo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 02:31:45 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533510"
+        },
+        {
+          "title": "US reviewing Aukus submarine pact as part of 'America First' agenda",
+          "description": "It comes as Australia faces pressure from the White House to dramatically lift its military spending.",
+          "url": "https://www.bbc.com/news/articles/cy8d3d5l9l1o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 01:43:24 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533515"
+        },
+        {
+          "title": "Key points at a glance from the Spending Review",
+          "description": "Chancellor Rachel Reeves unveils how the government plans to spend money in the coming years.",
+          "url": "https://www.bbc.com/news/articles/clyr170qm19o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 17:23:51 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533519"
+        },
+        {
+          "title": "Drakeford loses temper with Plaid leader",
+          "description": "Drakeford accuses Rhun ap Iorwerth of being \"very bad at listening\" as he is heckled.",
+          "url": "https://www.bbc.com/news/videos/clyg0xnxl7vo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:47:10 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533524"
+        },
+        {
+          "title": "Leon Brittan's widow says 'no closure' from false abuse claims after case dropped",
+          "description": "Lady Diana Brittan says her falsely accused late husband's legacy has been permanently tarnished.",
+          "url": "https://www.bbc.com/news/articles/c4g21m8py12o",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 04:56:55 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533530"
+        },
+        {
+          "title": "O'Neill calls for Lyons to resign over Facebook post ahead of Larne attack",
+          "description": "A crowd attacked the leisure centre hours after a minister revealed that migrants were being temporarily housed there.",
+          "url": "https://www.bbc.com/news/articles/cn056gwdjyxo",
+          "source": "https://feeds.bbci.co.uk/news/politics/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:52:51 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T10:16:09.533535"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T10:16:09.666073"
+    },
+    "timestamp": "2025-06-12T10:16:09.666171"
+  },
+  "timestamp": "2025-06-12T10:16:09.666346",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+      "https://feeds.bbci.co.uk/news/politics/rss.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T10:16:09.666358"
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T10:21:34.320882"
+  },
+  "approved_at": "2025-06-12T10:21:34.320884",
+  "vetting_action": "PASS"
+}

@@ -36,11 +36,14 @@ try:
     from utils.vector_manager import VectorManager
     from multimodal_processing.multimodal_pipeline import get_multimodal_pipeline
     from utils.embedding_utils import get_embedding_manager
+    from utils.web_retrieval_suggester import WebRetrievalSuggester
     # Import security middleware
     from web_ui.security_middleware import (
         security_middleware, require_unlock, optional_security,
         get_secure_memory_store, create_security_routes, inject_security_context
     )
+    # Import vetting interface
+    from web_ui.vetting_interface import vetting_bp
     logger.info("✅ Successfully imported SAM components")
 except ImportError as e:
     logger.warning(f"Import error: {e}")
@@ -48,12 +51,14 @@ except ImportError as e:
     VectorManager = None
     get_multimodal_pipeline = None
     get_embedding_manager = None
+    WebRetrievalSuggester = None
     security_middleware = None
     require_unlock = lambda f: f
     optional_security = lambda f: f
     get_secure_memory_store = None
     create_security_routes = lambda app: None
     inject_security_context = lambda: {}
+    vetting_bp = None
 
 # Flask app configuration
 app = Flask(__name__)
@@ -72,6 +77,7 @@ sam_model = None
 vector_manager = None
 multimodal_pipeline = None
 embedding_manager = None
+web_retrieval_suggester = None
 
 # Tool-augmented reasoning components
 self_decide_framework = None
@@ -86,7 +92,7 @@ def allowed_file(filename):
 
 def initialize_sam():
     """Initialize SAM components."""
-    global sam_model, vector_manager, multimodal_pipeline, embedding_manager
+    global sam_model, vector_manager, multimodal_pipeline, embedding_manager, web_retrieval_suggester
     global self_decide_framework, tool_selector, tool_executor, answer_synthesizer
 
     try:
@@ -206,6 +212,13 @@ def initialize_sam():
         else:
             logger.warning("⚠️ Embedding manager not available")
 
+        # Initialize web retrieval suggester
+        if WebRetrievalSuggester:
+            web_retrieval_suggester = WebRetrievalSuggester()
+            logger.info("✅ Web retrieval suggester initialized")
+        else:
+            logger.warning("⚠️ Web retrieval suggester not available")
+
         # Initialize tool-augmented reasoning components
         try:
             from reasoning.self_decide_framework import get_self_decide_framework
@@ -226,7 +239,7 @@ def initialize_sam():
             from memory.memory_vectorstore import get_memory_store, VectorStoreType
             memory_store = get_memory_store(
                 store_type=VectorStoreType.CHROMA,
-                storage_directory="web_ui",
+                storage_directory="memory_store",
                 embedding_dimension=384
             )
 
@@ -346,6 +359,136 @@ def index():
     """Main chat interface."""
     return render_template('index.html')
 
+@app.route('/vetting')
+@optional_security
+def vetting_dashboard():
+    """Content vetting dashboard."""
+    return render_template('vetting_dashboard.html')
+
+@app.route('/api/trigger-web-search', methods=['POST'])
+@optional_security
+def trigger_web_search():
+    """Phase 8.4: Trigger web search when user accepts escalation."""
+    try:
+        data = request.get_json()
+        search_query = data.get('search_query', '').strip()
+        original_query = data.get('original_query', '').strip()
+
+        if not search_query:
+            return jsonify({'error': 'Search query is required'}), 400
+
+        logger.info(f"Triggering web search for: '{search_query}' (original: '{original_query}')")
+
+        # Phase 8.5: Use the new intelligent web system with cocoindex
+        try:
+            from web_retrieval.intelligent_web_system import IntelligentWebSystem
+            from config.config_manager import ConfigManager
+
+            # Load configuration
+            config_manager = ConfigManager()
+            config = config_manager.get_config()
+
+            # Initialize intelligent web system
+            api_keys = {
+                'serper': config.serper_api_key if config.serper_api_key else None,
+                'newsapi': config.newsapi_api_key if config.newsapi_api_key else None
+            }
+
+            web_config = {
+                'cocoindex_search_provider': config.cocoindex_search_provider,
+                'cocoindex_num_pages': config.cocoindex_num_pages,
+                'web_retrieval_provider': config.web_retrieval_provider
+            }
+
+            intelligent_web_system = IntelligentWebSystem(api_keys=api_keys, config=web_config)
+
+            # Process the query using intelligent routing
+            result = intelligent_web_system.process_query(search_query)
+
+            if result['success']:
+                logger.info(f"🌐 Intelligent web search completed successfully using {result['tool_used']}")
+                logger.info(f"🔍 Web search result structure: {list(result.keys())}")
+                logger.info(f"🔍 Web search data keys: {list(result.get('data', {}).keys()) if 'data' in result else 'NO_DATA'}")
+
+                # Save to quarantine for vetting with enhanced debugging
+                logger.info(f"🚨 ABOUT TO CALL save_intelligent_web_to_quarantine 🚨")
+                logger.info(f"Query: '{search_query}'")
+                logger.info(f"Result type: {type(result)}")
+
+                try:
+                    from secure_streamlit_app import save_intelligent_web_to_quarantine
+                    logger.info(f"✅ Successfully imported save_intelligent_web_to_quarantine")
+
+                    save_intelligent_web_to_quarantine(result, search_query)
+                    logger.info(f"✅ save_intelligent_web_to_quarantine completed without exception")
+
+                except Exception as quarantine_error:
+                    logger.error(f"❌ QUARANTINE SAVE FAILED: {quarantine_error}")
+                    logger.error(f"❌ Quarantine error type: {type(quarantine_error)}")
+                    import traceback
+                    logger.error(f"❌ Quarantine traceback: {traceback.format_exc()}")
+                    # Don't re-raise, continue with vetting
+
+                # DISABLED: Automatic vetting process (to allow users to see quarantined content)
+                # The automatic vetting was immediately moving files to archive, preventing users
+                # from seeing them in the "Quarantined Content Preview" section
+                logger.info(f"🛡️ Skipping automatic vetting - content saved to quarantine for manual review")
+                vetting_message = "Content saved to quarantine. Visit the Content Vetting page to review and approve."
+
+                # Optional: Uncomment below to re-enable automatic vetting
+                # try:
+                #     logger.info(f"🛡️ About to trigger vetting process")
+                #     from secure_streamlit_app import trigger_vetting_process
+                #     vetting_result = trigger_vetting_process()
+                #
+                #     if vetting_result.get('status') == 'success':
+                #         logger.info("✅ Automatic vetting completed successfully after web search")
+                #         vetting_message = "Content automatically vetted and ready for use!"
+                #     else:
+                #         logger.warning(f"⚠️ Automatic vetting encountered issues: {vetting_result}")
+                #         vetting_message = "Content saved to quarantine. Manual vetting may be required."
+                # except Exception as e:
+                #     logger.warning(f"Automatic vetting failed: {e}")
+                #     vetting_message = "Content saved to quarantine. Manual vetting may be required."
+
+                return jsonify({
+                    'status': 'search_completed',
+                    'message': f'Intelligent web search completed using {result["tool_used"].replace("_", " ").title()}. {vetting_message}',
+                    'search_query': search_query,
+                    'original_query': original_query,
+                    'tool_used': result['tool_used'],
+                    'content_count': result.get('data', {}).get('total_chunks', 0) or result.get('data', {}).get('total_articles', 0) or 1,
+                    'next_step': 'content_ready',
+                    'vetting_status': vetting_result.get('status', 'unknown') if 'vetting_result' in locals() else 'failed'
+                })
+            else:
+                logger.error(f"Intelligent web search failed: {result.get('error', 'Unknown error')}")
+                return jsonify({
+                    'status': 'search_failed',
+                    'error': f'Intelligent web search failed: {result.get("error", "Unknown error")}',
+                    'fallback_message': 'I apologize, but I encountered an issue while searching the web. Please try again or ask me to answer with my current knowledge.'
+                }), 500
+
+        except subprocess.TimeoutExpired:
+            logger.error("Web content fetch timed out")
+            return jsonify({
+                'status': 'search_timeout',
+                'error': 'Web search timed out',
+                'fallback_message': 'The web search is taking longer than expected. Please try again or ask me to answer with my current knowledge.'
+            }), 500
+
+        except Exception as e:
+            logger.error(f"Error triggering web search: {e}")
+            return jsonify({
+                'status': 'search_error',
+                'error': str(e),
+                'fallback_message': 'I encountered an error while searching the web. Please try again or ask me to answer with my current knowledge.'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error in trigger_web_search: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/test')
 def test_endpoint():
     """Test endpoint to verify basic functionality."""
@@ -387,8 +530,25 @@ def chat():
         # Generate unique message ID for feedback tracking
         message_id = str(uuid.uuid4())
 
-        # Handle both string responses and dict responses with thought blocks
+        # Handle different response types
         if isinstance(response_data, dict):
+            # Phase 8.3: Handle web search escalation
+            if response_data.get('type') == 'web_search_escalation':
+                assessment = response_data['confidence_assessment']
+                return jsonify({
+                    'type': 'web_search_escalation',
+                    'message': response_data['message'],
+                    'confidence_score': assessment.confidence_score,
+                    'confidence_level': assessment.confidence_level.value,
+                    'reasons': assessment.reasons,
+                    'suggested_search_query': response_data['suggested_search_query'],
+                    'original_query': response_data['original_query'],
+                    'message_id': message_id,
+                    'timestamp': datetime.now().isoformat(),
+                    'conversation_id': session['conversation_id']
+                })
+
+            # Handle normal dict responses with thought blocks
             return jsonify({
                 'response': response_data['response'],
                 'message_id': message_id,
@@ -398,6 +558,7 @@ def chat():
                 'thought_blocks': response_data.get('thought_blocks', [])
             })
         else:
+            # Handle string responses
             return jsonify({
                 'response': response_data,
                 'message_id': message_id,
@@ -493,11 +654,60 @@ def should_use_tools(message):
     return any(indicator in message_lower for indicator in tool_indicators) or len(message.split()) > 10
 
 def generate_tool_augmented_response(message):
-    """Generate response using SELF-DECIDE framework and tools."""
+    """Generate response using SELF-DECIDE framework with confidence assessment."""
     try:
-        logger.info("Using tool-augmented reasoning for web UI response")
+        logger.info("Using tool-augmented reasoning with confidence assessment for web UI response")
 
-        # Execute SELF-DECIDE reasoning
+        # Phase 8.1: Perform initial vector store search for confidence assessment
+        search_results = []
+        if self_decide_framework and self_decide_framework.vector_manager:
+            try:
+                from utils.embedding_utils import get_embedding_manager
+                embedding_manager = get_embedding_manager()
+
+                # Generate query embedding
+                query_embedding = embedding_manager.embed_query(message)
+
+                # Set query context for memory adapter if available
+                if hasattr(self_decide_framework.vector_manager, 'set_query_context'):
+                    self_decide_framework.vector_manager.set_query_context(message)
+
+                # Search for relevant chunks
+                search_results = self_decide_framework.vector_manager.search(
+                    query_embedding, top_k=5, score_threshold=0.1
+                )
+
+                logger.info(f"Retrieved {len(search_results)} results for confidence assessment")
+
+            except Exception as e:
+                logger.warning(f"Vector search for confidence assessment failed: {e}")
+                search_results = []
+
+        # Phase 8.2: Assess confidence in retrieval quality
+        try:
+            from reasoning.confidence_assessor import get_confidence_assessor
+            confidence_assessor = get_confidence_assessor()
+
+            assessment = confidence_assessor.assess_retrieval_quality(search_results, message)
+
+            logger.info(f"Confidence assessment: {assessment.status} ({assessment.confidence_score:.2f})")
+
+            # Phase 8.3: Check if web search escalation should be offered
+            if assessment.status == "NOT_CONFIDENT":
+                # Return special response object for web search escalation
+                return {
+                    'type': 'web_search_escalation',
+                    'confidence_assessment': assessment,
+                    'message': assessment.explanation,
+                    'suggested_search_query': assessment.suggested_search_query,
+                    'original_query': message
+                }
+
+        except Exception as e:
+            logger.warning(f"Confidence assessment failed: {e}")
+            # Continue with normal processing if confidence assessment fails
+
+        # Normal processing: Execute SELF-DECIDE reasoning
         session = self_decide_framework.reason(message)
 
         # Synthesize enhanced response
@@ -612,7 +822,7 @@ def is_document_query(message):
             from memory.memory_vectorstore import get_memory_store, VectorStoreType
             memory_store = get_memory_store(
                 store_type=VectorStoreType.CHROMA,
-                storage_directory="web_ui",
+                storage_directory="memory_store",
                 embedding_dimension=384
             )
             all_memories = memory_store.get_all_memories()
@@ -645,7 +855,7 @@ def handle_document_query(message):
             from memory.memory_vectorstore import get_memory_store, VectorStoreType
             memory_store = get_memory_store(
                 store_type=VectorStoreType.CHROMA,
-                storage_directory="web_ui",
+                storage_directory="memory_store",
                 embedding_dimension=384
             )
         except ImportError as e:
@@ -1270,6 +1480,11 @@ def generate_standard_response(message):
         context_text = context_assembly.context_text
         routing_explanation = context_assembly.routing_explanation
         transparency_score = context_assembly.transparency_score
+
+        # Check if we should suggest web retrieval (Phase 7.1)
+        if web_retrieval_suggester and web_retrieval_suggester.should_suggest_web_retrieval(message, context_assembly.memories):
+            logger.info(f"Suggesting web retrieval for query: {message[:50]}...")
+            return web_retrieval_suggester.format_retrieval_suggestion(message)
 
         # Prepare context for prompt
         context = f"\n\n{context_text}" if context_text else ""
@@ -2089,6 +2304,13 @@ def uploaded_file(filename):
 # Initialize security routes and context
 create_security_routes(app)
 app.context_processor(inject_security_context)
+
+# Register vetting interface blueprint
+if vetting_bp:
+    app.register_blueprint(vetting_bp)
+    logger.info("✅ Vetting interface registered")
+else:
+    logger.warning("⚠️ Vetting interface not available")
 
 if __name__ == '__main__':
     # Create upload directory

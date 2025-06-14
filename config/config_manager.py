@@ -79,6 +79,13 @@ class SAMConfig:
     log_file: str = "logs/sam.log"
     log_max_size_mb: int = 100
     log_backup_count: int = 5
+
+    # Web Retrieval settings
+    web_retrieval_provider: str = "cocoindex"  # cocoindex, legacy
+    cocoindex_num_pages: int = 5
+    cocoindex_search_provider: str = "duckduckgo"  # serper, duckduckgo (default: free)
+    serper_api_key: str = ""
+    newsapi_api_key: str = ""
     
     def __post_init__(self):
         if not self.created_at:

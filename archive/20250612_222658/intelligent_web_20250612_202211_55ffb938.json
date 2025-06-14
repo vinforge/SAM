@@ -1,0 +1,237 @@
+{
+  "query": "latest AI developments in healthcare 2025",
+  "result": {
+    "success": true,
+    "query": "latest AI developments in healthcare 2025",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": "technology",
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "Nintendo Switch 2 Review: Bigger and Better, for a Higher Price",
+          "description": "The hardware improvements in the new $450 Nintendo will make this an automatic upgrade for fans of the two-in-one console.",
+          "url": "https://www.nytimes.com/2025/06/12/technology/personaltech/nintendo-switch-2-review.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Thu, 12 Jun 2025 09:03:50 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193176"
+        },
+        {
+          "title": "Elon Musk’s xAI Could Be Getting $250 Million in Investments",
+          "description": "Two dozen venture capital firms and other investors are investing in xAI, the artificial intelligence and social media company.",
+          "url": "https://www.nytimes.com/2025/06/12/business/xai-elon-musk-investors.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Thu, 12 Jun 2025 22:37:27 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193186"
+        },
+        {
+          "title": "This A.I. Company Wants to Take Your Job",
+          "description": "Mechanize, a San Francisco start-up, is building artificial intelligence tools to automate white-collar jobs “as fast as possible.”",
+          "url": "https://www.nytimes.com/2025/06/11/technology/ai-mechanize-jobs.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Wed, 11 Jun 2025 09:01:50 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193189"
+        },
+        {
+          "title": "Elon Musk Says His Trump Criticisms ‘Went Too Far’",
+          "description": "President Trump and Elon Musk traded social media barbs last week. Mr. Trump has said that he has no interest in repairing the relationship with his former adviser.",
+          "url": "https://www.nytimes.com/2025/06/11/business/elon-musk-trump-feud.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Wed, 11 Jun 2025 19:15:17 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193191"
+        },
+        {
+          "title": "Google DeepMind and National Hurricane Center Join on New A.I. Model",
+          "description": "The National Hurricane Center will experiment with the company’s DeepMind program to enhance the work of its expert meteorologists.",
+          "url": "https://www.nytimes.com/2025/06/12/science/google-hurricane-ai.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Thu, 12 Jun 2025 15:26:02 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193192"
+        },
+        {
+          "title": "Charging Your EV May Be Getting Easier, Even if It’s Not a Tesla",
+          "description": "It is becoming easier to find fast chargers for electric vehicles, and they are more likely to work — and not just for Teslas.",
+          "url": "https://www.nytimes.com/2025/06/12/business/electric-vehicle-charging-tesla.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Thu, 12 Jun 2025 09:02:26 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193194"
+        },
+        {
+          "title": "John L. Young, 89, Dies; Pioneered Posting Classified Documents Online",
+          "description": "His site, Cryptome, was a precursor to WikiLeaks, and in some ways bolder in its no-holds-barred approach to exposing government secrets.",
+          "url": "https://www.nytimes.com/2025/06/10/us/john-l-young-dead.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Wed, 11 Jun 2025 03:09:22 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193196"
+        },
+        {
+          "title": "Los Angeles Protests Amplified by Influencers and Online Creators",
+          "description": "Creators such as Cam Higby, who is conservative, have sometimes outnumbered traditional media outlets at the immigration protests. Their posts have gone viral.",
+          "url": "https://www.nytimes.com/2025/06/10/technology/la-protests-influencers-media.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Tue, 10 Jun 2025 21:59:41 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193200"
+        },
+        {
+          "title": "How ‘Maybe Happy Ending’ Overcame a Shaky Start and Won Big at the Tonys",
+          "description": "Broadway’s best musical winner had to delay its opening last fall and was selling poorly. But strong word-of-mouth and reviews helped this quirky show triumph.",
+          "url": "https://www.nytimes.com/2025/06/10/theater/maybe-happy-ending-tonys-broadway.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Wed, 11 Jun 2025 01:35:20 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193202"
+        },
+        {
+          "title": "As Energy Costs Surge, Eastern Governors Blame a Grid Manager",
+          "description": "Anger at PJM, which manages the electrical grid in all or parts of 13 states and the District of Columbia, has been boiling over in some state capitals.",
+          "url": "https://www.nytimes.com/2025/06/10/business/energy-environment/pjm-electrical-grid.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+          "published_at": "Thu, 12 Jun 2025 04:22:10 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.193204"
+        },
+        {
+          "title": "Data bill opposed by Sir Elton John and Dua Lipa finally passes",
+          "description": "Leading artists said the bill needed to be changed to protect them from having their work copied by AI.",
+          "url": "https://www.bbc.com/news/articles/c8e6z590wweo",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:13:32 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429592"
+        },
+        {
+          "title": "Meta urged to go further in crackdown on 'nudify' apps",
+          "description": "The apps use artificial intelligence to create fake nude images of people without their consent.",
+          "url": "https://www.bbc.com/news/articles/cgr58dlnne5o",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 14:07:53 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429602"
+        },
+        {
+          "title": "Disney and Universal sue AI firm Midjourney over images",
+          "description": "The Hollywood studios allege Midjourney's image generator is a \"bottomless pit of plagiarism\".",
+          "url": "https://www.bbc.com/news/articles/cg5vjqdm1ypo",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 00:11:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429605"
+        },
+        {
+          "title": "WhatsApp tells BBC it backs Apple in legal row with UK over user data",
+          "description": "The messaging app says the UK government's demands over data access could set a \"dangerous precedent.\"",
+          "url": "https://www.bbc.com/news/articles/cgmjrn42wdwo",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 16:01:09 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429607"
+        },
+        {
+          "title": "4chan and porn site investigated by Ofcom over online safety",
+          "description": "Nine companies are under investigation by Ofcom, using powers of the Online Safety Act.",
+          "url": "https://www.bbc.com/news/articles/ckgqwlvq180o",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Tue, 10 Jun 2025 11:01:31 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429609"
+        },
+        {
+          "title": "Indian scientists search for the perfect apple",
+          "description": "India can't grow enough apples to meet demand but farmers are struggling to raise production.",
+          "url": "https://www.bbc.com/news/articles/c0l05762elpo",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 23:05:53 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429611"
+        },
+        {
+          "title": "China's electric cars are becoming slicker and cheaper - but is there a deeper cost?",
+          "description": "The future for EVs will inevitably involve China. But where does that leave the UK and Europe markets – and what of the questions around national security?",
+          "url": "https://www.bbc.com/news/articles/cy8d4v69jw6o",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Mon, 09 Jun 2025 23:04:10 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429613"
+        },
+        {
+          "title": "Uber brings forward trialling driverless taxis in UK",
+          "description": "The autonomous cars with no human safety driver at the wheel will be trialled in London next spring.",
+          "url": "https://www.bbc.com/news/articles/cwynm4wl1j7o",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Tue, 10 Jun 2025 08:30:42 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429615"
+        },
+        {
+          "title": "Xbox handheld console finally revealed after a decade of speculation",
+          "description": "The ROG Xbox Ally will use Game Pass on-the-go - meaning subscribers start off with hundreds of games.",
+          "url": "https://www.bbc.com/news/articles/c1de113lkdpo",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Mon, 09 Jun 2025 10:07:34 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429617"
+        },
+        {
+          "title": "Government considers social media time limits for children",
+          "description": "The BBC understands proposals include a two-hour cap on apps and a 22:00 curfew.",
+          "url": "https://www.bbc.com/news/articles/c3d4349gdx4o",
+          "source": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+          "published_at": "Sun, 08 Jun 2025 18:23:09 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T20:22:11.429619"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T20:22:11.586089"
+    },
+    "timestamp": "2025-06-12T20:22:11.586313"
+  },
+  "timestamp": "2025-06-12T20:22:11.589275",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+      "https://feeds.bbci.co.uk/news/technology/rss.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T20:22:11.589288",
+    "debug_info": {
+      "saved_from": "save_intelligent_web_to_quarantine",
+      "cwd": "/Users/vinsoncornejo/Downloads/augment-projects/SAM",
+      "python_path": "NOT_SET"
+    }
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T22:26:46.477697"
+  },
+  "approved_at": "2025-06-12T22:26:46.477711",
+  "vetting_action": "PASS"
+}

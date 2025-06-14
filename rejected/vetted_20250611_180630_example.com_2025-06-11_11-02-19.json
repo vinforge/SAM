@@ -1,0 +1,79 @@
+{
+  "url": "https://example.com",
+  "content": "Example Domain Example Domain This domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission. More information...",
+  "timestamp": "2025-06-11T15:02:19.825516+00:00",
+  "error": null,
+  "metadata": {
+    "content_length": 202,
+    "fetch_method": "requests+beautifulsoup",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 SAM/1.0"
+  },
+  "vetting_results": {
+    "status": "completed",
+    "timestamp": "2025-06-11T18:06:30.868308",
+    "processing_time": 0.0004220008850097656,
+    "recommendation": "FAIL",
+    "confidence": 0.5196799999999999,
+    "reason": "Low overall quality score (0.44); Content lacks credible sources and evidence (credibility: 0.00)",
+    "overall_score": 0.44499999999999995,
+    "scores": {
+      "credibility": 0.0,
+      "persuasion": 0.0,
+      "speculation": 0.25,
+      "purity": 0.8,
+      "source_reputation": 0.6
+    },
+    "source_reputation": {
+      "domain": "example.com",
+      "tld": ".com",
+      "base_score": 0.6,
+      "trusted_bonus": 0.0,
+      "suspicious_penalty": 0.0,
+      "factor_adjustments": 0.05,
+      "final_score": 0.65,
+      "risk_category": "low_risk",
+      "https_used": true
+    },
+    "risk_assessment": {
+      "overall_score": 0.44499999999999995,
+      "risk_factors": [
+        {
+          "dimension": "credibility",
+          "score": 0.0,
+          "threshold": 0.4,
+          "severity": "high",
+          "description": "Content lacks credible sources and evidence"
+        }
+      ],
+      "confidence": 0.5196799999999999,
+      "analysis_mode": "balanced",
+      "weights_used": {
+        "credibility": 0.3,
+        "persuasion": 0.25,
+        "speculation": 0.2,
+        "purity": 0.15,
+        "source_reputation": 0.1
+      }
+    },
+    "sanitization": {
+      "removed_elements": [],
+      "suspicious_patterns": [],
+      "purity_score": 1.0,
+      "encoding_issues": [],
+      "content_stats": {
+        "original_length": 202,
+        "clean_length": 202,
+        "reduction_ratio": 0.0,
+        "word_count": 30,
+        "line_count": 1,
+        "non_ascii_ratio": 0.0
+      }
+    },
+    "metadata": {
+      "profile_used": "web_vetting",
+      "analysis_mode": "balanced",
+      "evaluator_version": "1.0",
+      "safety_threshold": 0.7
+    }
+  }
+}

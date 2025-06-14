@@ -11,7 +11,7 @@ Version: 1.0.0
 from .self_decide_framework import SelfDecideFramework
 from .self_discover_critic import SelfDiscoverCriticFramework
 from .answer_synthesizer import AnswerSynthesizer
-from .confidence_justifier import ConfidenceJustifier
+from .confidence_justifier import AdvancedConfidenceJustifier as ConfidenceJustifier
 from .tool_selector import ToolSelector
 from .tool_executor import ToolExecutor
 

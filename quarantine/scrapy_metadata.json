@@ -1,0 +1,26 @@
+{
+  "quarantine_info": {
+    "created": "2025-06-11T19:08:28.247571",
+    "description": "Web content scraped by SAM's Scrapy-based intelligent extraction",
+    "total_files": 2,
+    "total_articles": 0
+  },
+  "files": [
+    {
+      "filename": "scrapy_search_20250611_190828_11b6e2d9.json",
+      "query": "What is the latest health news on CNN for today?",
+      "timestamp": "2025-06-11T19:08:28.247580",
+      "article_count": 0,
+      "success": true,
+      "source": "scrapy_web_search"
+    },
+    {
+      "filename": "scrapy_search_20250611_190900_11b6e2d9.json",
+      "query": "What is the latest health news on CNN for today?",
+      "timestamp": "2025-06-11T19:09:00.414636",
+      "article_count": 0,
+      "success": true,
+      "source": "scrapy_web_search"
+    }
+  ]
+}

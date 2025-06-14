@@ -24,6 +24,7 @@ from ui.memory_graph import MemoryGraphVisualizer
 from ui.memory_commands import MemoryCommandProcessor, get_command_processor
 from ui.role_memory_filter import RoleBasedMemoryFilter, get_role_filter
 from ui.bulk_ingestion_ui import render_bulk_ingestion
+from ui.api_key_manager import render_api_key_manager
 from memory.memory_vectorstore import get_memory_store
 from memory.memory_reasoning import get_memory_reasoning_engine
 from config.agent_mode import get_mode_controller
@@ -73,6 +74,7 @@ def main():
                 "💬 Enhanced Chat",
                 "Chat with SAM",
                 "📁 Bulk Ingestion",
+                "🔑 API Key Manager",
                 "Memory Browser",
                 "Memory Editor",
                 "Memory Graph",
@@ -136,6 +138,8 @@ def main():
         render_chat_interface()
     elif page == "📁 Bulk Ingestion":
         render_bulk_ingestion()
+    elif page == "🔑 API Key Manager":
+        render_api_key_manager()
     elif page == "Memory Browser":
         render_memory_browser()
     elif page == "Memory Editor":

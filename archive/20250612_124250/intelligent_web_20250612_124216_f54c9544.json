@@ -1,0 +1,231 @@
+{
+  "query": "what is the latest in automotive news for the US?",
+  "result": {
+    "success": true,
+    "query": "what is the latest in automotive news for the US?",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": null,
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "British passenger in seat 11A survives plane crash, reports say",
+          "description": "Vishwashkumar Ramesh is believed to have survived the Air India crash that killed at least 200 people.",
+          "url": "https://www.bbc.com/news/articles/ce3v6drp96zo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:17:56 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605559"
+        },
+        {
+          "title": "Verified video shows Air India plane descending and moment of crash",
+          "description": "A plane bound for London Gatwick carrying 242 people has crashed after taking off from Ahmedabad in India.",
+          "url": "https://www.bbc.com/news/videos/cy4kxq9e9gqo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:48:16 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605571"
+        },
+        {
+          "title": "What we know so far about Air India flight AI171",
+          "description": "More than 200 people were on board the flight to London Gatwick when it crashed shortly after take-off.",
+          "url": "https://www.bbc.com/news/articles/c5y5nq170z4o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:21:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605574"
+        },
+        {
+          "title": "What does the crash mean for Boeing?",
+          "description": "Until Thursday's tragic Air India crash in Ahmedabad, Boeing's 787 Dreamliner had an exemplary safety record.",
+          "url": "https://www.bbc.com/news/articles/cje7542k0gno",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 15:15:23 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605576"
+        },
+        {
+          "title": "Watch: BBC correspondent reports from crash site as rescuers work among wreckage",
+          "description": "Air India say there were 169 Indian nationals on board the flight, as-well as 53 Britons, one Canadian national and seven Portuguese nationals.",
+          "url": "https://www.bbc.com/news/videos/c74qpwg7pwno",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 10:51:25 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605578"
+        },
+        {
+          "title": "Families hid in attics during 'racist' disorder in NI",
+          "description": "John Boutcher was speaking at a press conference following three nights of violence in Northern Ireland.",
+          "url": "https://www.bbc.com/news/articles/c20xrq9vzz7o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:36:03 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605581"
+        },
+        {
+          "title": "Legal win for son tricked into moving to Africa by parents",
+          "description": "The boy travelled to Ghana from London in March 2024 after being told a relative was ill.",
+          "url": "https://www.bbc.com/news/articles/clyg0p88z83o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:18:59 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605583"
+        },
+        {
+          "title": "Thunderstorm warnings in place as drought declared for millions",
+          "description": "Temperatures on Friday will likely match the previous hottest day of 2025 so far.",
+          "url": "https://www.bbc.com/news/articles/c14k6vp62zxo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:35:48 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605589"
+        },
+        {
+          "title": "Six Gaza aid boat activists deported from Israel",
+          "description": "Their boat had been intercepted as they attempted to break Israel's naval blockade on Gaza and deliver a symbolic amount of aid.",
+          "url": "https://www.bbc.com/news/articles/cx273w1032yo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 15:46:56 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605591"
+        },
+        {
+          "title": "Reeves refuses to rule out tax rises after economy shrinks",
+          "description": "The chancellor highlights \"uncertainty\" in the world as economists warn of tax rises if the economy fails to grow.",
+          "url": "https://www.bbc.com/news/articles/cy5e6ly9qq3o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:38:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.605594"
+        },
+        {
+          "title": "Inside a Courthouse, Chaos and Tears as Trump Accelerates Deportations",
+          "description": "Immigration courtrooms in New York City have emerged as a flashpoint, with masked agents making surprise arrests of immigrants who have appeared for routine hearings and check-ins.",
+          "url": "https://www.nytimes.com/2025/06/12/nyregion/immigration-courthouse-arrests-trump-deportation.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 07:00:17 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686311"
+        },
+        {
+          "title": "Russian Scientist Released After Four Months in Federal Custody",
+          "description": "Kseniia Petrova, a Harvard researcher, still faces criminal charges for failing to declare scientific samples she was carrying in her suitcase.",
+          "url": "https://www.nytimes.com/2025/06/12/science/russian-scientist-harvard-release.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 16:33:42 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686321"
+        },
+        {
+          "title": "Lawyers for Kilmar Abrego Garcia Seek Sanctions Against Trump Officials",
+          "description": "Kilmar Armando Abrego Garcia’s lawyers asked the judge in the case to appoint a special master to investigate the failure by Trump officials to comply with her instructions.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/abrego-garcia-sanctions.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 15:33:43 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686324"
+        },
+        {
+          "title": "The Real-Life Dating Boot Camp That Inspired ‘Love on the Spectrum’",
+          "description": "When U.C.L.A. psychologists first proposed teaching adults with autism how to date, funders wouldn’t go near it. Now we are in a new world.",
+          "url": "https://www.nytimes.com/2025/06/12/health/autism-dating-ucla-love-on-the-spectrum.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 13:07:18 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686327"
+        },
+        {
+          "title": "Trump Blocks California E.V. Rules in Latest Move to Rein In the State",
+          "description": "California leaders said the state intends to challenge the move in court, and to find new ways to move drivers toward electric vehicles.",
+          "url": "https://www.nytimes.com/2025/06/12/us/california-trump-electric-vehicle-waiver.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 16:22:47 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686329"
+        },
+        {
+          "title": "Supreme Court Sides With Teenager in School Disability Discrimination Case",
+          "description": "Disability rights groups had followed the case closely, warning that arguments by the school district could threaten broader protections for people with disabilities.",
+          "url": "https://www.nytimes.com/2025/06/12/us/supreme-court-school-disability.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 16:15:41 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686332"
+        },
+        {
+          "title": "Supreme Court Revives Suit From Victims of Botched F.B.I. Raid",
+          "description": "Lower courts ruled in favor of agents who had used a battering ram and a flash-bang grenade in mistakenly raiding the home of a Georgia couple.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/supreme-court-fbi-raid.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 16:26:41 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686334"
+        },
+        {
+          "title": "Brian Wilson and Sly Stone: Pop World Builders Dogged by Darkness",
+          "description": "Two of music’s powerful visionaries died this week. The songs they meticulously constructed offered an escape their makers struggled to realize in their own lives.",
+          "url": "https://www.nytimes.com/2025/06/12/arts/music/brian-wilson-sly-stone.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 12:33:53 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686336"
+        },
+        {
+          "title": "How “Pet Sounds” Became the Beach Boys Masterpiece",
+          "description": "Brian Wilson’s 1966 masterpiece is now considered a crowning achievement of music. The album’s reputation grew over time.",
+          "url": "https://www.nytimes.com/2025/06/11/arts/music/brian-wilson-pet-sounds.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 12:39:01 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686339"
+        },
+        {
+          "title": "Harvey Weinstein Retrial: Judge Declares Mistrial on Final Sex Crime Charge",
+          "description": "The jury had earlier convicted Harvey Weinstein of one felony sex crime, but jury deliberations had devolved into threats and yelling.",
+          "url": "https://www.nytimes.com/2025/06/12/nyregion/harvey-weinstein-sex-crimes-trial.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 16:24:42 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T12:42:16.686341"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T12:42:16.816627"
+    },
+    "timestamp": "2025-06-12T12:42:16.816714"
+  },
+  "timestamp": "2025-06-12T12:42:16.816932",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://feeds.bbci.co.uk/news/rss.xml",
+      "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T12:42:16.816952"
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T12:42:39.559750"
+  },
+  "approved_at": "2025-06-12T12:42:39.559761",
+  "vetting_action": "PASS"
+}

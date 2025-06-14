@@ -1,0 +1,232 @@
+{
+  "query": "What is the latest sports news on CNN?",
+  "result": {
+    "success": true,
+    "query": "What is the latest sports news on CNN?",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": "sports",
+        "urgency": "high",
+        "specific_source": "cnn"
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "Reeves boosts NHS and housing as some budgets squeezed",
+          "description": "Some departments, including the Home Office and Foreign Office, have lost out in the government's Spending Review.",
+          "url": "https://www.bbc.com/news/articles/c331xnrn3dzo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 17:52:31 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241084"
+        },
+        {
+          "title": "Chris Mason: This Spending Review is a gamble on patience in an era of impatience",
+          "description": "The big bet for the government remains on economic growth - finding it and sustaining it.",
+          "url": "https://www.bbc.com/news/articles/cj09lz0q5pno",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 00:15:45 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241096"
+        },
+        {
+          "title": "Leisure centre attacked in third night of violence in Northern Ireland",
+          "description": "This comes after two days of disorder, in which 32 officers were injured and six people arrested.",
+          "url": "https://www.bbc.com/news/articles/cjdzv79l1emo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 22:53:31 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241098"
+        },
+        {
+          "title": "Brian Wilson, co-​creator of iconic 1960s band The Beach Boys, dies aged 82",
+          "description": "His songs including Surfin' USA, California Girls and God Only Knows have become pop music classics.",
+          "url": "https://www.bbc.com/news/articles/cg71xrxrn8go",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 22:40:42 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241100"
+        },
+        {
+          "title": "New species of dinosaur discovered that 'rewrites' T.rex family tree",
+          "description": "The dinosaur skeletons, found hidden in a museum collection in Mongolia, is an ancestor of the mighty tyrannosaurs.",
+          "url": "https://www.bbc.com/news/articles/cy8dzv3vp5jo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 00:31:20 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241102"
+        },
+        {
+          "title": "US to partially evacuate embassy in Iraq over security threats",
+          "description": "Talks between the US and Iran appear to have reached an impasse, increasing  tensions in the Middle East.",
+          "url": "https://www.bbc.com/news/articles/c629yk5z07vo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 23:50:51 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241104"
+        },
+        {
+          "title": "'I made the sign of victory for Siwar': Mother's relief as malnourished Gaza baby evacuated to Jordan",
+          "description": "The BBC travels in an ambulance from the Gaza border to Amman with Siwar and her family",
+          "url": "https://www.bbc.com/news/articles/cn0g45z792do",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 23:43:11 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241106"
+        },
+        {
+          "title": "Harvey Weinstein guilty of sexual assault after New York retrial",
+          "description": "The jury found him not guilty of an additional sexual assault charge, and have yet to return a verdict on a charge of rape.",
+          "url": "https://www.bbc.com/news/articles/cn7z3gezdjro",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 19:14:10 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241111"
+        },
+        {
+          "title": "Jesus polished luxury vehicles at an LA car wash for a decade. Then ICE showed up",
+          "description": "The BBC obtained CCTV footage of a raid at a Los Angeles car wash that shows  how President Trump's immigration crackdown has ramped up.",
+          "url": "https://www.bbc.com/news/articles/czxylvq392xo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 23:44:15 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241113"
+        },
+        {
+          "title": "UK agrees post-Brexit deal over Gibraltar",
+          "description": "Talks on rules governing the border of Spain and Gibraltar have been ongoing since Britain left the EU.",
+          "url": "https://www.bbc.com/news/articles/cd903neydwjo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 21:24:08 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.241115"
+        },
+        {
+          "title": "Senate Republicans Want to Trim Some of Trump’s Tax Cuts in Domestic Policy Bill",
+          "description": "G.O.P. senators are considering whether to further curb the president’s favorite tax cuts as they rewrite key portions of the sprawling domestic agenda bill passed by the House.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/republicans-trump-populist-tax-cuts.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 19:13:16 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308680"
+        },
+        {
+          "title": "No, Not That Lee. Pentagon Finds Black Hero to Rechristen Base Long Named for Robert E.",
+          "description": "The Army unveiled a list of seven installations that the Trump administration is reverting, sort of, to earlier names venerating Confederate heroes.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/army-bases-trump-confederate.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 21:45:35 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308691"
+        },
+        {
+          "title": "McConnell Tells Hegseth U.S. Reputation Is at Stake in Ukraine War",
+          "description": "A testy exchange between a senator who strongly supports Ukraine aid and the defense secretary revealed a deepening split among G.O.P. officials on the war.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/hegseth-congress-defense.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 21:54:35 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308693"
+        },
+        {
+          "title": "U.S. to Evacuate Diplomats From Iraq Amid Iran Tensions",
+          "description": "The State Department said it had decided to shrink the U.S. “footprint” in Baghdad, and Britain issued a warning about “increased tensions within the region.”",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/iran-us-iraq-diplomats-middle-east.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 23:26:45 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308696"
+        },
+        {
+          "title": "Trump Bends Military’s Role, Suggesting More Troops in More Cities",
+          "description": "President Trump has expanded domestic use of the armed forces, testing the limits on involving troops at protests and the border.",
+          "url": "https://www.nytimes.com/2025/06/11/us/politics/trump-domestic-military-expansion.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 22:36:15 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308698"
+        },
+        {
+          "title": "Why California Says Trump’s Military Deployment Is Illegal",
+          "description": "California has sued the Trump administration over its move to deploy troops to Los Angeles. Eric Schmitt, a national security correspondent for The New York Times, explains the laws governing the use of American troops on U.S. soil.",
+          "url": "https://www.nytimes.com/video/us/politics/100000010218788/why-california-says-trumps-military-deployment-is-illegal.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 17:04:02 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308700"
+        },
+        {
+          "title": "Which U.S. Cities Have Joined L.A. in Protesting Immigration Raids?",
+          "description": "Demonstrations are not only in Los Angeles. They have cropped up in cities across the country.",
+          "url": "https://www.nytimes.com/2025/06/11/us/us-protest-tracker-trump-ice.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 00:33:20 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308702"
+        },
+        {
+          "title": "Judge Opens Door to Releasing Mahmoud Khalil as Soon as This Week",
+          "description": "Mr. Khalil, a legal permanent resident, has been held in Louisiana for more than three months. The judge suggested he could be released as early as Friday unless the government successfully appeals.",
+          "url": "https://www.nytimes.com/2025/06/11/nyregion/mahmoud-khalil-release-order.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 00:12:22 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308703"
+        },
+        {
+          "title": "Brian Wilson, Songwriter and Leader of the Beach Boys, Dies at 82",
+          "description": "A hitmaker elevated and burdened by the label of genius, he transcended the breezy surf genre to create complex harmonies and intricate soundscapes in the studio.",
+          "url": "https://www.nytimes.com/2025/06/11/arts/music/brian-wilson-dead.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 23:55:32 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308705"
+        },
+        {
+          "title": "Beach Boy Brian Wilson’s 12 Essential Songs",
+          "description": "The Beach Boys leader, whose death was announced on Wednesday, was a brilliant writer, arranger and producer whose ambitions propelled his band — and contemporaries like the Beatles — into the future.",
+          "url": "https://www.nytimes.com/2025/06/11/arts/music/brian-wilson-beach-boys-songs.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Wed, 11 Jun 2025 21:50:49 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:50:04.308708"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-11T20:50:04.478038"
+    },
+    "timestamp": "2025-06-11T20:50:04.478197"
+  },
+  "timestamp": "2025-06-11T20:50:04.478516",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://feeds.bbci.co.uk/news/rss.xml",
+      "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    ],
+    "quarantine_timestamp": "2025-06-11T20:50:04.478535"
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-11T20:52:24.710869"
+  },
+  "approved_at": "2025-06-11T20:52:24.710872",
+  "vetting_action": "PASS"
+}

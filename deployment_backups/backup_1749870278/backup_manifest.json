@@ -1,0 +1,12 @@
+{
+  "backup_timestamp": 1749870278.14906,
+  "backup_items": [
+    "TPV Config: deployment_backups/backup_1749870278/tpv_config.yaml",
+    "Secure App: deployment_backups/backup_1749870278/secure_streamlit_app.py"
+  ],
+  "backup_reason": "TPV Production Deployment",
+  "system_info": {
+    "python_version": "3.11.4 (main, Jul  5 2023, 08:40:20) [Clang 14.0.6 ]",
+    "platform": "darwin"
+  }
+}

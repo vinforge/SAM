@@ -1,0 +1,42 @@
+{
+  "test_arms": {
+    "A_BASELINE": {
+      "description": "No TPV - Control group",
+      "tpv_enabled": false,
+      "control_mode": null
+    },
+    "B_MONITORING": {
+      "description": "Phase 1 - Passive monitoring only",
+      "tpv_enabled": true,
+      "control_mode": "PASSIVE"
+    },
+    "C_ACTIVE_CONTROL": {
+      "description": "Phase 2 - Active reasoning control",
+      "tpv_enabled": true,
+      "control_mode": "ACTIVE"
+    }
+  },
+  "benchmark_dataset": {
+    "total_prompts": 20,
+    "categories": {
+      "simple_factual": 5,
+      "complex_analysis": 5,
+      "summarization": 5,
+      "open_ended": 5
+    }
+  },
+  "metrics_collected": [
+    "end_to_end_latency_ms",
+    "total_tokens_generated",
+    "tpv_halt_reason",
+    "response_text",
+    "tpv_steps",
+    "final_score",
+    "control_decision"
+  ],
+  "hypotheses": [
+    "Efficiency: Active Control reduces latency and tokens without quality loss",
+    "Quality: Active Control improves answers by preventing stagnation",
+    "User Experience: Faster, more concise answers with transparency improve UX"
+  ]
+}

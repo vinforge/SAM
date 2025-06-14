@@ -1,0 +1,236 @@
+{
+  "query": "What is the latest CDC news in the US?",
+  "result": {
+    "success": true,
+    "query": "What is the latest CDC news in the US?",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": null,
+        "urgency": "high",
+        "specific_source": null
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "What could have caused Air India plane to crash in 30 seconds?",
+          "description": "Experts told the BBC that a flap issue, engine failure or a bird strike are among the possible causes of the crash.",
+          "url": "https://www.bbc.com/news/articles/c626y121rxxo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 20:20:47 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173742"
+        },
+        {
+          "title": "British man in seat 11A is only passenger to survive India plane crash",
+          "description": "Vishwashkumar Ramesh is only passenger to survive the Air India crash that killed 241 people.",
+          "url": "https://www.bbc.com/news/articles/ce3v6drp96zo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 21:29:13 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173751"
+        },
+        {
+          "title": "Who are the victims of the Air India plane crash?",
+          "description": "Details are still emerging, but these are the people so far confirmed by the BBC to have died.",
+          "url": "https://www.bbc.com/news/articles/cdd28legnzvo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 22:07:12 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173753"
+        },
+        {
+          "title": "Air India plane crash - how the day unfolded",
+          "description": "London-bound flight carrying 242 people crashed shortly after take-off in Ahmedabad, western India.",
+          "url": "https://www.bbc.com/news/videos/cx2q3z716v9o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 20:29:52 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173755"
+        },
+        {
+          "title": "What we know so far about Air India flight AI171",
+          "description": "Air India confirms that 241 passengers and crew died, and one British man survived, when the plane crashed moments after take off.",
+          "url": "https://www.bbc.com/news/articles/c5y5nq170z4o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 17:26:05 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173757"
+        },
+        {
+          "title": "Masonry thrown at police in Portadown in fourth night of NI disorder",
+          "description": "There have been three days of violence in Ballymena and other towns, leading to 13 arrests.",
+          "url": "https://www.bbc.com/news/articles/c20xrq9vzz7o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 22:59:33 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173759"
+        },
+        {
+          "title": "Legal win for son tricked into moving to Africa by parents",
+          "description": "The boy travelled to Ghana from London in March 2024 after being told a relative was ill.",
+          "url": "https://www.bbc.com/news/articles/clyg0p88z83o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 16:18:59 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173761"
+        },
+        {
+          "title": "Thunderstorm warnings in place as drought declared for millions",
+          "description": "Temperatures on Friday will likely match the previous hottest day of 2025 so far.",
+          "url": "https://www.bbc.com/news/articles/c14k6vp62zxo",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 12:35:48 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173764"
+        },
+        {
+          "title": "US senator dragged out of LA immigration news conference",
+          "description": "California senator Alex Padilla was pushed out of the news conference by authorities after he interrupted Noem.",
+          "url": "https://www.bbc.com/news/articles/c5ygn48djrko",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 22:05:22 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173766"
+        },
+        {
+          "title": "Reeves refuses to rule out tax rises after economy shrinks",
+          "description": "The chancellor highlights \"uncertainty\" in the world as economists warn of tax rises if the economy fails to grow.",
+          "url": "https://www.bbc.com/news/articles/cy5e6ly9qq3o",
+          "source": "https://feeds.bbci.co.uk/news/rss.xml",
+          "published_at": "Thu, 12 Jun 2025 11:38:26 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.173767"
+        },
+        {
+          "title": "Hundreds Dead in Air India Plane Crash",
+          "description": "The London-bound Boeing Dreamliner went down moments after takeoff in Ahmedabad, India, with 242 people aboard. Dozens more on the ground perished as the plane exploded on the campus of a medical college.",
+          "url": "https://www.nytimes.com/2025/06/12/world/asia/india-plane-crash.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 21:23:20 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217218"
+        },
+        {
+          "title": "Air India Crash Survivor: ‘I Don’t Know How I Am Alive’",
+          "description": "Viswash Kumar Ramesh, 38, who sustained multiple injuries, a doctor said, was the only passenger out of 242 people on board the plane to walk away.",
+          "url": "https://www.nytimes.com/2025/06/12/world/asia/viswash-kumar-ramesh-air-india-survivor.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 22:03:39 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217227"
+        },
+        {
+          "title": "What Caused the Air India Plane Crash?",
+          "description": "Safety experts said investigators would be looking at why and how the plane started descending during its take off.",
+          "url": "https://www.nytimes.com/2025/06/12/business/india-plane-crash-causes.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 22:38:02 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217230"
+        },
+        {
+          "title": "Chaos at Site of Air India Plane Crash",
+          "description": "“We didn’t know what to do — it was like our brains stopped working,” said one intern who escaped the building after an Air India jet crashed, killing at least 260 people.",
+          "url": "https://www.nytimes.com/2025/06/12/world/asia/air-india-plane-crash-site.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:46:43 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217232"
+        },
+        {
+          "title": "Trump’s Immigration P.R. Campaign Enters a New Militarized Phase",
+          "description": "The government’s visuals appear intended to persuade migrants without legal status to leave the country, while also making clear the administration will not tolerate resistance.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/trump-immigration-pr-campaign.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:25:01 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217234"
+        },
+        {
+          "title": "G.O.P. Senators Want Fewer Cuts to Food Aid, Teeing Up a Fight with the House",
+          "description": "Republicans whose constituents rely on nutritional assistance worry that cuts to those programs approved by the House will saddle their states with huge costs and harm low-income children.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/republican-senators-food-aid.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:39:52 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217236"
+        },
+        {
+          "title": "The Real-Life Dating Boot Camp That Inspired ‘Love on the Spectrum’",
+          "description": "When U.C.L.A. psychologists first proposed teaching adults with autism how to date, funders wouldn’t go near it. Now we are in a new world.",
+          "url": "https://www.nytimes.com/2025/06/12/health/autism-dating-ucla-love-on-the-spectrum.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 13:07:18 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217237"
+        },
+        {
+          "title": "A Night Out for Trump at the Theater, With a Pocket of Dissent",
+          "description": "Opening night of “Les Misérables” was meant to celebrate the president’s takeover of the Kennedy Center. But he also was forced to encounter his critics.",
+          "url": "https://www.nytimes.com/2025/06/12/us/politics/trump-les-miserables.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:29:04 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217239"
+        },
+        {
+          "title": "In Some Ozempic Households, the Weight Loss is Contagious",
+          "description": "Patients taking the drugs are finding their families are benefiting, too.",
+          "url": "https://www.nytimes.com/2025/06/12/well/ozempic-weight-loss-family.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 22:48:47 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217241"
+        },
+        {
+          "title": "Brian Wilson Wrote the California Dream, but He Didn’t Live It",
+          "description": "An artist nearly synonymous with Los Angeles made his name crafting songs playing up his home state’s beachy vibes. His inner life, however, was anything but sunny.",
+          "url": "https://www.nytimes.com/2025/06/12/arts/music/brian-wilson-beach-boys-california.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+          "published_at": "Thu, 12 Jun 2025 20:28:19 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-12T19:01:25.217242"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-12T19:01:25.305954"
+    },
+    "timestamp": "2025-06-12T19:01:25.306032"
+  },
+  "timestamp": "2025-06-12T19:01:25.307702",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://feeds.bbci.co.uk/news/rss.xml",
+      "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+    ],
+    "quarantine_timestamp": "2025-06-12T19:01:25.307710",
+    "debug_info": {
+      "saved_from": "save_intelligent_web_to_quarantine",
+      "cwd": "/Users/vinsoncornejo/Downloads/augment-projects/SAM",
+      "python_path": "NOT_SET"
+    }
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-12T19:02:13.586548"
+  },
+  "approved_at": "2025-06-12T19:02:13.586559",
+  "vetting_action": "PASS"
+}

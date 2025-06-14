@@ -1,0 +1,232 @@
+{
+  "query": "What is today's health-related news on CNN?",
+  "result": {
+    "success": true,
+    "query": "What is today's health-related news on CNN?",
+    "tool_used": "news_api_tool",
+    "routing_decision": {
+      "primary_tool": "news_api_tool",
+      "fallback_chain": [
+        "rss_reader_tool",
+        "rss_reader_tool",
+        "search_api_tool"
+      ],
+      "reasoning": "News-related query detected",
+      "confidence": 0.85,
+      "parameters": {
+        "topic_category": "health",
+        "urgency": "high",
+        "specific_source": "cnn"
+      }
+    },
+    "data": {
+      "success": true,
+      "tool_used": "news_api_tool",
+      "articles": [
+        {
+          "title": "Democrats Grill N.I.H. Leader on Cuts: Who Is Calling the Shots?",
+          "description": "Senators criticized the head of the National Institutes of Health for not taking responsibility for Trump administration cuts to research funding.",
+          "url": "https://www.nytimes.com/2025/06/10/us/politics/nih-bhattacharya-congress-testimony.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Tue, 10 Jun 2025 21:11:23 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099701"
+        },
+        {
+          "title": "A Killer Within Easy Reach",
+          "description": "Pesticides are a leading means of suicide. The tiny nation of Suriname is working to restrict access to one of the most common and dangerous ones.",
+          "url": "https://www.nytimes.com/2025/06/10/health/paraquat-pesticides-suicide-suriname.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Wed, 11 Jun 2025 21:52:46 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099712"
+        },
+        {
+          "title": "F.D.A. to Use A.I. in Drug Approvals to ‘Radically Increase Efficiency’",
+          "description": "With a Trump-driven reduction of nearly 2,000 employees, agency officials view artificial intelligence as a way to speed drugs to the market.",
+          "url": "https://www.nytimes.com/2025/06/10/health/fda-drug-approvals-artificial-intelligence.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Tue, 10 Jun 2025 18:30:11 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099715"
+        },
+        {
+          "title": "RFK Jr. Removes All CDC Vaccine Panel Experts",
+          "description": "The U.S. health secretary chose to “retire” members of a committee that makes significant decisions about who receives immunizations, including the vaccines for children.",
+          "url": "https://www.nytimes.com/2025/06/09/health/rfk-jr-cdc-vaccine-panel.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Tue, 10 Jun 2025 00:48:50 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099718"
+        },
+        {
+          "title": "Trump Bill’s Caps on Grad School Loans Could Worsen Doctor Shortage",
+          "description": "The proposed limits on federal loans fall well below the costs of medical school. Critics say this could deter students from pursuing medicine.",
+          "url": "https://www.nytimes.com/2025/06/09/health/trump-budget-student-loans-doctors.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Tue, 10 Jun 2025 02:45:09 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099720"
+        },
+        {
+          "title": "A Day With One Abortion Pill Prescriber",
+          "description": "A nurse practitioner spoke on the phone with patients in states with abortion bans, assessed their medical eligibility and sent pills. She took some unconventional steps to protect their privacy.",
+          "url": "https://www.nytimes.com/2025/06/09/health/a-day-with-one-abortion-pill-prescriber.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Mon, 09 Jun 2025 20:31:39 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099722"
+        },
+        {
+          "title": "Gun Deaths of Children Rose in States That Loosened Gun Laws, Study Finds",
+          "description": "Researchers looked at firearm fatalities in the 13 years immediately after the Supreme Court limited local governments’ ability to restrict gun ownership.",
+          "url": "https://www.nytimes.com/2025/06/09/health/gun-deaths-children.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Mon, 09 Jun 2025 16:39:07 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099724"
+        },
+        {
+          "title": "The Ethical Minefield of Testing Infants for Incurable Diseases",
+          "description": "Screening can now determine their risk for an ever-growing list of conditions — including ones we can’t do much about.",
+          "url": "https://www.nytimes.com/2025/06/05/health/babies-incurable-diseases.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Thu, 05 Jun 2025 14:28:45 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099729"
+        },
+        {
+          "title": "Reagan Invoked the ‘Welfare Queen.’ The New G.O.P. Target Is a Lazy Gamer.",
+          "description": "Republicans targeting safety net programs once invoked women they claimed were living lavishly on government funds. Now as they seek to pare back Medicaid, the imagery has changed — but not the argument.",
+          "url": "https://www.nytimes.com/2025/06/10/us/politics/republicans-medicaid-cuts.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Tue, 10 Jun 2025 20:10:34 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099731"
+        },
+        {
+          "title": "How to Tackle Your To-Do List if You Struggle With Executive Functioning",
+          "description": "Conditions like A.D.H.D. and autism can make starting and completing tasks feel impossible, but experts say there are workarounds.",
+          "url": "https://www.nytimes.com/2025/06/10/well/mind/executive-function-tips.html",
+          "source": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+          "published_at": "Tue, 10 Jun 2025 09:01:35 +0000",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.099733"
+        },
+        {
+          "title": "MPs set to vote on decriminalising abortion in England and Wales",
+          "description": "Women would never be prosecuted for terminating a pregnancy under proposed new laws.",
+          "url": "https://www.bbc.com/news/articles/cg5v900v1y6o",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Tue, 10 Jun 2025 15:50:41 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181783"
+        },
+        {
+          "title": "We quit our jobs, sold our home twice and spent 10 years fighting for the truth",
+          "description": "A NHS trust and hospital manager have been found guilty of health and safety failings over the death of Alice Figueiredo.",
+          "url": "https://www.bbc.com/news/articles/cdxn5d4dzrwo",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Mon, 09 Jun 2025 23:53:15 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181794"
+        },
+        {
+          "title": "Cervical screening invites to change in England",
+          "description": "Invitations be sent out by the NHS every five years instead of every three for women aged 25-49 in England, if they have a negative test.",
+          "url": "https://www.bbc.com/news/articles/c4g7rkly5z2o",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Tue, 10 Jun 2025 16:24:51 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181797"
+        },
+        {
+          "title": "Martha doctor's failings 'particularly grave'",
+          "description": "A medical tribunal has found a senior doctor's failings amounted to gross negligence and misconduct.",
+          "url": "https://www.bbc.com/news/articles/cn9jnwvgenjo",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Wed, 11 Jun 2025 16:05:34 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181798"
+        },
+        {
+          "title": "RFK Jr sacks entire US vaccine committee",
+          "description": "The US health secretary, a vaccine sceptic who has been criticised by health experts, said the panel was 'plagued' with conflicts of interest.",
+          "url": "https://www.bbc.com/news/articles/clyge27y2g9o",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Tue, 10 Jun 2025 21:42:12 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181800"
+        },
+        {
+          "title": "Restrict shop-bought baby food, government tells parents",
+          "description": "Avoid relying on food pouches for everyday meals, says NHS website for first time.",
+          "url": "https://www.bbc.com/news/articles/c628vpgd7zpo",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Mon, 09 Jun 2025 15:59:33 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181802"
+        },
+        {
+          "title": "Doctors trialling 'poo pills' to flush out dangerous superbugs",
+          "description": "Can a dose of good bacteria clear superbugs from their hiding place in the bowels?",
+          "url": "https://www.bbc.com/news/articles/clyge290l4xo",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Sat, 07 Jun 2025 23:00:14 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181803"
+        },
+        {
+          "title": "Why food firms are scrambling to cut down on ingredients",
+          "description": "Food firms are marketing ranges with fewer ingredients, but are they healthier?",
+          "url": "https://www.bbc.com/news/articles/creqge8xgx4o",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Fri, 06 Jun 2025 14:05:19 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181805"
+        },
+        {
+          "title": "Exercise improves colon cancer survival, major study shows",
+          "description": "Risk of dying was cut by a third after colon cancer patients dialled up exercise levels.",
+          "url": "https://www.bbc.com/news/articles/c8xgyw7k7veo",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Mon, 02 Jun 2025 10:04:32 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181807"
+        },
+        {
+          "title": "Disposable vape ban begins - but will it have an impact?",
+          "description": "Retailers will no longer be able to sell single-use vapes as new laws come into force across the UK.",
+          "url": "https://www.bbc.com/news/articles/c80kxx2xr77o",
+          "source": "https://feeds.bbci.co.uk/news/health/rss.xml",
+          "published_at": "Sat, 31 May 2025 23:12:11 GMT",
+          "tool_source": "rss_fallback",
+          "timestamp": "2025-06-11T20:04:34.181809"
+        }
+      ],
+      "total_articles": 20,
+      "source": "rss_fallback",
+      "timestamp": "2025-06-11T20:04:34.326323"
+    },
+    "timestamp": "2025-06-11T20:04:34.326380"
+  },
+  "timestamp": "2025-06-11T20:04:34.326660",
+  "metadata": {
+    "source": "intelligent_web_system",
+    "method": "news_api_tool",
+    "content_count": 20,
+    "sources": [
+      "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+      "https://feeds.bbci.co.uk/news/health/rss.xml"
+    ],
+    "quarantine_timestamp": "2025-06-11T20:04:34.326670"
+  },
+  "vetting_result": {
+    "action": "PASS",
+    "reason": "Auto-approved intelligent web content",
+    "overall_score": 0.8,
+    "timestamp": "2025-06-11T20:24:22.051062"
+  },
+  "approved_at": "2025-06-11T20:24:22.051072",
+  "vetting_action": "PASS"
+}

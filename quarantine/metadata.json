@@ -1,0 +1,51 @@
+{
+  "entries": [
+    {
+      "filename": "httpbin.org_2025-06-11_10-16-53.json",
+      "source_url": "https://httpbin.org/html",
+      "fetch_timestamp": "2025-06-11T10:16:53.111004",
+      "content_length": 3596,
+      "content_type": null,
+      "fetch_method": "manual_cli",
+      "security_status": "untrusted",
+      "review_status": "pending",
+      "tags": [
+        "cli_fetch",
+        "manual",
+        "untrusted"
+      ]
+    },
+    {
+      "filename": "example.com_2025-06-11_11-02-19.json",
+      "source_url": "https://example.com",
+      "fetch_timestamp": "2025-06-11T11:02:19.841922",
+      "content_length": 202,
+      "content_type": null,
+      "fetch_method": "manual_cli",
+      "security_status": "untrusted",
+      "review_status": "pending",
+      "tags": [
+        "cli_fetch",
+        "manual",
+        "untrusted"
+      ]
+    },
+    {
+      "filename": "en.wikipedia.org_2025-06-11_16-48-59.json",
+      "source_url": "https://en.wikipedia.org/wiki/Artificial_intelligence",
+      "fetch_timestamp": "2025-06-11T16:48:59.665812",
+      "content_length": 219019,
+      "content_type": null,
+      "fetch_method": "manual_cli",
+      "security_status": "untrusted",
+      "review_status": "pending",
+      "tags": [
+        "cli_fetch",
+        "manual",
+        "untrusted"
+      ]
+    }
+  ],
+  "last_updated": "2025-06-11T16:48:59.665828",
+  "total_entries": 3
+}

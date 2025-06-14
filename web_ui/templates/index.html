@@ -513,9 +513,15 @@
                 <p>Multimodal AI Assistant</p>
             </div>
             <div class="header-right">
+                <a href="http://localhost:8502" target="_blank" class="memory-control-btn" title="Secure Chat Interface">
+                    🔒 Secure Chat
+                </a>
                 <button class="memory-control-btn" title="Open Memory Control Center">
                     🧠⚙️ Memory Center
                 </button>
+                <a href="/vetting" class="memory-control-btn" title="Content Vetting Dashboard">
+                    🛡️ Content Vetting
+                </a>
                 <button class="upload-btn">📄 Upload Document</button>
             </div>
         </div>
@@ -634,6 +640,9 @@ How can I assist you today?
 
                 if (data.error) {
                     addMessage(`Error: ${data.error}`, 'assistant');
+                } else if (data.type === 'web_search_escalation') {
+                    // Phase 8.3: Handle web search escalation
+                    handleWebSearchEscalation(data);
                 } else {
                     addMessage(data.response, 'assistant', data.message_id, data.has_thoughts, data.thought_blocks);
                 }
@@ -773,6 +782,259 @@ How can I assist you today?
 
         function hideTypingIndicator() {
             document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        // Phase 8.3: Web Search Escalation Functions
+        function handleWebSearchEscalation(data) {
+            console.log('Handling web search escalation:', data);
+
+            // Create escalation message with interactive buttons
+            const escalationMessage = createWebSearchEscalationMessage(data);
+            addEscalationMessage(escalationMessage, data);
+        }
+
+        function createWebSearchEscalationMessage(data) {
+            const confidencePercent = (data.confidence_score * 100).toFixed(1);
+            const reasonsText = data.reasons.length > 0 ?
+                `\n\n**Why I'm suggesting this:**\n• ${data.reasons.join('\n• ')}` : '';
+
+            return `🤔 **I've checked my local knowledge...**
+
+${data.message}
+
+**Confidence in current knowledge:** ${confidencePercent}%${reasonsText}
+
+**Would you like me to search the web for more current information?**`;
+        }
+
+        function addEscalationMessage(content, escalationData) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant chat-container';
+            messageDiv.setAttribute('data-escalation-data', JSON.stringify(escalationData));
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = 'SAM';
+
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+
+            // Apply basic formatting to content
+            const htmlContent = content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br>')
+                .replace(/• (.*?)(<br>|$)/g, '• $1$2');
+
+            messageContent.innerHTML = htmlContent;
+
+            // Add web search decision buttons
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = `
+                margin-top: 15px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            `;
+
+            const searchButton = document.createElement('button');
+            searchButton.style.cssText = `
+                background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 25px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: transform 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            `;
+            searchButton.innerHTML = '🌐 Yes, Search Online';
+            searchButton.addEventListener('click', () => triggerWebSearch(escalationData));
+            searchButton.addEventListener('mouseenter', () => {
+                searchButton.style.transform = 'translateY(-2px)';
+            });
+            searchButton.addEventListener('mouseleave', () => {
+                searchButton.style.transform = 'translateY(0)';
+            });
+
+            const localButton = document.createElement('button');
+            localButton.style.cssText = `
+                background: rgba(79, 172, 254, 0.1);
+                color: #4facfe;
+                border: 2px solid rgba(79, 172, 254, 0.3);
+                padding: 12px 20px;
+                border-radius: 25px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            `;
+            localButton.innerHTML = '📚 No, Answer with Current Knowledge';
+            localButton.addEventListener('click', () => answerWithLocalKnowledge(escalationData));
+            localButton.addEventListener('mouseenter', () => {
+                localButton.style.background = 'rgba(79, 172, 254, 0.2)';
+                localButton.style.transform = 'translateY(-2px)';
+            });
+            localButton.addEventListener('mouseleave', () => {
+                localButton.style.background = 'rgba(79, 172, 254, 0.1)';
+                localButton.style.transform = 'translateY(0)';
+            });
+
+            buttonContainer.appendChild(searchButton);
+            buttonContainer.appendChild(localButton);
+            messageContent.appendChild(buttonContainer);
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function triggerWebSearch(escalationData) {
+            console.log('Triggering web search:', escalationData);
+
+            // Disable the escalation buttons
+            const messageDiv = document.querySelector('[data-escalation-data]');
+            const buttons = messageDiv.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+            });
+
+            // Show search progress message
+            addMessage('🔍 **Searching the web and analyzing content...**\n\nThis may take a moment while I fetch and vet the information for security and quality.', 'assistant');
+
+            try {
+                const response = await fetch('/api/trigger-web-search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        search_query: escalationData.suggested_search_query || escalationData.original_query,
+                        original_query: escalationData.original_query
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'search_completed') {
+                    // Show success message with details
+                    const toolUsed = data.tool_used ? data.tool_used.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Web Search';
+                    const contentCount = data.content_count || 'some';
+
+                    addMessage(`✅ **Web search completed using ${toolUsed}!**\n\nI found ${contentCount} pieces of content and saved them to quarantine for security analysis.\n\n${data.message}`, 'assistant');
+
+                    // Simulate processing time and then re-query with new knowledge
+                    setTimeout(() => {
+                        addMessage('🧠 **Processing complete!** Let me now answer your original question with the new information...', 'assistant');
+
+                        // Re-send the original query to get an answer with new knowledge
+                        setTimeout(() => {
+                            reQueryWithNewKnowledge(escalationData.original_query);
+                        }, 1000);
+                    }, 2000);
+
+                } else if (data.status === 'search_initiated') {
+                    // Legacy support for old status
+                    addMessage('✅ **Web search completed!**\n\nI\'ve found and analyzed some content. Let me check the vetting results and then provide you with an updated answer.', 'assistant');
+
+                    setTimeout(() => {
+                        addMessage('🧠 **Processing complete!** Let me now answer your original question with the new information...', 'assistant');
+                        setTimeout(() => {
+                            reQueryWithNewKnowledge(escalationData.original_query);
+                        }, 1000);
+                    }, 2000);
+
+                } else {
+                    addMessage(`❌ **Web search failed:** ${data.error || 'Unknown error'}\n\n${data.fallback_message || 'Please try again or ask me to answer with my current knowledge.'}`, 'assistant');
+                }
+
+            } catch (error) {
+                console.error('Error triggering web search:', error);
+                addMessage(`❌ **Error during web search:** ${error.message}\n\nPlease try again or ask me to answer with my current knowledge.`, 'assistant');
+            }
+        }
+
+        async function answerWithLocalKnowledge(escalationData) {
+            console.log('Answering with local knowledge:', escalationData);
+
+            // Disable the escalation buttons
+            const messageDiv = document.querySelector('[data-escalation-data]');
+            const buttons = messageDiv.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+            });
+
+            // Show processing message
+            addMessage('📚 **Using my current knowledge to answer...**', 'assistant');
+
+            try {
+                // Force a response with current knowledge by sending a modified query
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: `Please answer this question using only your current knowledge (no web search needed): ${escalationData.original_query}`
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    addMessage(`Error: ${data.error}`, 'assistant');
+                } else if (data.type === 'web_search_escalation') {
+                    // If it still wants to escalate, provide a basic fallback
+                    addMessage(`Based on my current knowledge: I have limited information about "${escalationData.original_query}". While I could search the web for more current details, you've chosen to proceed with my existing knowledge. I recommend uploading relevant documents or trying a more specific question that might match my training data better.`, 'assistant');
+                } else {
+                    addMessage(data.response, 'assistant', data.message_id, data.has_thoughts, data.thought_blocks);
+                }
+
+            } catch (error) {
+                console.error('Error getting local answer:', error);
+                addMessage(`Error: ${error.message}`, 'assistant');
+            }
+        }
+
+        async function reQueryWithNewKnowledge(originalQuery) {
+            console.log('Re-querying with new knowledge:', originalQuery);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: originalQuery })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    addMessage(`Error: ${data.error}`, 'assistant');
+                } else if (data.type === 'web_search_escalation') {
+                    // If it still wants to escalate, something went wrong
+                    addMessage('🤔 It seems the new information hasn\'t been fully integrated yet. Please try asking your question again in a moment, or let me know if you\'d like me to search for additional sources.', 'assistant');
+                } else {
+                    addMessage(`🌐 **Updated answer with web information:**\n\n${data.response}`, 'assistant', data.message_id, data.has_thoughts, data.thought_blocks);
+                }
+
+            } catch (error) {
+                console.error('Error re-querying:', error);
+                addMessage(`Error: ${error.message}`, 'assistant');
+            }
         }
 
         // Phase 6 Feedback System Functions

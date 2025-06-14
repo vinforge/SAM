@@ -9,6 +9,7 @@ Version: 1.0.0
 """
 
 import logging
+import time
 from typing import Dict, List, Any, Optional
 from .memory_vectorstore import MemoryVectorStore, VectorStoreType, MemoryType, MemoryChunk, MemorySearchResult
 
@@ -345,6 +346,76 @@ class SecureMemoryVectorStore(MemoryVectorStore):
         """Get current timestamp in ISO format."""
         from datetime import datetime
         return datetime.now().isoformat()
+
+    def get_all_memories(self) -> List[Any]:
+        """Get all memories from the store."""
+        try:
+            all_memories = []
+
+            # Try encrypted store first if available
+            if self._is_encryption_active() and self.encrypted_store:
+                try:
+                    # Get all documents from encrypted ChromaDB
+                    collection = self.encrypted_store.collection
+                    if collection:
+                        # Get all documents
+                        results = collection.get()
+
+                        if results and 'documents' in results:
+                            for i, doc in enumerate(results['documents']):
+                                # Create a memory-like object
+                                memory_obj = type('Memory', (), {
+                                    'content': doc,
+                                    'source': results.get('metadatas', [{}])[i].get('source', 'unknown'),
+                                    'timestamp': results.get('metadatas', [{}])[i].get('timestamp', time.time()),
+                                    'memory_type': results.get('metadatas', [{}])[i].get('memory_type', 'document'),
+                                    'importance_score': results.get('metadatas', [{}])[i].get('importance_score', 0.0),
+                                    'tags': results.get('metadatas', [{}])[i].get('tags', []),
+                                    'metadata': results.get('metadatas', [{}])[i] if i < len(results.get('metadatas', [])) else {}
+                                })()
+                                all_memories.append(memory_obj)
+
+                        logger.info(f"Retrieved {len(all_memories)} memories from encrypted store")
+                        return all_memories
+
+                except Exception as e:
+                    logger.warning(f"Could not get memories from encrypted store: {e}")
+
+            # Fallback to regular store
+            if hasattr(self, 'vector_store') and self.vector_store:
+                try:
+                    # Try to get all memories from regular vector store
+                    if hasattr(self.vector_store, 'get_all_memories'):
+                        all_memories = self.vector_store.get_all_memories()
+                    elif hasattr(self.vector_store, 'collection'):
+                        # Direct ChromaDB access
+                        collection = self.vector_store.collection
+                        results = collection.get()
+
+                        if results and 'documents' in results:
+                            for i, doc in enumerate(results['documents']):
+                                memory_obj = type('Memory', (), {
+                                    'content': doc,
+                                    'source': results.get('metadatas', [{}])[i].get('source', 'unknown'),
+                                    'timestamp': results.get('metadatas', [{}])[i].get('timestamp', time.time()),
+                                    'memory_type': results.get('metadatas', [{}])[i].get('memory_type', 'document'),
+                                    'importance_score': results.get('metadatas', [{}])[i].get('importance_score', 0.0),
+                                    'tags': results.get('metadatas', [{}])[i].get('tags', []),
+                                    'metadata': results.get('metadatas', [{}])[i] if i < len(results.get('metadatas', [])) else {}
+                                })()
+                                all_memories.append(memory_obj)
+
+                    logger.info(f"Retrieved {len(all_memories)} memories from regular store")
+                    return all_memories
+
+                except Exception as e:
+                    logger.warning(f"Could not get memories from regular store: {e}")
+
+            return all_memories
+
+        except Exception as e:
+            logger.error(f"Error getting all memories: {e}")
+            return []
 
 # Factory function for backward compatibility
 def get_secure_memory_store(store_type: VectorStoreType = VectorStoreType.CHROMA,

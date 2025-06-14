@@ -1,0 +1,11 @@
+{
+  "url": "https://example.com",
+  "content": "Example Domain Example Domain This domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission. More information...",
+  "timestamp": "2025-06-11T15:02:19.825516+00:00",
+  "error": null,
+  "metadata": {
+    "content_length": 202,
+    "fetch_method": "requests+beautifulsoup",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 SAM/1.0"
+  }
+}
