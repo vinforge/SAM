@@ -830,30 +830,47 @@ Error details: {path_validation.get('error_details', 'None')}
                 source["file_types"],
                 dry_run
             )
-            
-            self._display_scan_result(source["name"], result, dry_run)
+
+            # Display result without nested expanders (we're already inside one)
+            self._display_scan_result(source["name"], result, dry_run, use_expander=False)
     
-    def _display_scan_result(self, source_name: str, result: Dict, dry_run: bool):
+    def _display_scan_result(self, source_name: str, result: Dict, dry_run: bool, use_expander: bool = True):
         """Display the result of a scan operation."""
         if result["success"]:
             st.success(f"✅ {source_name}: Scan completed successfully")
-            
+
             # Parse output for summary
             stdout = result["stdout"]
             if "Bulk Ingestion Summary:" in stdout:
                 summary_start = stdout.find("Bulk Ingestion Summary:")
                 summary_section = stdout[summary_start:summary_start+500]
-                
-                with st.expander(f"📊 {source_name} Results"):
+
+                if use_expander:
+                    with st.expander(f"📊 {source_name} Results"):
+                        st.code(summary_section)
+
+                        if dry_run:
+                            st.info("🔍 This was a dry run - no files were actually processed")
+                else:
+                    # Display directly without expander (we're already inside one)
+                    st.markdown(f"**📊 {source_name} Results:**")
                     st.code(summary_section)
-                    
+
                     if dry_run:
                         st.info("🔍 This was a dry run - no files were actually processed")
-            
+
         else:
             st.error(f"❌ {source_name}: Scan failed")
-            
-            with st.expander(f"🔍 {source_name} Error Details"):
+
+            if use_expander:
+                with st.expander(f"🔍 {source_name} Error Details"):
+                    if result["stderr"]:
+                        st.code(result["stderr"])
+                    if result["stdout"]:
+                        st.code(result["stdout"])
+            else:
+                # Display directly without expander
+                st.markdown(f"**🔍 {source_name} Error Details:**")
                 if result["stderr"]:
                     st.code(result["stderr"])
                 if result["stdout"]:
