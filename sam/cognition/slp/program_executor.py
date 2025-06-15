@@ -29,6 +29,193 @@ class ProgramExecutor:
         self.tpv_controller = tpv_controller
         self.reasoning_engine = reasoning_engine
         self.execution_timer = ExecutionTimer()
+
+        # Configuration thresholds
+        self.min_quality_threshold = 0.6
+        self.max_execution_time_ms = 30000  # 30 seconds
+
+    def execute(self, program: LatentProgram, query: str, context: Dict[str, Any]) -> str:
+        """
+        Core execute method as specified in task3.md.
+
+        Performs streamlined response generation using the captured program's
+        exact parameters and configuration.
+
+        Args:
+            program: The latent program to execute
+            query: The user's query
+            context: Context information
+
+        Returns:
+            Generated response string
+
+        Raises:
+            ProgramExecutionError: If execution fails
+        """
+        try:
+            logger.info(f"🚀 Executing latent program {program.id[:8]}... for streamlined response generation")
+
+            # Apply program's TPV configuration if available
+            original_tpv_state = None
+            if self.tpv_controller and program.tpv_config:
+                original_tpv_state = self._get_tpv_state()
+                self._apply_program_tpv_config(program)
+                logger.debug(f"Applied TPV config: {program.tpv_config}")
+
+            # Use program's proven prompt template and parameters
+            if program.prompt_template_used:
+                response = self._execute_with_proven_template(program, query, context)
+            else:
+                response = self._execute_with_proven_parameters(program, query, context)
+
+            # Validate response quality
+            if not response or len(response.strip()) < 10:
+                raise ProgramExecutionError("Generated response is too short or empty")
+
+            logger.info(f"✅ Program {program.id[:8]}... executed successfully, response length: {len(response)}")
+            return response
+
+        except Exception as e:
+            logger.error(f"❌ Program execution failed: {e}")
+            raise ProgramExecutionError(f"Failed to execute program {program.id}: {e}")
+
+        finally:
+            # Restore original TPV state
+            if self.tpv_controller and original_tpv_state:
+                self._restore_tpv_state(original_tpv_state)
+
+    def _execute_with_proven_template(self, program: LatentProgram, query: str, context: Dict[str, Any]) -> str:
+        """Execute using the program's proven prompt template."""
+        try:
+            # Use the exact template that was successful before
+            template = program.prompt_template_used
+
+            # Format with current query and context
+            formatted_prompt = self._format_prompt_template(template, query, context)
+
+            # Apply program's execution constraints
+            execution_config = {
+                'max_tokens': program.execution_constraints.get('max_tokens', 1000),
+                'timeout_seconds': program.execution_constraints.get('timeout_seconds', 30),
+                'temperature': program.tpv_config.get('temperature', 0.7) if program.tpv_config else 0.7
+            }
+
+            # Execute with the proven configuration
+            if self.reasoning_engine:
+                return self.reasoning_engine.generate_response(formatted_prompt, context, execution_config)
+            else:
+                # Fallback to Ollama API call with proven parameters
+                return self._execute_with_ollama(formatted_prompt, execution_config)
+
+        except Exception as e:
+            raise ProgramExecutionError(f"Proven template execution failed: {e}")
+
+    def _execute_with_proven_parameters(self, program: LatentProgram, query: str, context: Dict[str, Any]) -> str:
+        """Execute using the program's proven parameters without a specific template."""
+        try:
+            # Build prompt using program's proven approach
+            system_prompt = self._build_system_prompt_from_program(program)
+            user_prompt = self._build_user_prompt_from_program(program, query, context)
+
+            # Apply program's execution constraints
+            execution_config = {
+                'max_tokens': program.execution_constraints.get('max_tokens', 1000),
+                'timeout_seconds': program.execution_constraints.get('timeout_seconds', 30),
+                'temperature': program.tpv_config.get('temperature', 0.7) if program.tpv_config else 0.7,
+                'top_p': program.tpv_config.get('top_p', 0.9) if program.tpv_config else 0.9
+            }
+
+            full_prompt = f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:"
+
+            # Execute with proven parameters
+            if self.reasoning_engine:
+                return self.reasoning_engine.generate_response(full_prompt, context, execution_config)
+            else:
+                # Fallback to Ollama API call
+                return self._execute_with_ollama(full_prompt, execution_config)
+
+        except Exception as e:
+            raise ProgramExecutionError(f"Proven parameters execution failed: {e}")
+
+    def _execute_with_ollama(self, prompt: str, config: Dict[str, Any]) -> str:
+        """Execute using Ollama API with the program's proven configuration."""
+        try:
+            import requests
+
+            ollama_payload = {
+                "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": config.get('temperature', 0.7),
+                    "top_p": config.get('top_p', 0.9),
+                    "max_tokens": config.get('max_tokens', 1000)
+                }
+            }
+
+            timeout = config.get('timeout_seconds', 30)
+
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=ollama_payload,
+                timeout=timeout
+            )
+
+            if response.status_code == 200:
+                response_data = response.json()
+                ai_response = response_data.get('response', '').strip()
+
+                if ai_response:
+                    return ai_response
+                else:
+                    raise ProgramExecutionError("Empty response from Ollama")
+            else:
+                raise ProgramExecutionError(f"Ollama API error: {response.status_code}")
+
+        except Exception as e:
+            raise ProgramExecutionError(f"Ollama execution failed: {e}")
+
+    def _build_system_prompt_from_program(self, program: LatentProgram) -> str:
+        """Build system prompt based on program's proven approach."""
+        # Extract system prompt characteristics from program metadata
+        base_prompt = "You are SAM, a secure AI assistant."
+
+        # Add domain-specific instructions based on program signature
+        if hasattr(program, 'signature') and isinstance(program.signature, dict):
+            domain_tags = program.signature.get('domain_tags', [])
+            if 'cybersecurity' in domain_tags:
+                base_prompt += " You specialize in cybersecurity analysis and risk assessment."
+            elif 'document_analysis' in domain_tags:
+                base_prompt += " You excel at document analysis and summarization."
+            elif 'technical' in domain_tags:
+                base_prompt += " You provide detailed technical explanations and analysis."
+
+        # Add reasoning instructions if available
+        if program.reasoning_trace:
+            base_prompt += " Use structured reasoning to analyze the query step by step."
+
+        return base_prompt
+
+    def _build_user_prompt_from_program(self, program: LatentProgram, query: str, context: Dict[str, Any]) -> str:
+        """Build user prompt based on program's proven approach."""
+        # Start with the query
+        user_prompt = f"Question: {query}"
+
+        # Add context if the program typically uses it
+        if context.get('memory_results') and program.context_requirements.get('min_context_size', 0) > 0:
+            context_parts = []
+            for result in context['memory_results'][:3]:  # Limit to top 3 results
+                source_type = getattr(result, 'source_type', 'unknown')
+                source_label = "📄 Document" if source_type == 'secure_documents' else "🌐 Web Knowledge"
+                content_preview = result.chunk.content[:500]  # Use program's typical context size
+                context_parts.append(f"{source_label} - {result.chunk.source}\nContent: {content_preview}")
+
+            if context_parts:
+                user_prompt += f"\n\nAvailable Information:\n" + "\n\n".join(context_parts)
+
+        user_prompt += "\n\nPlease provide a helpful answer based on the available information."
+
+        return user_prompt
     
     def execute_with_monitoring(self, program: LatentProgram, 
                               query: str, context: Dict[str, Any]) -> ExecutionResult:

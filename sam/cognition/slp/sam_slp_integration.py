@@ -66,19 +66,19 @@ class SAMSLPIntegration:
                 return self._generate_standard_response(query, context, fallback_generator, start_time)
             
             # Phase 1: Try to find matching program
-            matching_program = self.program_manager.find_matching_program(
+            matching_program, confidence = self.program_manager.find_matching_program(
                 query, context, user_profile
             )
-            
-            if matching_program:
+
+            if matching_program and confidence >= self.program_manager.execution_threshold:
                 # Execute using latent program
                 return self._execute_with_program(
-                    matching_program, query, context, fallback_generator, start_time
+                    matching_program, query, context, fallback_generator, start_time, confidence
                 )
             else:
                 # Generate standard response and consider program capture
                 return self._generate_and_capture(
-                    query, context, user_profile, fallback_generator, start_time
+                    query, context, user_profile, fallback_generator, start_time, confidence
                 )
                 
         except Exception as e:
@@ -87,7 +87,7 @@ class SAMSLPIntegration:
     
     def _execute_with_program(self, program: LatentProgram, query: str,
                             context: Dict[str, Any], fallback_generator,
-                            start_time: float) -> Dict[str, Any]:
+                            start_time: float, confidence: float = 0.0) -> Dict[str, Any]:
         """Execute response using a latent program."""
         try:
             logger.info(f"🚀 Executing with latent program: {program.id}")
@@ -123,6 +123,7 @@ class SAMSLPIntegration:
                         'used_program': True,
                         'program_id': program.id,
                         'program_confidence': program.confidence_score,
+                        'signature_match_confidence': confidence,
                         'execution_time_ms': execution_result.execution_time_ms,
                         'quality_score': execution_result.quality_score,
                         'token_count': execution_result.token_count,
@@ -143,7 +144,7 @@ class SAMSLPIntegration:
     
     def _generate_and_capture(self, query: str, context: Dict[str, Any],
                             user_profile: Optional[str], fallback_generator,
-                            start_time: float) -> Dict[str, Any]:
+                            start_time: float, confidence: float = 0.0) -> Dict[str, Any]:
         """Generate standard response and consider program capture."""
         try:
             # Generate standard response
@@ -164,6 +165,7 @@ class SAMSLPIntegration:
                         result['slp_metadata'] = {}
                     result['slp_metadata']['captured_program'] = True
                     result['slp_metadata']['total_programs'] = len(self.program_manager.store.get_all_programs())
+                    result['slp_metadata']['signature_match_confidence'] = confidence
             
             return result
             

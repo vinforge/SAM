@@ -6066,7 +6066,8 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
 
         logger.info(f"Unified search for '{prompt}' returned {len(memory_results)} results")
 
-        # Phase 8.1.5: Try SLP-enabled response generation if available
+        # Phase 7B: Implement Core Execution Switch (Task 1b)
+        # This is the architectural switch specified in task3.md
         if slp_integration and slp_integration.enabled:
             try:
                 # Prepare context for SLP
@@ -6078,30 +6079,86 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
                     'has_tpv': sam_tpv_integration is not None
                 }
 
-                # Define fallback generator for SLP
-                def fallback_generator(query, context):
-                    return _generate_standard_secure_response(query, context, sam_tpv_integration, user_profile)
-
-                # Try SLP-enabled response generation
-                slp_result = slp_integration.generate_response_with_slp(
-                    query=prompt,
-                    context=slp_context,
-                    user_profile=getattr(st.session_state, 'user_profile', 'general'),
-                    fallback_generator=fallback_generator
+                # Phase 7B: Find and Decide Logic
+                matched_program, confidence = slp_integration.program_manager.find_matching_program(
+                    prompt, slp_context, getattr(st.session_state, 'user_profile', 'general')
                 )
 
-                if slp_result and slp_result.get('response'):
-                    # Store SLP metadata in session state for UI display
-                    if 'slp_session_data' not in st.session_state:
-                        st.session_state.slp_session_data = {}
+                # Phase 7B: Core Execution Switch Implementation
+                if confidence > slp_integration.program_manager.execution_threshold:
+                    # UI NOTIFICATION: "Using Cognitive Program #123..."
+                    program_id_short = matched_program.id[:8] + "..." if len(matched_program.id) > 8 else matched_program.id
+                    logger.info(f"🧠 Using Cognitive Program #{program_id_short} (confidence: {confidence:.2f})")
 
-                    st.session_state.slp_session_data['last_response'] = slp_result.get('slp_metadata', {})
+                    # Execute with the matched program
+                    execution_result = slp_integration.program_manager.execute_program(
+                        matched_program, prompt, slp_context
+                    )
 
-                    logger.info(f"🚀 SLP response generated successfully")
-                    return slp_result['response']
+                    if execution_result.success:
+                        # Store SLP metadata for UI display
+                        if 'slp_session_data' not in st.session_state:
+                            st.session_state.slp_session_data = {}
+
+                        st.session_state.slp_session_data['last_response'] = {
+                            'used_program': True,
+                            'program_id': matched_program.id,
+                            'program_confidence': matched_program.confidence_score,
+                            'signature_match_confidence': confidence,
+                            'execution_time_ms': execution_result.execution_time_ms,
+                            'quality_score': execution_result.quality_score,
+                            'token_count': execution_result.token_count,
+                            'program_usage_count': matched_program.usage_count + 1
+                        }
+
+                        logger.info(f"✅ Cognitive Program executed successfully in {execution_result.execution_time_ms:.0f}ms")
+                        return execution_result.response
+                    else:
+                        logger.warning(f"❌ Cognitive Program execution failed, falling back to standard reasoning")
+                        # Fall through to standard reasoning
+                else:
+                    # UI NOTIFICATION: "Reasoning from scratch..."
+                    logger.info(f"🔍 Reasoning from scratch (confidence {confidence:.2f} below threshold {slp_integration.program_manager.execution_threshold:.2f})")
+
+                    # Generate standard response and consider program capture
+                    def fallback_generator(query, context):
+                        return _generate_standard_secure_response(query, context, sam_tpv_integration, user_profile)
+
+                    response = fallback_generator(prompt, slp_context)
+
+                    # Consider capturing this successful interaction as a new program
+                    if response and len(response) > 50:
+                        capture_result = {
+                            'response': response,
+                            'quality_score': 0.8,  # Assume good quality for successful generation
+                            'execution_time_ms': 1000,  # Estimate
+                            'token_count': len(response.split()) * 1.3
+                        }
+
+                        capture_success = slp_integration.program_manager.consider_program_capture(
+                            prompt, slp_context, capture_result, getattr(st.session_state, 'user_profile', 'general')
+                        )
+
+                        # Store capture metadata for UI display
+                        if 'slp_session_data' not in st.session_state:
+                            st.session_state.slp_session_data = {}
+
+                        st.session_state.slp_session_data['last_response'] = {
+                            'used_program': False,
+                            'captured_program': capture_success,
+                            'signature_match_confidence': confidence,
+                            'response_time_ms': 1000,
+                            'quality_score': 0.8,
+                            'total_programs': len(slp_integration.program_manager.store.get_all_programs()) if capture_success else None
+                        }
+
+                        if capture_success:
+                            logger.info(f"📚 New cognitive program captured for future use")
+
+                    return response
 
             except Exception as e:
-                logger.warning(f"SLP response generation failed, falling back to standard: {e}")
+                logger.warning(f"SLP processing failed, falling back to standard: {e}")
                 # Continue with standard processing
 
         # Phase 8.2: Assess confidence in retrieval quality (unless forced to use local)

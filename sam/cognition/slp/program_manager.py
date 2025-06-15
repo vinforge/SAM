@@ -49,42 +49,48 @@ class ProgramManager:
         logger.info("Program manager initialized")
     
     def find_matching_program(self, query: str, context: Dict[str, Any],
-                            user_profile: Optional[str] = None) -> Optional[LatentProgram]:
+                            user_profile: Optional[str] = None) -> Tuple[Optional[LatentProgram], float]:
         """
         Find the best matching program for a query.
-        
+
         Args:
             query: User's query
             context: Context information
             user_profile: Optional user profile
-            
+
         Returns:
-            Best matching program or None
+            Tuple of (best matching program or None, confidence score)
         """
         try:
             # Generate signature for the query
             signature = generate_signature(query, context, user_profile)
-            
+
             # Find candidate programs
             candidates = self.find_candidate_programs(signature)
-            
+
             if not candidates:
                 logger.debug("No candidate programs found")
-                return None
-            
+                return None, 0.0
+
             # Score and rank candidates
             best_match = self.score_and_rank_candidates(candidates, signature, query, context)
-            
-            if best_match and best_match.confidence_score >= self.execution_threshold:
-                logger.info(f"Found matching program: {best_match.id} (confidence: {best_match.confidence_score:.2f})")
-                return best_match
-            
-            logger.debug(f"Best match confidence {best_match.confidence_score:.2f} below threshold {self.execution_threshold}")
-            return None
-            
+
+            if best_match:
+                # Get the match confidence score
+                match_confidence = getattr(best_match, 'match_score', best_match.confidence_score)
+
+                if match_confidence >= self.execution_threshold:
+                    logger.info(f"Found matching program: {best_match.id} (confidence: {match_confidence:.2f})")
+                    return best_match, match_confidence
+                else:
+                    logger.debug(f"Best match confidence {match_confidence:.2f} below threshold {self.execution_threshold}")
+                    return None, match_confidence
+
+            return None, 0.0
+
         except Exception as e:
             logger.error(f"Error finding matching program: {e}")
-            return None
+            return None, 0.0
     
     def find_candidate_programs(self, signature: ProgramSignature) -> List[LatentProgram]:
         """Find candidate programs based on signature similarity."""
