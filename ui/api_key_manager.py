@@ -247,12 +247,14 @@ class APIKeyManager:
         
         with col2:
             # Request timeout
+            # Ensure the current value doesn't exceed the UI maximum
+            current_timeout = min(self.config.request_timeout_seconds, 300)
             timeout = st.number_input(
                 "Request Timeout (seconds)",
                 min_value=10,
-                max_value=120,
-                value=self.config.request_timeout_seconds,
-                help="Timeout for web requests",
+                max_value=300,
+                value=current_timeout,
+                help="Timeout for web requests (10-300 seconds)",
                 key="timeout_input"
             )
             
