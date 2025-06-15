@@ -367,6 +367,135 @@ def render_tpv_control_sidebar():
         - Significant cost savings
         """)
 
+        # SLP (Cognitive Automation) Status
+        render_slp_status_sidebar()
+
+
+def render_slp_status_sidebar():
+    """Render SLP (Scalable Latent Program) status in sidebar."""
+    try:
+        st.header("🧠 Cognitive Automation")
+        st.markdown("*Phase 7A: Pattern Learning*")
+
+        # Check if SLP feature is available
+        if ENTITLEMENTS_AVAILABLE and not is_feature_available("bulk_processing"):
+            st.warning("🔒 **Cognitive Automation** requires SAM Pro activation")
+            st.markdown("Activate SAM Pro above to unlock pattern learning and cognitive automation.")
+            return
+
+        # Try to get SLP integration
+        try:
+            from sam.cognition.slp import get_slp_integration
+            slp_integration = get_slp_integration()
+
+            if not slp_integration:
+                st.error("❌ SLP system not available")
+                return
+
+        except Exception as e:
+            st.error(f"❌ SLP not available: {e}")
+            return
+
+        # SLP Enable/Disable Toggle
+        current_enabled = slp_integration.enabled
+        new_enabled = st.toggle(
+            "Enable Cognitive Automation",
+            value=current_enabled,
+            help="Enable SAM's cognitive automation and pattern learning system"
+        )
+
+        # Update setting if changed
+        if new_enabled != current_enabled:
+            if new_enabled:
+                slp_integration.enable_slp()
+                st.success("✅ Cognitive automation enabled")
+            else:
+                slp_integration.disable_slp()
+                st.success("✅ Cognitive automation disabled")
+            st.rerun()
+
+        if new_enabled:
+            # Get SLP statistics
+            stats = slp_integration.get_slp_statistics()
+            integration_stats = stats.get('integration_stats', {})
+            program_stats = stats.get('program_stats', {})
+
+            # Performance metrics
+            st.subheader("📊 Performance Metrics")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Queries", integration_stats.get('total_queries', 0))
+                st.metric("Program Hits", integration_stats.get('program_hits', 0))
+
+            with col2:
+                hit_rate = integration_stats.get('hit_rate_percent', 0)
+                st.metric("Hit Rate", f"{hit_rate:.1f}%")
+                capture_rate = integration_stats.get('capture_rate_percent', 0)
+                st.metric("Capture Rate", f"{capture_rate:.1f}%")
+
+            # Time savings
+            time_saved = integration_stats.get('total_time_saved_ms', 0)
+            if time_saved > 0:
+                st.metric("Time Saved", f"{time_saved:.0f}ms")
+
+            # Program statistics
+            st.subheader("🧠 Program Statistics")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Active Programs", program_stats.get('active_programs', 0))
+                st.metric("Proven Programs", program_stats.get('proven_programs', 0))
+
+            with col2:
+                st.metric("Experimental", program_stats.get('experimental_programs', 0))
+                avg_confidence = program_stats.get('average_confidence', 0)
+                st.metric("Avg Confidence", f"{avg_confidence:.2f}")
+
+            # Program management
+            with st.expander("🛠️ Program Management", expanded=False):
+                if st.button("🧹 Cleanup Old Programs", help="Remove unused programs older than 30 days"):
+                    cleaned = slp_integration.cleanup_old_programs(30)
+                    if cleaned > 0:
+                        st.success(f"✅ Cleaned up {cleaned} old programs")
+                    else:
+                        st.info("ℹ️ No old programs to clean up")
+
+                # Show recent program activity
+                if 'slp_session_data' in st.session_state:
+                    last_response = st.session_state.slp_session_data.get('last_response', {})
+                    if last_response:
+                        st.markdown("**Last Response:**")
+                        if last_response.get('used_program'):
+                            program_id = last_response.get('program_id', 'Unknown')
+                            confidence = last_response.get('program_confidence', 0)
+                            st.success(f"✅ Used program: {program_id[:8]}... (confidence: {confidence:.2f})")
+                        elif last_response.get('captured_program'):
+                            st.info("📚 New pattern captured for future use")
+                        else:
+                            st.info("🔍 Standard processing (no pattern match)")
+
+        # Phase 7A Information
+        st.subheader("🚀 Phase 7A Features")
+        st.markdown("""
+        **Cognitive Automation** learns from your interactions!
+
+        ✅ **Pattern Recognition**: Identifies recurring tasks
+        ✅ **Automatic Capture**: Saves successful reasoning patterns
+        ✅ **Intelligent Reuse**: Applies learned patterns to similar queries
+        ✅ **Continuous Learning**: Improves over time with usage
+
+        **Benefits:**
+        - Faster responses for repeated tasks
+        - Consistent high-quality outputs
+        - Personalized AI behavior
+        - Reduced computational overhead
+        """)
+
+    except Exception as e:
+        logger.debug(f"SLP status display error: {e}")
+        st.error(f"❌ SLP status error: {e}")
+
 def render_tpv_status():
     """Render TPV (Thinking Process Verification) status display with Phase 2 active control."""
     try:
@@ -492,12 +621,154 @@ def render_tpv_status():
     except Exception as e:
         logger.debug(f"TPV status display error: {e}")
 
+
+def render_slp_status():
+    """Render SLP (Scalable Latent Program) status display."""
+    try:
+        # Check if SLP data is available
+        slp_data = st.session_state.get('slp_session_data', {}).get('last_response')
+
+        if slp_data:
+            with st.expander("🧠 Cognitive Automation Status (Phase 7A: Pattern Learning)", expanded=False):
+                if slp_data.get('used_program'):
+                    # Program was used
+                    st.success("⚡ **Pattern Match Found** - Used learned cognitive program")
+
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    with col1:
+                        program_id = slp_data.get('program_id', 'Unknown')
+                        st.metric(
+                            "Program ID",
+                            program_id[:8] + "..." if len(program_id) > 8 else program_id,
+                            help="Unique identifier for the cognitive program used"
+                        )
+
+                    with col2:
+                        confidence = slp_data.get('program_confidence', 0)
+                        st.metric(
+                            "Confidence",
+                            f"{confidence:.2f}",
+                            help="Confidence score for program match (0.0 - 1.0)"
+                        )
+
+                    with col3:
+                        execution_time = slp_data.get('execution_time_ms', 0)
+                        st.metric(
+                            "Execution Time",
+                            f"{execution_time:.0f}ms",
+                            help="Time taken to execute the cognitive program"
+                        )
+
+                    with col4:
+                        quality_score = slp_data.get('quality_score', 0)
+                        st.metric(
+                            "Quality Score",
+                            f"{quality_score:.2f}",
+                            help="Quality assessment of the program execution"
+                        )
+
+                    # Program details
+                    st.subheader("📊 Program Performance")
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        usage_count = slp_data.get('program_usage_count', 0)
+                        st.metric(
+                            "Usage Count",
+                            usage_count,
+                            help="Number of times this program has been used"
+                        )
+
+                    with col2:
+                        token_count = slp_data.get('token_count', 0)
+                        st.metric(
+                            "Token Count",
+                            token_count,
+                            help="Number of tokens in the response"
+                        )
+
+                    with col3:
+                        total_time = slp_data.get('total_response_time_ms', 0)
+                        st.metric(
+                            "Total Time",
+                            f"{total_time:.0f}ms",
+                            help="Total response generation time including overhead"
+                        )
+
+                    # Efficiency calculation
+                    if execution_time > 0 and total_time > 0:
+                        efficiency = (1 - (total_time - execution_time) / total_time) * 100
+                        if efficiency > 0:
+                            st.success(f"🚀 **Efficiency Gain**: {efficiency:.1f}% faster than standard processing")
+
+                elif slp_data.get('captured_program'):
+                    # New program was captured
+                    st.info("📚 **New Pattern Learned** - Cognitive program captured for future use")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        response_time = slp_data.get('response_time_ms', 0)
+                        st.metric(
+                            "Response Time",
+                            f"{response_time:.0f}ms",
+                            help="Time taken for this response"
+                        )
+
+                    with col2:
+                        quality_score = slp_data.get('quality_score', 0)
+                        st.metric(
+                            "Quality Score",
+                            f"{quality_score:.2f}",
+                            help="Quality score that qualified this for capture"
+                        )
+
+                    total_programs = slp_data.get('total_programs', 0)
+                    st.success(f"🧠 **Learning Progress**: {total_programs} cognitive programs now available")
+
+                else:
+                    # Standard processing
+                    st.info("🔍 **Standard Processing** - No pattern match found, using standard reasoning")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        response_time = slp_data.get('response_time_ms', 0)
+                        st.metric(
+                            "Response Time",
+                            f"{response_time:.0f}ms",
+                            help="Time taken for standard processing"
+                        )
+
+                    with col2:
+                        quality_score = slp_data.get('quality_score', 0)
+                        st.metric(
+                            "Quality Score",
+                            f"{quality_score:.2f}",
+                            help="Quality assessment of the response"
+                        )
+
+                # Status indicator
+                if slp_data.get('used_program'):
+                    st.success("🎯 **Phase 7A Active**: Cognitive automation successfully applied learned pattern.")
+                elif slp_data.get('captured_program'):
+                    st.info("📖 **Phase 7A Learning**: New cognitive pattern captured for future automation.")
+                else:
+                    st.info("🔍 **Phase 7A Monitoring**: Analyzing interaction for potential pattern capture.")
+
+    except Exception as e:
+        logger.debug(f"SLP status display error: {e}")
+
 def render_chat_interface():
     """Render the chat interface."""
     st.header("💬 Secure Chat")
 
     # Render TPV status if available
     render_tpv_status()
+
+    # Render SLP status if available
+    render_slp_status()
 
     # Enhanced greeting with feature overview
     if len(st.session_state.get('chat_history', [])) == 0:
@@ -5760,8 +6031,17 @@ def search_unified_memory(query: str, max_results: int = 5) -> list:
         return []
 
 def generate_secure_response(prompt: str, force_local: bool = False) -> str:
-    """Generate a secure response using SAM's capabilities with Phase 8 confidence assessment and TPV monitoring."""
+    """Generate a secure response using SAM's capabilities with SLP, Phase 8 confidence assessment and TPV monitoring."""
     try:
+        # Phase 0: Initialize SLP integration if available
+        slp_integration = None
+        try:
+            from sam.cognition.slp import get_slp_integration
+            slp_integration = get_slp_integration()
+            logger.info("🧠 SLP integration available for cognitive automation")
+        except Exception as e:
+            logger.warning(f"SLP integration not available: {e}")
+
         # Phase 1: Initialize TPV integration if available
         tpv_enabled_response = None
         try:
@@ -5774,6 +6054,10 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
             # Determine user profile (could be enhanced with actual user profiling)
             user_profile = UserProfile.GENERAL  # Default profile for now
 
+            # Connect SLP to TPV if both are available
+            if slp_integration:
+                slp_integration.tpv_integration = sam_tpv_integration
+
         except Exception as e:
             logger.warning(f"TPV integration not available: {e}")
             sam_tpv_integration = None
@@ -5781,6 +6065,44 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
         memory_results = search_unified_memory(query=prompt, max_results=5)
 
         logger.info(f"Unified search for '{prompt}' returned {len(memory_results)} results")
+
+        # Phase 8.1.5: Try SLP-enabled response generation if available
+        if slp_integration and slp_integration.enabled:
+            try:
+                # Prepare context for SLP
+                slp_context = {
+                    'memory_results': memory_results,
+                    'sources': [r.chunk.source for r in memory_results],
+                    'session_state': getattr(st.session_state, 'user_profile', 'general'),
+                    'force_local': force_local,
+                    'has_tpv': sam_tpv_integration is not None
+                }
+
+                # Define fallback generator for SLP
+                def fallback_generator(query, context):
+                    return _generate_standard_secure_response(query, context, sam_tpv_integration, user_profile)
+
+                # Try SLP-enabled response generation
+                slp_result = slp_integration.generate_response_with_slp(
+                    query=prompt,
+                    context=slp_context,
+                    user_profile=getattr(st.session_state, 'user_profile', 'general'),
+                    fallback_generator=fallback_generator
+                )
+
+                if slp_result and slp_result.get('response'):
+                    # Store SLP metadata in session state for UI display
+                    if 'slp_session_data' not in st.session_state:
+                        st.session_state.slp_session_data = {}
+
+                    st.session_state.slp_session_data['last_response'] = slp_result.get('slp_metadata', {})
+
+                    logger.info(f"🚀 SLP response generated successfully")
+                    return slp_result['response']
+
+            except Exception as e:
+                logger.warning(f"SLP response generation failed, falling back to standard: {e}")
+                # Continue with standard processing
 
         # Phase 8.2: Assess confidence in retrieval quality (unless forced to use local)
         if not force_local:
@@ -6023,6 +6345,171 @@ Try rephrasing your question or uploading more relevant documents."""
 
     except Exception as e:
         logger.error(f"Response generation failed: {e}")
+        return f"I apologize, but I encountered an error while processing your request: {e}"
+
+
+def _generate_standard_secure_response(query: str, context: Dict[str, Any],
+                                     sam_tpv_integration=None, user_profile=None) -> str:
+    """
+    Generate standard secure response for SLP fallback.
+
+    This function provides the standard SAM response generation logic
+    that can be used as a fallback when SLP programs are not available.
+    """
+    try:
+        # Extract memory results from context
+        memory_results = context.get('memory_results', [])
+
+        if memory_results:
+            # Count sources for transparency
+            secure_count = sum(1 for r in memory_results if getattr(r, 'source_type', '') == 'secure_documents')
+            web_count = sum(1 for r in memory_results if getattr(r, 'source_type', '') == 'web_knowledge')
+
+            # Build context from all available memories
+            context_parts = []
+            for i, result in enumerate(memory_results):
+                source_type = getattr(result, 'source_type', 'unknown')
+                source_label = "📄 Document" if source_type == 'secure_documents' else "🌐 Web Knowledge" if source_type == 'web_knowledge' else "📋 Memory"
+
+                # Get more content for better context (up to 1000 chars instead of 300)
+                content_preview = result.chunk.content[:1000]
+                if len(result.chunk.content) > 1000:
+                    content_preview += "..."
+                context_parts.append(f"{source_label} - {result.chunk.source}\nContent: {content_preview}")
+
+            context_text = "\n\n".join(context_parts)
+
+            # Add source summary
+            source_summary = []
+            if secure_count > 0:
+                source_summary.append(f"{secure_count} uploaded document(s)")
+            if web_count > 0:
+                source_summary.append(f"{web_count} web knowledge item(s)")
+
+            sources_text = " and ".join(source_summary) if source_summary else "available sources"
+
+            # Generate response using Ollama model
+            try:
+                import requests
+
+                # Prepare the prompt for Ollama
+                system_prompt = f"""You are SAM, a secure AI assistant. Answer the user's question based on the provided content from {sources_text}.
+
+When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.
+
+Be helpful and informative. Extract relevant information from the provided sources to answer the question directly.
+If the information isn't sufficient, say so clearly. Always be concise but thorough.
+
+The sources include both uploaded documents and current web knowledge that has been vetted and approved for your knowledge base."""
+
+                user_prompt = f"""Question: {query}
+
+Available Information:
+{context_text}
+
+Please provide a helpful answer based on the available information."""
+
+                # TPV-enabled response generation
+                if sam_tpv_integration:
+                    try:
+                        # Use TPV integration for response generation
+                        full_prompt = f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:"
+
+                        # Calculate initial confidence based on context quality
+                        initial_confidence = min(0.8, len(context_text) / 2000.0) if context_text else 0.3
+
+                        tpv_response = sam_tpv_integration.generate_response_with_tpv(
+                            prompt=full_prompt,
+                            user_profile=user_profile,
+                            initial_confidence=initial_confidence,
+                            context={'has_context': bool(context_text), 'sources': sources_text},
+                            ollama_params={
+                                "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                                "stream": False,
+                                "options": {
+                                    "temperature": 0.7,
+                                    "top_p": 0.9,
+                                    "max_tokens": 500
+                                }
+                            }
+                        )
+
+                        if tpv_response.content:
+                            return tpv_response.content
+
+                    except Exception as e:
+                        logger.error(f"TPV-enabled generation failed in fallback: {e}")
+
+                # Fallback: Standard Ollama API call
+                ollama_response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json={
+                        "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                        "prompt": f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:",
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.7,
+                            "top_p": 0.9,
+                            "max_tokens": 500
+                        }
+                    },
+                    timeout=30
+                )
+
+                if ollama_response.status_code == 200:
+                    response_data = ollama_response.json()
+                    ai_response = response_data.get('response', '').strip()
+
+                    if ai_response:
+                        return ai_response
+
+            except Exception as e:
+                logger.error(f"Ollama API call failed in fallback: {e}")
+
+            # Final fallback: return context with basic formatting
+            return f"""Based on {sources_text}, here's what I found:
+
+{context_text}
+
+I'm SAM, your secure AI assistant. How can I help you further?"""
+
+        else:
+            # No memory results - generate basic response
+            try:
+                import requests
+
+                system_prompt = """You are SAM, a helpful AI assistant. When thinking through questions, you can use <think>...</think> tags to show your reasoning process.
+
+Answer the user's question helpfully and accurately based on your general knowledge."""
+
+                ollama_response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json={
+                        "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                        "prompt": f"System: {system_prompt}\n\nUser: {query}\n\nAssistant:",
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.7,
+                            "top_p": 0.9,
+                            "max_tokens": 500
+                        }
+                    },
+                    timeout=30
+                )
+
+                if ollama_response.status_code == 200:
+                    response_data = ollama_response.json()
+                    ai_response = response_data.get('response', '').strip()
+                    if ai_response:
+                        return ai_response
+
+            except Exception as e:
+                logger.error(f"Fallback Ollama call failed: {e}")
+
+            return f"I understand you're asking about: {query}. However, I don't have specific information available to provide a detailed answer."
+
+    except Exception as e:
+        logger.error(f"Standard response generation failed: {e}")
         return f"I apologize, but I encountered an error while processing your request: {e}"
 
 def process_secure_document(uploaded_file) -> dict:
