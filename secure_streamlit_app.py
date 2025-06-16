@@ -266,11 +266,13 @@ def render_pro_features_activation():
 def render_tpv_control_sidebar():
     """Render TPV control sidebar for Phase 4 deployment."""
     with st.sidebar:
+        # Navigation Section
+        render_navigation_section()
+
         # SAM Pro Features Activation Section
         render_pro_features_activation()
 
         st.header("🧠 Active Reasoning Control")
-        st.markdown("*Phase 4: Production Deployment*")
 
         # Check if TPV feature is available
         if ENTITLEMENTS_AVAILABLE and not is_feature_available("tpv_active_control"):
@@ -350,32 +352,67 @@ def render_tpv_control_sidebar():
         with st.expander("⚙️ Deployment Config", expanded=False):
             st.json(deployment_info)
 
-        # Phase 4 Information
-        st.subheader("🚀 Phase 4 Features")
-        st.markdown("""
-        **Active Reasoning Control** is now in production!
 
-        ✅ **Scientifically Validated**: 48.4% token reduction
-        ✅ **Quality Maintained**: No degradation in response quality
-        ✅ **Intelligent Control**: 90% intervention rate
-        ✅ **Zero Errors**: Complete elimination of timeout issues
-
-        **Benefits:**
-        - Faster, more concise responses
-        - Prevents rambling and stagnation
-        - Transparent reasoning control
-        - Significant cost savings
-        """)
 
         # SLP (Cognitive Automation) Status
         render_slp_status_sidebar()
+
+def render_navigation_section():
+    """Render navigation section with links to other SAM interfaces."""
+    st.header("🧭 SAM Navigation")
+
+    # Check authentication status for conditional messaging
+    is_authenticated = st.session_state.get('security_manager') and st.session_state.security_manager.is_unlocked()
+
+    if is_authenticated:
+        st.success("🔓 **Authenticated** - All interfaces available")
+
+        # Navigation button
+        st.markdown("""
+        <a href="http://localhost:8501" target="_blank" style="text-decoration: none;">
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: 600;
+                margin: 4px 0;
+                transition: transform 0.2s ease;
+                cursor: pointer;
+                border: none;
+                width: 100%;
+                box-sizing: border-box;
+            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                🧠 Memory Center
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+        st.caption("🧠🎨 Access Dream Canvas, API keys, bulk processing, and advanced memory features")
+
+        # Session info
+        if st.session_state.security_manager:
+            session_info = st.session_state.security_manager.get_session_info()
+            time_remaining = session_info.get('time_remaining', 0)
+            minutes_remaining = time_remaining // 60
+
+            if minutes_remaining > 30:
+                st.info(f"⏰ Session: {minutes_remaining}m remaining")
+            elif minutes_remaining > 10:
+                st.warning(f"⏰ Session: {minutes_remaining}m remaining")
+            else:
+                st.error(f"⏰ Session: {minutes_remaining}m remaining - Consider extending")
+    else:
+        st.warning("🔒 **Authentication Required**")
+        st.markdown("Complete setup or unlock SAM to access other interfaces.")
+
+    st.markdown("---")
 
 
 def render_slp_status_sidebar():
     """Render SLP (Scalable Latent Program) status in sidebar."""
     try:
         st.header("🧠 Cognitive Automation")
-        st.markdown("*Phase 7A: Pattern Learning*")
 
         # Check if SLP feature is available
         if ENTITLEMENTS_AVAILABLE and not is_feature_available("bulk_processing"):
@@ -475,22 +512,7 @@ def render_slp_status_sidebar():
                         else:
                             st.info("🔍 Standard processing (no pattern match)")
 
-        # Phase 7A Information
-        st.subheader("🚀 Phase 7A Features")
-        st.markdown("""
-        **Cognitive Automation** learns from your interactions!
 
-        ✅ **Pattern Recognition**: Identifies recurring tasks
-        ✅ **Automatic Capture**: Saves successful reasoning patterns
-        ✅ **Intelligent Reuse**: Applies learned patterns to similar queries
-        ✅ **Continuous Learning**: Improves over time with usage
-
-        **Benefits:**
-        - Faster responses for repeated tasks
-        - Consistent high-quality outputs
-        - Personalized AI behavior
-        - Reduced computational overhead
-        """)
 
     except Exception as e:
         logger.debug(f"SLP status display error: {e}")
@@ -629,7 +651,7 @@ def render_slp_status():
         slp_data = st.session_state.get('slp_session_data', {}).get('last_response')
 
         if slp_data:
-            with st.expander("🧠 Cognitive Automation Status (Phase 7A: Pattern Learning)", expanded=False):
+            with st.expander("🧠 Cognitive Automation Status", expanded=False):
                 if slp_data.get('used_program'):
                     # Program was used
                     st.success("⚡ **Pattern Match Found** - Used learned cognitive program")
@@ -751,11 +773,11 @@ def render_slp_status():
 
                 # Status indicator
                 if slp_data.get('used_program'):
-                    st.success("🎯 **Phase 7A Active**: Cognitive automation successfully applied learned pattern.")
+                    st.success("🎯 **Cognitive Automation Active**: Successfully applied learned pattern.")
                 elif slp_data.get('captured_program'):
-                    st.info("📖 **Phase 7A Learning**: New cognitive pattern captured for future automation.")
+                    st.info("📖 **Learning Mode**: New cognitive pattern captured for future automation.")
                 else:
-                    st.info("🔍 **Phase 7A Monitoring**: Analyzing interaction for potential pattern capture.")
+                    st.info("🔍 **Monitoring**: Analyzing interaction for potential pattern capture.")
 
     except Exception as e:
         logger.debug(f"SLP status display error: {e}")
@@ -931,23 +953,132 @@ How can I assist you today?
                        st.session_state.get(f"force_local_{escalation_id}")):
 
                     st.markdown("---")
-                    st.markdown("**Choose your preferred approach:**")
+                    st.markdown("### 🎯 **Choose Your Approach:**")
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
-                        if st.button("🌐 Yes, Search Online", key=f"history_search_{escalation_id}_{i}", use_container_width=True):
+                        if st.button("🌐 **Yes, Search Online**", key=f"history_search_{escalation_id}_{i}", use_container_width=True, type="primary"):
                             st.session_state[f"trigger_search_{escalation_id}"] = True
                             st.rerun()
+                        st.caption("🔍 Search the web for current information")
 
                     with col2:
-                        if st.button("📚 No, Answer Locally", key=f"history_local_{escalation_id}_{i}", use_container_width=True):
+                        if st.button("📚 **No, Answer Locally**", key=f"history_local_{escalation_id}_{i}", use_container_width=True):
                             st.session_state[f"force_local_{escalation_id}"] = True
                             st.rerun()
+                        st.caption("💭 Use my current knowledge")
 
                     with col3:
-                        if st.button("📄 Manual Upload", key=f"history_upload_{escalation_id}_{i}", use_container_width=True):
+                        if st.button("📄 **Manual Upload**", key=f"history_upload_{escalation_id}_{i}", use_container_width=True):
                             st.info("💡 Switch to the '📚 Documents' tab to upload relevant documents, then ask your question again.")
-    
+                        st.caption("📁 Upload relevant documents")
+
+    # Add manual web search controls
+    with st.expander("🌐 Manual Web Search Controls", expanded=False):
+        st.markdown("**Force web search for any query:**")
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            manual_search_query = st.text_input(
+                "Enter query for web search:",
+                placeholder="e.g., latest AI developments, current news about...",
+                key="manual_web_search_input"
+            )
+
+        with col2:
+            if st.button("🔍 Search Web", key="manual_web_search_button", use_container_width=True):
+                if manual_search_query.strip():
+                    # Trigger manual web search
+                    st.session_state['manual_web_search_trigger'] = {
+                        'query': manual_search_query.strip(),
+                        'timestamp': time.time()
+                    }
+                    st.rerun()
+                else:
+                    st.warning("Please enter a search query")
+
+    # Handle manual web search trigger
+    if 'manual_web_search_trigger' in st.session_state:
+        search_data = st.session_state['manual_web_search_trigger']
+        search_query = search_data['query']
+
+        # Add user message to chat history
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": f"🌐 Manual Web Search: {search_query}"
+        })
+
+        # Display user message
+        with st.chat_message("user"):
+            st.markdown(f"🌐 **Manual Web Search:** {search_query}")
+
+        # Perform web search
+        with st.chat_message("assistant"):
+            st.markdown("🔍 **Searching the web and analyzing content...**\n\nThis may take a moment while I fetch and vet the information for security and quality.")
+
+            # Perform actual web search
+            search_result = perform_secure_web_search(search_query)
+
+            if search_result['success']:
+                st.success("✅ **Web search completed successfully!**")
+
+                # Process and display results
+                try:
+                    from utils.thought_processor import get_thought_processor
+                    thought_processor = get_thought_processor()
+                    processed = thought_processor.process_response(search_result['response'])
+
+                    # Display only the clean response (thoughts hidden by default)
+                    st.markdown(processed.visible_content)
+
+                    # Add thought dropdown if thoughts are present (collapsed by default)
+                    if processed.has_thoughts and processed.thought_blocks:
+                        total_tokens = sum(block.token_count for block in processed.thought_blocks)
+                        with st.expander(f"🧠 SAM's Thoughts ({total_tokens} tokens)", expanded=False):
+                            for i, thought_block in enumerate(processed.thought_blocks):
+                                st.markdown(f"**Thought {i+1}:**")
+                                st.markdown(thought_block.content)
+                                if i < len(processed.thought_blocks) - 1:
+                                    st.divider()
+
+                    # Add to chat history
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": processed.visible_content
+                    })
+
+                    # Add feedback system
+                    render_feedback_system(len(st.session_state.chat_history) - 1)
+
+                except ImportError:
+                    # Fallback if thought processor is not available
+                    st.markdown(search_result['response'])
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": search_result['response']
+                    })
+
+                st.info("🛡️ **Content saved to quarantine for security analysis.**\n\n"
+                       "📋 **Next Steps:**\n"
+                       "1. Go to the **Content Vetting** page\n"
+                       "2. Review and approve the web content\n"
+                       "3. Ask follow-up questions to use the new knowledge")
+
+            else:
+                st.error("❌ **Web search failed**")
+                st.markdown(f"**Error:** {search_result['error']}")
+                st.info("💡 **Fallback:** You can manually search the web and upload relevant documents through the '📚 Documents' tab.")
+
+                # Add error result to chat history
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": f"❌ Web search failed: {search_result['error']}\n\n💡 **Fallback:** You can manually search the web and upload relevant documents through the '📚 Documents' tab."
+                })
+
+        # Clear the trigger
+        del st.session_state['manual_web_search_trigger']
+        st.rerun()
+
     # Chat input
     if prompt := st.chat_input("Ask SAM anything..."):
         # Add user message to chat history
@@ -997,24 +1128,27 @@ How can I assist you today?
 
                             # Add a clear separator and button section
                             st.markdown("---")
-                            st.markdown("**Choose your preferred approach:**")
+                            st.markdown("### 🎯 **Choose Your Approach:**")
 
-                            # Add interactive web search buttons
+                            # Add interactive web search buttons with enhanced styling
                             col1, col2, col3 = st.columns(3)
 
                             with col1:
-                                if st.button("🌐 Yes, Search Online", key=f"search_{escalation_id}", use_container_width=True):
+                                if st.button("🌐 **Yes, Search Online**", key=f"search_{escalation_id}", use_container_width=True, type="primary"):
                                     st.session_state[f"trigger_search_{escalation_id}"] = True
                                     st.rerun()
+                                st.caption("🔍 Search the web for current information")
 
                             with col2:
-                                if st.button("📚 No, Answer Locally", key=f"local_{escalation_id}", use_container_width=True):
+                                if st.button("📚 **No, Answer Locally**", key=f"local_{escalation_id}", use_container_width=True):
                                     st.session_state[f"force_local_{escalation_id}"] = True
                                     st.rerun()
+                                st.caption("💭 Use my current knowledge")
 
                             with col3:
-                                if st.button("📄 Manual Upload", key=f"upload_{escalation_id}", use_container_width=True):
+                                if st.button("📄 **Manual Upload**", key=f"upload_{escalation_id}", use_container_width=True):
                                     st.info("💡 Switch to the '📚 Documents' tab to upload relevant documents, then ask your question again.")
+                                st.caption("📁 Upload relevant documents")
 
                             # Add escalation to chat history with escalation_id for button persistence
                             st.session_state.chat_history.append({
@@ -1028,9 +1162,31 @@ How can I assist you today?
 
                             # Process thoughts using the thought processor
                             try:
+                                logger.info(f"🧠 Attempting to import thought processor")
                                 from utils.thought_processor import get_thought_processor
+                                logger.info(f"🧠 Thought processor imported successfully")
+
                                 thought_processor = get_thought_processor()
+                                logger.info(f"🧠 Thought processor instance created")
+
+                                # Debug logging
+                                logger.info(f"🧠 Processing response with thought processor")
+                                logger.info(f"🧠 Raw response length: {len(raw_response)}")
+                                logger.info(f"🧠 Contains <think> tags: {'<think>' in raw_response}")
+                                logger.info(f"🧠 Raw response preview: '{raw_response[:200]}...'")
+
+                                # Test the thought processor with a simple example
+                                test_response = "Hello! <think>This is a test thought</think> How are you?"
+                                test_processed = thought_processor.process_response(test_response)
+                                logger.info(f"🧠 Test processed - has_thoughts: {test_processed.has_thoughts}")
+                                logger.info(f"🧠 Test processed - visible: '{test_processed.visible_content}'")
+
                                 processed = thought_processor.process_response(raw_response)
+                                logger.info(f"🧠 Response processed successfully")
+
+                                logger.info(f"🧠 Processed response - has_thoughts: {processed.has_thoughts}")
+                                logger.info(f"🧠 Processed response - thought_blocks: {len(processed.thought_blocks)}")
+                                logger.info(f"🧠 Visible content length: {len(processed.visible_content)}")
 
                                 # Display the clean response
                                 st.markdown(processed.visible_content)
@@ -1052,8 +1208,22 @@ How can I assist you today?
                                 # Add feedback system
                                 render_feedback_system(len(st.session_state.chat_history) - 1)
 
-                            except ImportError:
+                            except ImportError as e:
+                                logger.error(f"🧠 ImportError: Could not import thought processor: {e}")
+                                logger.error(f"🧠 ImportError details: {type(e).__name__}: {str(e)}")
                                 # Fallback if thought processor is not available
+                                st.markdown(raw_response)
+                                st.session_state.chat_history.append({"role": "assistant", "content": raw_response})
+
+                                # Add feedback system
+                                render_feedback_system(len(st.session_state.chat_history) - 1)
+                            except Exception as e:
+                                logger.error(f"🧠 Exception in thought processor: {e}")
+                                logger.error(f"🧠 Exception type: {type(e).__name__}")
+                                logger.error(f"🧠 Exception details: {str(e)}")
+                                import traceback
+                                logger.error(f"🧠 Traceback: {traceback.format_exc()}")
+                                # Fallback on any other error
                                 st.markdown(raw_response)
                                 st.session_state.chat_history.append({"role": "assistant", "content": raw_response})
 
@@ -1104,6 +1274,9 @@ def render_document_interface():
                         with col4:
                             sync_status = "✅ Yes" if result.get('synced_to_regular_store') else "❌ No"
                             st.metric("🔄 Synced", sync_status)
+
+                        # Force refresh of document repository after successful upload
+                        st.session_state['document_upload_success'] = True
 
                     # Show enrichment scores and analytics
                     if result.get('knowledge_consolidated'):
@@ -1267,8 +1440,18 @@ def render_document_interface():
 
         # Enhanced Document Repository
         st.markdown("---")
-        st.subheader("📚 Document Repository")
-        st.markdown("*Complete list of documents ingested by SAM with source file access*")
+
+        # Header with refresh button
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.subheader("📚 Document Repository")
+            st.markdown("*Complete list of documents ingested by SAM with source file access*")
+        with col2:
+            if st.button("🔄 Refresh Repository", key="refresh_document_repository", help="Refresh the document list to show newly uploaded files"):
+                # Clear any cached data and force refresh
+                if 'document_list_cache' in st.session_state:
+                    del st.session_state['document_list_cache']
+                st.rerun()
 
         # Check if system is unlocked before trying to get documents
         if not st.session_state.security_manager.is_unlocked():
@@ -1276,8 +1459,25 @@ def render_document_interface():
             st.info("💡 The document repository shows all documents that have been securely processed and encrypted by SAM.")
             return
 
-        # Get detailed document information
-        document_list = get_ingested_documents_list()
+        # Auto-refresh if document was just uploaded
+        if st.session_state.get('document_upload_success', False):
+            st.session_state['document_upload_success'] = False
+            if 'document_list_cache' in st.session_state:
+                del st.session_state['document_list_cache']
+            st.info("🔄 **Repository updated** - New document has been added!")
+
+        # Get detailed document information (with basic caching)
+        cache_key = 'document_list_cache'
+        if cache_key not in st.session_state or st.session_state.get('force_refresh_docs', False):
+            with st.spinner("🔄 Refreshing document repository..."):
+                logger.info("Refreshing document repository - fetching latest document list")
+                document_list = get_ingested_documents_list()
+                st.session_state[cache_key] = document_list
+                st.session_state['force_refresh_docs'] = False
+                logger.info(f"Document repository refreshed - found {len(document_list)} documents")
+        else:
+            document_list = st.session_state[cache_key]
+            logger.debug(f"Using cached document list with {len(document_list)} documents")
 
         if document_list:
             # Summary metrics
@@ -1286,7 +1486,9 @@ def render_document_interface():
 
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("📄 Total Documents", total_docs)
+                # Show real-time document count with refresh indicator
+                refresh_indicator = "🔄" if st.session_state.get('document_upload_success', False) else ""
+                st.metric("📄 Total Documents", f"{total_docs} {refresh_indicator}")
             with col2:
                 st.metric("💾 Total Size", f"{total_size / (1024*1024):.1f} MB")
             with col3:
@@ -1295,6 +1497,18 @@ def render_document_interface():
             with col4:
                 recent_docs = len([doc for doc in document_list if doc.get('is_recent', False)])
                 st.metric("🆕 Recent (24h)", recent_docs)
+
+            # Show last refresh time and debug info
+            import datetime
+            current_time = datetime.datetime.now().strftime("%H:%M:%S")
+
+            # Add real-time memory store count for debugging
+            try:
+                memory_stats = st.session_state.secure_memory_store.get_memory_stats()
+                total_memories = memory_stats.get('total_memories', 0)
+                st.caption(f"📊 Repository data as of {current_time} | 🧠 Total memories in store: {total_memories}")
+            except Exception as e:
+                st.caption(f"📊 Repository data as of {current_time} | ⚠️ Could not get memory stats: {e}")
 
             # Document list with search and filtering
             st.markdown("### 🔍 Document Search & Filter")
@@ -1658,6 +1872,9 @@ def process_folder_bulk(folder_path, recursive, file_types, max_files, skip_erro
         # Success message
         if successful_files:
             st.success(f"🎉 Bulk processing completed! Successfully processed {len(successful_files)} out of {len(supported_files)} files.")
+            # Force refresh of document repository after bulk processing
+            st.session_state['document_upload_success'] = True
+            st.session_state['force_refresh_docs'] = True
         else:
             st.error("❌ No files were successfully processed.")
 
@@ -5984,7 +6201,7 @@ def create_web_search_escalation_message(assessment, original_query: str) -> str
 
 **Would you like me to search the web for more current information?**
 
-🌐 **Interactive Web Search Available!**"""
+🌐 **Choose your preferred approach using the buttons below:**"""
 
     return escalation_message, escalation_id
 
@@ -6061,6 +6278,67 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
         except Exception as e:
             logger.warning(f"TPV integration not available: {e}")
             sam_tpv_integration = None
+
+        # Phase 0.5: Initialize SOF v2 Dynamic Agent Architecture if available
+        sof_integration = None
+        try:
+            from sam.orchestration import is_sof_enabled, get_sof_integration
+
+            if is_sof_enabled():
+                sof_integration = get_sof_integration()
+                logger.info("🤖 SOF v2 Dynamic Agent Architecture available")
+
+                # Try SOF v2 processing first for mathematical and tool-based queries
+                if sof_integration and sof_integration._initialized:
+                    # Check if this is a mathematical query that should use CalculatorTool
+                    import re
+                    math_pattern = r'[\d\+\-\*\/\(\)\.\s]+'
+                    if re.search(r'\d+\s*[\+\-\*\/]\s*\d+', prompt):
+                        logger.info(f"🧮 Detected mathematical query, routing to SOF v2: '{prompt}'")
+
+                        try:
+                            sof_result = sof_integration.process_query(
+                                query=prompt,
+                                user_id=getattr(st.session_state, 'user_id', None),
+                                session_id=getattr(st.session_state, 'session_id', None),
+                                use_dynamic_planning=True
+                            )
+
+                            if sof_result.get('success') and sof_result.get('response'):
+                                logger.info(f"✅ SOF v2 successfully processed mathematical query")
+                                return sof_result['response']
+                            else:
+                                logger.warning(f"⚠️ SOF v2 processing failed, falling back to standard: {sof_result.get('error', 'Unknown error')}")
+                        except Exception as sof_error:
+                            logger.warning(f"⚠️ SOF v2 execution failed: {sof_error}")
+
+                    # Check for other tool-requiring queries (web search, complex analysis)
+                    elif any(keyword in prompt.lower() for keyword in ['search', 'find', 'latest', 'current', 'news', 'recent']):
+                        logger.info(f"🌐 Detected potential web search query, considering SOF v2: '{prompt[:50]}...'")
+
+                        try:
+                            sof_result = sof_integration.process_query(
+                                query=prompt,
+                                user_id=getattr(st.session_state, 'user_id', None),
+                                session_id=getattr(st.session_state, 'session_id', None),
+                                use_dynamic_planning=True
+                            )
+
+                            if sof_result.get('success') and sof_result.get('response'):
+                                logger.info(f"✅ SOF v2 successfully processed web search query")
+                                return sof_result['response']
+                            else:
+                                logger.info(f"📋 SOF v2 deferred to standard processing: {sof_result.get('error', 'No error')}")
+                        except Exception as sof_error:
+                            logger.warning(f"⚠️ SOF v2 execution failed: {sof_error}")
+                else:
+                    logger.warning("🤖 SOF v2 available but not initialized")
+            else:
+                logger.info("🤖 SOF v2 disabled in configuration")
+
+        except Exception as e:
+            logger.warning(f"SOF v2 integration not available: {e}")
+
         # Phase 8.1: Perform unified search across all knowledge sources
         memory_results = search_unified_memory(query=prompt, max_results=5)
 
@@ -6122,9 +6400,20 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
 
                     # Generate standard response and consider program capture
                     def fallback_generator(query, context):
-                        return _generate_standard_secure_response(query, context, sam_tpv_integration, user_profile)
+                        logger.info(f"🔧 [SLP] Fallback generator called for query: '{query[:50]}...'")
+                        result = _generate_standard_secure_response(query, context, sam_tpv_integration, user_profile)
+                        logger.info(f"🔧 [SLP] Fallback generator result type: {type(result)}")
+                        # Handle tuple return for web search escalation
+                        if isinstance(result, tuple) and len(result) == 2:
+                            logger.info(f"🔧 [SLP] Detected web search escalation tuple")
+                            # This is a web search escalation (escalation_message, escalation_id)
+                            return result[0]  # Return just the escalation message for SLP
+                        logger.info(f"🔧 [SLP] Returning standard response, length: {len(str(result))}")
+                        return result
 
                     response = fallback_generator(prompt, slp_context)
+                    logger.info(f"🔧 [SLP] Final response length: {len(response)}")
+                    logger.info(f"🔧 [SLP] Response contains <think>: {'<think>' in response}")
 
                     # Consider capturing this successful interaction as a new program
                     if response and len(response) > 50:
@@ -6179,17 +6468,28 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
                         }
                     })
 
+                logger.info(f"🔍 Starting confidence assessment for {len(search_results_for_assessment)} results")
+                logger.info(f"🔍 Query: '{prompt[:50]}...'")
+
                 assessment = confidence_assessor.assess_retrieval_quality(search_results_for_assessment, prompt)
 
-                logger.info(f"Confidence assessment: {assessment.status} ({assessment.confidence_score:.2f})")
+                logger.info(f"🔍 Confidence assessment complete: {assessment.status} ({assessment.confidence_score:.2f})")
+                logger.info(f"🔍 Confidence level: {assessment.confidence_level}")
+                logger.info(f"🔍 Recommendation: {assessment.recommendation}")
+                logger.info(f"🔍 Reasons: {assessment.reasons}")
 
                 # Phase 8.3: Check if web search escalation should be offered
                 if assessment.status == "NOT_CONFIDENT":
+                    logger.info(f"🌐 Triggering web search escalation for low confidence")
                     escalation_message, escalation_id = create_web_search_escalation_message(assessment, prompt)
                     return escalation_message, escalation_id
+                else:
+                    logger.info(f"✅ Confidence sufficient, proceeding with local response")
 
             except Exception as e:
                 logger.warning(f"Confidence assessment failed: {e}")
+                import traceback
+                logger.warning(f"Confidence assessment traceback: {traceback.format_exc()}")
                 # Continue with normal processing if confidence assessment fails
 
         if memory_results:
@@ -6414,8 +6714,57 @@ def _generate_standard_secure_response(query: str, context: Dict[str, Any],
     that can be used as a fallback when SLP programs are not available.
     """
     try:
+        logger.info(f"🔧 [SLP Fallback] _generate_standard_secure_response called")
+        logger.info(f"🔧 [SLP Fallback] Query: '{query[:50]}...'")
+
         # Extract memory results from context
         memory_results = context.get('memory_results', [])
+        force_local = context.get('force_local', False)
+
+        logger.info(f"🔧 [SLP Fallback] Memory results: {len(memory_results)}")
+        logger.info(f"🔧 [SLP Fallback] Force local: {force_local}")
+
+        # Phase 8.2: Assess confidence in retrieval quality (unless forced to use local)
+        if not force_local and memory_results:
+            try:
+                from reasoning.confidence_assessor import get_confidence_assessor
+                confidence_assessor = get_confidence_assessor()
+
+                # Convert memory results to format expected by confidence assessor
+                search_results_for_assessment = []
+                for result in memory_results:
+                    search_results_for_assessment.append({
+                        'similarity_score': result.similarity_score,
+                        'content': result.chunk.content,
+                        'metadata': {
+                            'source': result.chunk.source,
+                            'timestamp': getattr(result.chunk, 'timestamp', None)
+                        }
+                    })
+
+                logger.info(f"🔍 [SLP Fallback] Starting confidence assessment for {len(search_results_for_assessment)} results")
+                logger.info(f"🔍 [SLP Fallback] Query: '{query[:50]}...'")
+
+                assessment = confidence_assessor.assess_retrieval_quality(search_results_for_assessment, query)
+
+                logger.info(f"🔍 [SLP Fallback] Confidence assessment complete: {assessment.status} ({assessment.confidence_score:.2f})")
+                logger.info(f"🔍 [SLP Fallback] Confidence level: {assessment.confidence_level}")
+                logger.info(f"🔍 [SLP Fallback] Recommendation: {assessment.recommendation}")
+                logger.info(f"🔍 [SLP Fallback] Reasons: {assessment.reasons}")
+
+                # Phase 8.3: Check if web search escalation should be offered
+                if assessment.status == "NOT_CONFIDENT":
+                    logger.info(f"🌐 [SLP Fallback] Triggering web search escalation for low confidence")
+                    escalation_message, escalation_id = create_web_search_escalation_message(assessment, query)
+                    return escalation_message, escalation_id
+                else:
+                    logger.info(f"✅ [SLP Fallback] Confidence sufficient, proceeding with local response")
+
+            except Exception as e:
+                logger.warning(f"[SLP Fallback] Confidence assessment failed: {e}")
+                import traceback
+                logger.warning(f"[SLP Fallback] Confidence assessment traceback: {traceback.format_exc()}")
+                # Continue with normal processing if confidence assessment fails
 
         if memory_results:
             # Count sources for transparency

@@ -1,5 +1,5 @@
 {
-  "use_sof_framework": false,
+  "use_sof_framework": true,
   "sof_version": "2.0.0",
   "max_execution_time": 60.0,
   "skill_timeout": 30.0,
