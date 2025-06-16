@@ -783,8 +783,85 @@ def render_slp_status():
         logger.debug(f"SLP status display error: {e}")
 
 def render_chat_interface():
-    """Render the chat interface."""
-    st.header("💬 Secure Chat")
+    """Render the chat interface with enhanced UX features."""
+
+    # Add custom CSS for better chat interface styling
+    st.markdown("""
+    <style>
+    /* Chat interface enhancements */
+    .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .chat-sort-controls {
+        min-width: 150px;
+    }
+
+    .conversation-status {
+        background: linear-gradient(90deg, #f0f2f6, #ffffff);
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1px solid #e1e5e9;
+        margin: 10px 0;
+        text-align: center;
+        font-size: 0.9em;
+        color: #555;
+    }
+
+    .scroll-button {
+        background: linear-gradient(90deg, #4CAF50, #45a049);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .scroll-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    /* Smooth scroll behavior */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Chat input highlighting */
+    .stChatInput > div > div {
+        border: 2px solid #4CAF50 !important;
+        border-radius: 10px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Enhanced header with conversation sorting controls
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        st.header("💬 Secure Chat")
+
+    with col2:
+        # Conversation sorting controls
+        if 'chat_history' in st.session_state and len(st.session_state.chat_history) > 1:
+            sort_order = st.selectbox(
+                "📋 Sort:",
+                ["Latest First", "Oldest First"],
+                key="chat_sort_order",
+                help="Change conversation display order",
+                label_visibility="collapsed"
+            )
+
+            # Apply sorting to chat history display
+            if 'chat_sort_order' not in st.session_state:
+                st.session_state.chat_sort_order = "Latest First"
+        else:
+            # Show placeholder when no conversation history
+            st.markdown("<div style='height: 38px;'></div>", unsafe_allow_html=True)
 
     # Render TPV status if available
     render_tpv_status()
@@ -936,42 +1013,63 @@ How can I assist you today?
                 del st.session_state[f"force_local_{escalation_id}"]
                 st.rerun()
 
-    # Display chat history
-    for i, message in enumerate(st.session_state.chat_history):
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    # Display chat history with sorting
+    chat_history_to_display = st.session_state.chat_history.copy()
 
-            # Check if this is an escalation message that needs buttons
-            if (message["role"] == "assistant" and
-                "Interactive Web Search Available!" in message["content"] and
-                message.get("escalation_id")):
+    # Apply sorting based on user selection
+    sort_order = st.session_state.get('chat_sort_order', 'Latest First')
+    if sort_order == "Oldest First":
+        # Keep original order (oldest first)
+        pass
+    else:
+        # Reverse for latest first
+        chat_history_to_display = list(reversed(chat_history_to_display))
 
-                escalation_id = message["escalation_id"]
+    # Create a container for chat messages that we can scroll to
+    chat_container = st.container()
 
-                # Only show buttons if escalation hasn't been resolved
-                if not (st.session_state.get(f"trigger_search_{escalation_id}") or
-                       st.session_state.get(f"force_local_{escalation_id}")):
+    with chat_container:
+        for i, message in enumerate(chat_history_to_display):
+            # Calculate original index for button keys (important for consistency)
+            if sort_order == "Latest First":
+                original_index = len(st.session_state.chat_history) - 1 - i
+            else:
+                original_index = i
 
-                    st.markdown("---")
-                    st.markdown("### 🎯 **Choose Your Approach:**")
-                    col1, col2, col3 = st.columns(3)
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-                    with col1:
-                        if st.button("🌐 **Yes, Search Online**", key=f"history_search_{escalation_id}_{i}", use_container_width=True, type="primary"):
-                            st.session_state[f"trigger_search_{escalation_id}"] = True
-                            st.rerun()
-                        st.caption("🔍 Search the web for current information")
+                # Check if this is an escalation message that needs buttons
+                if (message["role"] == "assistant" and
+                    "Interactive Web Search Available!" in message["content"] and
+                    message.get("escalation_id")):
 
-                    with col2:
-                        if st.button("📚 **No, Answer Locally**", key=f"history_local_{escalation_id}_{i}", use_container_width=True):
-                            st.session_state[f"force_local_{escalation_id}"] = True
-                            st.rerun()
-                        st.caption("💭 Use my current knowledge")
+                    escalation_id = message["escalation_id"]
 
-                    with col3:
-                        if st.button("📄 **Manual Upload**", key=f"history_upload_{escalation_id}_{i}", use_container_width=True):
-                            st.info("💡 Switch to the '📚 Documents' tab to upload relevant documents, then ask your question again.")
-                        st.caption("📁 Upload relevant documents")
+                    # Only show buttons if escalation hasn't been resolved
+                    if not (st.session_state.get(f"trigger_search_{escalation_id}") or
+                           st.session_state.get(f"force_local_{escalation_id}")):
+
+                        st.markdown("---")
+                        st.markdown("### 🎯 **Choose Your Approach:**")
+                        col1, col2, col3 = st.columns(3)
+
+                        with col1:
+                            if st.button("🌐 **Yes, Search Online**", key=f"history_search_{escalation_id}_{original_index}", use_container_width=True, type="primary"):
+                                st.session_state[f"trigger_search_{escalation_id}"] = True
+                                st.rerun()
+                            st.caption("🔍 Search the web for current information")
+
+                        with col2:
+                            if st.button("📚 **No, Answer Locally**", key=f"history_local_{escalation_id}_{original_index}", use_container_width=True):
+                                st.session_state[f"force_local_{escalation_id}"] = True
+                                st.rerun()
+                            st.caption("💭 Use my current knowledge")
+
+                        with col3:
+                            if st.button("📄 **Manual Upload**", key=f"history_upload_{escalation_id}_{original_index}", use_container_width=True):
+                                st.info("💡 Switch to the '📚 Documents' tab to upload relevant documents, then ask your question again.")
+                            st.caption("📁 Upload relevant documents")
 
     # Add manual web search controls
     with st.expander("🌐 Manual Web Search Controls", expanded=False):
@@ -1079,8 +1177,167 @@ How can I assist you today?
         del st.session_state['manual_web_search_trigger']
         st.rerun()
 
-    # Chat input
-    if prompt := st.chat_input("Ask SAM anything..."):
+    # Auto-scroll functionality and manual scroll controls
+    if len(st.session_state.get('chat_history', [])) > 0:
+        # Add scroll controls
+        col1, col2, col3 = st.columns([1, 2, 1])
+
+        with col2:
+            if st.button("⬇️ Scroll to Chat Input", use_container_width=True, help="Scroll down to the message input box"):
+                # Trigger auto-scroll by setting a flag
+                st.session_state['scroll_to_input'] = True
+                st.rerun()
+
+        # Auto-scroll JavaScript - more reliable approach
+        scroll_trigger = st.session_state.get('scroll_to_input', False)
+        if scroll_trigger:
+            st.session_state['scroll_to_input'] = False  # Reset flag
+
+        # Add floating scroll button
+        st.markdown("""
+        <div id="floating-scroll-btn" style="
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            z-index: 1000;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s ease;
+        " onclick="scrollToChatInput()" title="Scroll to chat input">
+            ⬇️
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <script>
+        // Enhanced auto-scroll functionality
+        function scrollToChatInput() {{
+            setTimeout(function() {{
+                // Multiple strategies to find and scroll to chat input
+                let chatInput = document.querySelector('[data-testid="stChatInput"]') ||
+                               document.querySelector('.stChatInput') ||
+                               document.querySelector('input[placeholder*="Ask SAM"]');
+
+                if (chatInput) {{
+                    // Scroll to chat input with some padding
+                    chatInput.scrollIntoView({{
+                        behavior: 'smooth',
+                        block: 'center',
+                        inline: 'nearest'
+                    }});
+
+                    // Focus the input for better UX
+                    setTimeout(() => chatInput.focus(), 100);
+                }} else {{
+                    // Fallback: scroll to bottom
+                    window.scrollTo({{
+                        top: document.body.scrollHeight,
+                        behavior: 'smooth'
+                    }});
+                }}
+
+                // Hide floating button after scrolling
+                const floatingBtn = document.getElementById('floating-scroll-btn');
+                if (floatingBtn) {{
+                    floatingBtn.style.display = 'none';
+                }}
+            }}, 300);
+        }}
+
+        // Floating scroll button visibility management
+        function updateFloatingButton() {{
+            const floatingBtn = document.getElementById('floating-scroll-btn');
+            if (!floatingBtn) return;
+
+            const chatInput = document.querySelector('[data-testid="stChatInput"]');
+            if (!chatInput) return;
+
+            const chatInputRect = chatInput.getBoundingClientRect();
+            const isInputVisible = chatInputRect.top < window.innerHeight && chatInputRect.bottom > 0;
+
+            // Show button if chat input is not visible and user has scrolled up
+            if (!isInputVisible && window.scrollY > 200) {{
+                floatingBtn.style.display = 'flex';
+            }} else {{
+                floatingBtn.style.display = 'none';
+            }}
+        }}
+
+        // Auto-scroll on page load and updates
+        scrollToChatInput();
+
+        // Scroll when triggered by button
+        if ({str(scroll_trigger).lower()}) {{
+            scrollToChatInput();
+        }}
+
+        // Monitor scroll position for floating button
+        window.addEventListener('scroll', updateFloatingButton);
+        window.addEventListener('resize', updateFloatingButton);
+
+        // Auto-scroll when new content is added
+        const observer = new MutationObserver(function(mutations) {{
+            let shouldScroll = false;
+            mutations.forEach(function(mutation) {{
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {{
+                    // Check if new chat messages were added
+                    for (let node of mutation.addedNodes) {{
+                        if (node.nodeType === 1 &&
+                            (node.querySelector('[data-testid="chatMessage"]') ||
+                             node.classList?.contains('stChatMessage'))) {{
+                            shouldScroll = true;
+                            break;
+                        }}
+                    }}
+                }}
+            }});
+
+            if (shouldScroll) {{
+                setTimeout(() => {{
+                    scrollToChatInput();
+                    updateFloatingButton();
+                }}, 200);
+            }}
+        }});
+
+        // Start observing the main content area
+        const mainContent = document.querySelector('.main') || document.body;
+        observer.observe(mainContent, {{ childList: true, subtree: true }});
+
+        // Initial floating button check
+        setTimeout(updateFloatingButton, 1000);
+        </script>
+        """, unsafe_allow_html=True)
+
+    # Add conversation status indicator
+    if len(st.session_state.get('chat_history', [])) > 1:
+        sort_order = st.session_state.get('chat_sort_order', 'Latest First')
+        total_messages = len(st.session_state.chat_history)
+
+        # Show conversation info
+        st.markdown(f"""
+        <div style="text-align: center; color: #666; font-size: 0.9em; margin: 10px 0;">
+            💬 <strong>{total_messages}</strong> messages • Sorted: <strong>{sort_order}</strong>
+            {' • 🔄 Auto-scroll enabled' if total_messages > 0 else ''}
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Chat input with enhanced placeholder
+    chat_input_placeholder = "Ask SAM anything..."
+    if len(st.session_state.get('chat_history', [])) > 0:
+        chat_input_placeholder += " (Auto-scroll enabled ⬇️)"
+
+    if prompt := st.chat_input(chat_input_placeholder):
         # Add user message to chat history
         st.session_state.chat_history.append({"role": "user", "content": prompt})
 
