@@ -51,6 +51,7 @@
             display: flex;
             gap: 15px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .header h1 {
@@ -65,7 +66,7 @@
             margin: 0;
         }
 
-        .memory-control-btn, .upload-btn {
+        .memory-control-btn, .upload-btn, .dream-canvas-btn {
             background: rgba(255,255,255,0.2);
             border: 2px solid rgba(255,255,255,0.3);
             color: white;
@@ -78,7 +79,7 @@
             display: inline-block;
         }
 
-        .memory-control-btn:hover, .upload-btn:hover {
+        .memory-control-btn:hover, .upload-btn:hover, .dream-canvas-btn:hover {
             background: rgba(255,255,255,0.3);
             border-color: rgba(255,255,255,0.5);
             transform: translateY(-2px);
@@ -521,6 +522,9 @@
                 </button>
                 <a href="/vetting" class="memory-control-btn" title="Content Vetting Dashboard">
                     🛡️ Content Vetting
+                </a>
+                <a href="/dream-canvas" class="dream-canvas-btn" title="Dream Canvas - Cognitive Synthesis Visualization">
+                    🧠🎨 Dream Canvas
                 </a>
                 <button class="upload-btn">📄 Upload Document</button>
             </div>

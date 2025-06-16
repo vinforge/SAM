@@ -53,6 +53,7 @@ class MemoryType(Enum):
     INSIGHT = "insight"
     FACT = "fact"
     PROCEDURE = "procedure"
+    SYNTHESIS = "synthesis"  # For cognitive synthesis insights
 
 @dataclass
 class MemoryChunk:

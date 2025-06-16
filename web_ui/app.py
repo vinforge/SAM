@@ -365,6 +365,12 @@ def vetting_dashboard():
     """Content vetting dashboard."""
     return render_template('vetting_dashboard.html')
 
+@app.route('/dream-canvas')
+@optional_security
+def dream_canvas():
+    """Dream Canvas - Cognitive synthesis visualization."""
+    return render_template('dream_canvas.html')
+
 @app.route('/api/trigger-web-search', methods=['POST'])
 @optional_security
 def trigger_web_search():
@@ -2300,6 +2306,203 @@ def learning_history():
 def uploaded_file(filename):
     """Serve uploaded files."""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# Phase 8C: Dream Canvas API Endpoints
+@app.route('/api/synthesis/trigger', methods=['POST'])
+@optional_security
+def trigger_synthesis():
+    """Trigger cognitive synthesis with optional visualization."""
+    try:
+        data = request.get_json() or {}
+        visualize = data.get('visualize', False)
+
+        logger.info(f"🧠 Triggering cognitive synthesis (visualize: {visualize})")
+
+        # Import synthesis components
+        try:
+            from memory.synthesis import SynthesisEngine, SynthesisConfig
+            from memory.memory_vectorstore import get_memory_store, VectorStoreType
+        except ImportError as e:
+            return jsonify({
+                'status': 'error',
+                'error': f'Synthesis components not available: {e}'
+            }), 500
+
+        # Get memory store
+        memory_store = get_memory_store(
+            store_type=VectorStoreType.CHROMA,
+            storage_directory="memory_store",
+            embedding_dimension=384
+        )
+
+        # Configure synthesis engine
+        config = SynthesisConfig(
+            enable_reingestion=True,
+            enable_deduplication=True
+        )
+
+        synthesis_engine = SynthesisEngine(config=config)
+
+        # Run synthesis
+        result = synthesis_engine.run_synthesis(memory_store, visualize=visualize)
+
+        # Prepare response
+        response_data = {
+            'status': 'success',
+            'run_id': result.run_id,
+            'timestamp': result.timestamp,
+            'clusters_found': result.clusters_found,
+            'insights_generated': result.insights_generated,
+            'output_file': result.output_file
+        }
+
+        # Add visualization data if requested
+        if visualize and result.visualization_data:
+            response_data['visualization_data'] = result.visualization_data
+            response_data['visualization_enabled'] = True
+        else:
+            response_data['visualization_enabled'] = False
+
+        logger.info(f"✅ Synthesis completed: {result.insights_generated} insights generated")
+        return jsonify(response_data)
+
+    except Exception as e:
+        logger.error(f"Error triggering synthesis: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/synthesis/history', methods=['GET'])
+@optional_security
+def get_synthesis_history():
+    """Get synthesis run history."""
+    try:
+        from memory.synthesis import SynthesisEngine
+
+        synthesis_engine = SynthesisEngine()
+        history = synthesis_engine.get_synthesis_history()
+
+        return jsonify({
+            'status': 'success',
+            'history': history
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting synthesis history: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/synthesis/visualization/<run_id>', methods=['GET'])
+@optional_security
+def get_visualization_data(run_id):
+    """Get visualization data for a specific synthesis run."""
+    try:
+        # Load synthesis output file
+        from pathlib import Path
+        import json
+
+        synthesis_dir = Path("synthesis_output")
+        output_file = synthesis_dir / f"synthesis_run_log_{run_id}.json"
+
+        if not output_file.exists():
+            return jsonify({
+                'status': 'error',
+                'error': 'Synthesis run not found'
+            }), 404
+
+        with open(output_file, 'r') as f:
+            synthesis_data = json.load(f)
+
+        # Check if visualization data exists
+        if 'visualization_data' in synthesis_data:
+            return jsonify({
+                'status': 'success',
+                'visualization_data': synthesis_data['visualization_data']
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'error': 'No visualization data available for this run'
+            }), 404
+
+    except Exception as e:
+        logger.error(f"Error getting visualization data: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/synthesis/suggest-eps', methods=['POST'])
+@optional_security
+def suggest_optimal_eps():
+    """Suggest optimal DBSCAN eps parameter using k-distance graph analysis."""
+    try:
+        data = request.get_json() or {}
+        min_samples = data.get('min_samples', 5)
+        target_clusters = data.get('target_clusters', 10)
+
+        logger.info(f"🤔 Analyzing optimal eps with min_samples={min_samples}, target_clusters={target_clusters}")
+
+        # Import required components
+        try:
+            from memory.synthesis.eps_optimizer import EpsOptimizer
+            from memory.memory_vectorstore import get_memory_store, VectorStoreType
+        except ImportError as e:
+            return jsonify({
+                'status': 'error',
+                'error': f'Eps optimizer not available: {e}'
+            }), 500
+
+        # Get memory store and embeddings
+        memory_store = get_memory_store(
+            store_type=VectorStoreType.CHROMA,
+            storage_directory="memory_store",
+            embedding_dimension=384
+        )
+
+        all_memories = memory_store.get_all_memories()
+        if len(all_memories) < 10:
+            return jsonify({
+                'status': 'error',
+                'error': 'Insufficient memories for eps analysis (minimum 10 required)'
+            }), 400
+
+        # Extract embeddings
+        embeddings = []
+        for memory in all_memories:
+            if memory.embedding and len(memory.embedding) > 0:
+                embeddings.append(memory.embedding)
+
+        if len(embeddings) < 10:
+            return jsonify({
+                'status': 'error',
+                'error': 'Insufficient valid embeddings for analysis'
+            }), 400
+
+        # Run eps optimization
+        optimizer = EpsOptimizer()
+        suggestions = optimizer.suggest_clustering_params(
+            np.array(embeddings),
+            target_clusters=target_clusters
+        )
+
+        logger.info(f"✅ Optimal eps analysis complete: eps={suggestions['eps']:.4f}")
+
+        return jsonify({
+            'status': 'success',
+            'suggestions': suggestions,
+            'analysis_summary': f"Analyzed {len(embeddings)} embeddings to find optimal clustering parameters"
+        })
+
+    except Exception as e:
+        logger.error(f"Error suggesting optimal eps: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 # Initialize security routes and context
 create_security_routes(app)

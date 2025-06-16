@@ -50,11 +50,17 @@ Thumbs.db
 
 # SAM Specific - User Data
 memory_store/*.json
+memory_store/chroma_db/
+chroma_db/
 logs/*.log
 logs/*.db
 data/uploads/*
 data/documents/*
 data/vector_store/*
+data/*.db
+data/ingestion_state.db
+data/latent_programs.db
+data/test_latent_programs.db
 web_ui/uploads/*
 web_ui/data/*
 web_ui/memory_store/*
@@ -62,6 +68,9 @@ web_ui/multimodal_output/*
 multimodal_output/
 backups/
 temp_uploads/
+quarantine/
+synthesis_output/
+archive/
 
 # SAM Specific - Development Files
 MyStuff/
@@ -73,6 +82,12 @@ enrichment.log
 # SAM Specific - Config (keep templates)
 config/sam_config.json
 config/collab_key.json
+
+# SAM Specific - Security and Session Files
+security/keystore.json
+security/shared_session.json
+security/*.key
+security/*.pem
 
 # SAM Specific - Models and Cache
 models/
