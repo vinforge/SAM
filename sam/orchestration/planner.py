@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from .uif import SAM_UIF
 from .skills.base import BaseSkillModule
 from .config import get_sof_config
+from .reasoning_curriculum import ReasoningCurriculum, CurriculumLevel
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +58,21 @@ class DynamicPlanner:
     - Integration with Cognitive Memory Core (Phase B)
     """
     
-    def __init__(self):
+    def __init__(self, enable_curriculum: bool = True):
         self.logger = logging.getLogger(f"{__name__}.DynamicPlanner")
         self._config = get_sof_config()
         self._registered_skills: Dict[str, BaseSkillModule] = {}
         self._plan_cache: Dict[str, PlanCacheEntry] = {}
         self._llm_model = None
         self._graph_database = None
+
+        # PINN-inspired reasoning curriculum
+        self._curriculum = ReasoningCurriculum() if enable_curriculum else None
+
         self._initialize_llm()
         self._initialize_graph_awareness()
+
+        self.logger.info(f"DynamicPlanner initialized (curriculum: {enable_curriculum})")
     
     def _initialize_llm(self) -> None:
         """Initialize the language model for plan generation."""
@@ -146,8 +153,10 @@ class DynamicPlanner:
                         fallback_used=False
                     )
             
-            # Generate new plan
-            if self._llm_model:
+            # Generate new plan using curriculum if available
+            if self._curriculum:
+                result = self._generate_curriculum_plan(uif)
+            elif self._llm_model:
                 result = self._generate_llm_plan(uif)
             else:
                 result = self._generate_fallback_plan(uif)
@@ -201,7 +210,45 @@ class DynamicPlanner:
                 self.logger.debug(f"Removed expired cache entry: {query_hash}")
         
         return None
-    
+
+    def _generate_curriculum_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
+        """
+        Generate plan using PINN-inspired curriculum learning.
+
+        Returns:
+            Plan generation result with curriculum-informed skill selection
+        """
+        try:
+            # Generate reasoning plan using curriculum
+            available_skills = list(self._registered_skills.keys())
+            reasoning_plan = self._curriculum.generate_reasoning_plan(
+                query=uif.input_query,
+                available_skills=available_skills
+            )
+
+            # Store curriculum information in UIF for coordinator
+            uif.curriculum_level = reasoning_plan.curriculum_level.value
+            uif.complexity_score = reasoning_plan.complexity_score
+            uif.reasoning_strategy = reasoning_plan.reasoning_strategy
+            uif.estimated_effort = reasoning_plan.estimated_effort
+
+            return PlanGenerationResult(
+                plan=reasoning_plan.skills,
+                confidence=reasoning_plan.confidence_threshold,
+                reasoning=f"Curriculum {reasoning_plan.curriculum_level.value}: {reasoning_plan.reasoning_strategy}",
+                cache_hit=False,
+                generation_time=0.0,  # Will be set by caller
+                fallback_used=False
+            )
+
+        except Exception as e:
+            self.logger.error(f"Curriculum plan generation failed: {e}")
+            # Fall back to standard plan generation
+            if self._llm_model:
+                return self._generate_llm_plan(uif)
+            else:
+                return self._generate_fallback_plan(uif)
+
     def _generate_llm_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
         """
         Generate plan using LLM-as-a-Planner approach.
@@ -553,6 +600,69 @@ class DynamicPlanner:
         """Clear the plan cache."""
         self._plan_cache.clear()
         self.logger.info("Plan cache cleared")
+
+    def record_curriculum_performance(
+        self,
+        plan: List[str],
+        success: bool,
+        confidence: float,
+        execution_time: float
+    ) -> None:
+        """
+        Record performance for curriculum advancement.
+
+        Args:
+            plan: The executed plan
+            success: Whether execution was successful
+            confidence: Final confidence score
+            execution_time: Time taken for execution
+        """
+        if not self._curriculum:
+            return
+
+        # Find the reasoning plan that matches this execution
+        # For now, create a minimal plan object for recording
+        from .reasoning_curriculum import ReasoningPlan, CurriculumLevel
+
+        # Estimate curriculum level from plan complexity
+        if len(plan) <= 2:
+            level = CurriculumLevel.FOUNDATION
+        elif len(plan) <= 4:
+            level = CurriculumLevel.INTERMEDIATE
+        elif len(plan) <= 6:
+            level = CurriculumLevel.ADVANCED
+        elif len(plan) <= 8:
+            level = CurriculumLevel.EXPERT
+        else:
+            level = CurriculumLevel.RESEARCH
+
+        # Create a minimal reasoning plan for recording
+        reasoning_plan = ReasoningPlan(
+            skills=plan,
+            curriculum_level=level,
+            complexity_score=0.5,  # Default
+            confidence_threshold=0.7,  # Default
+            reasoning_strategy="executed_plan",
+            estimated_effort=len(plan)
+        )
+
+        self._curriculum.record_performance(
+            plan=reasoning_plan,
+            success=success,
+            confidence=confidence,
+            execution_time=execution_time
+        )
+
+    def get_curriculum_status(self) -> Optional[Dict[str, Any]]:
+        """
+        Get curriculum status and statistics.
+
+        Returns:
+            Curriculum status or None if not enabled
+        """
+        if self._curriculum:
+            return self._curriculum.get_curriculum_status()
+        return None
     
     def get_registered_skills(self) -> List[str]:
         """Get list of registered skill names."""

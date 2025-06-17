@@ -18,6 +18,7 @@ from .skills.base import BaseSkillModule, SkillExecutionError
 from .validator import PlanValidationEngine, PlanValidationReport
 from .planner import DynamicPlanner, PlanGenerationResult
 from .config import get_sof_config
+from .loss_balancer import LossBalancer, EffortAllocation
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +58,15 @@ class CoordinatorEngine:
     """
     
     def __init__(self, fallback_generator: Optional[Callable[[str], str]] = None,
-                 enable_dynamic_planning: bool = True):
+                 enable_dynamic_planning: bool = True,
+                 enable_loss_balancing: bool = True):
         """
         Initialize the coordinator engine.
 
         Args:
             fallback_generator: Optional fallback function for generating responses
             enable_dynamic_planning: Whether to enable dynamic plan generation
+            enable_loss_balancing: Whether to enable PINN-inspired loss balancing
         """
         self.logger = logging.getLogger(f"{__name__}.CoordinatorEngine")
         self._registered_skills: Dict[str, BaseSkillModule] = {}
@@ -72,10 +75,13 @@ class CoordinatorEngine:
         self._fallback_generator = fallback_generator
         self._execution_history: List[ExecutionReport] = []
 
+        # PINN-inspired loss balancer for dynamic effort allocation
+        self._loss_balancer = LossBalancer() if enable_loss_balancing else None
+
         # Load configuration
         self._config = get_sof_config()
 
-        self.logger.info(f"CoordinatorEngine initialized (dynamic planning: {enable_dynamic_planning})")
+        self.logger.info(f"CoordinatorEngine initialized (dynamic planning: {enable_dynamic_planning}, loss balancing: {enable_loss_balancing})")
     
     def register_skill(self, skill: BaseSkillModule) -> None:
         """
@@ -166,7 +172,21 @@ class CoordinatorEngine:
             
             self._execution_history.append(report)
             self.logger.info(f"Plan execution completed: {execution_result} in {execution_time:.2f}s")
-            
+
+            # Record curriculum performance if dynamic planner is available
+            if (self._dynamic_planner and
+                execution_result in [ExecutionResult.SUCCESS, ExecutionResult.PARTIAL_SUCCESS]):
+
+                success = execution_result == ExecutionResult.SUCCESS
+                confidence = getattr(uif, 'current_confidence', 0.5)
+
+                self._dynamic_planner.record_curriculum_performance(
+                    plan=plan,
+                    success=success,
+                    confidence=confidence,
+                    execution_time=execution_time
+                )
+
             return report
             
         except Exception as e:
@@ -175,17 +195,29 @@ class CoordinatorEngine:
     
     def _execute_validated_plan(self, plan: List[str], uif: SAM_UIF) -> ExecutionResult:
         """
-        Execute a validated plan step by step.
-        
+        Execute a validated plan step by step with PINN-inspired effort allocation.
+
         Args:
             plan: Validated execution plan
             uif: Universal Interface Format
-            
+
         Returns:
             Execution result
         """
         uif.status = UIFStatus.RUNNING
         failed_skills = []
+
+        # Initialize effort allocation if loss balancer is enabled
+        effort_allocation = None
+        if self._loss_balancer:
+            query_complexity = self._assess_query_complexity(uif.query)
+            initial_confidence = getattr(uif, 'initial_confidence', 0.5)
+            effort_allocation = self._loss_balancer.allocate_effort(
+                plan=plan,
+                initial_confidence=initial_confidence,
+                query_complexity=query_complexity
+            )
+            uif.add_log_entry(f"Effort allocation initialized for {len(plan)} skills", "LossBalancer")
         
         for i, skill_name in enumerate(plan):
             try:
@@ -193,22 +225,50 @@ class CoordinatorEngine:
                 if self._is_execution_timeout(uif):
                     uif.add_warning("Execution timeout reached")
                     return ExecutionResult.TIMEOUT
-                
+
+                # Check for early termination based on confidence
+                if (effort_allocation and i > 0 and
+                    self._loss_balancer.should_terminate_early(
+                        effort_allocation,
+                        getattr(uif, 'current_confidence', 0.5),
+                        uif.executed_skills,
+                        plan[i:]
+                    )):
+                    uif.add_log_entry("Early termination triggered by high confidence", "LossBalancer")
+                    break
+
                 # Get the skill
                 if skill_name not in self._registered_skills:
                     error_msg = f"Skill '{skill_name}' not found during execution"
                     uif.set_error(error_msg)
                     failed_skills.append(skill_name)
-                    
+
                     if not self._config.continue_on_skill_failure:
                         return ExecutionResult.FAILURE
                     continue
                 
                 skill = self._registered_skills[skill_name]
-                
+
+                # Apply effort configuration if available
+                if effort_allocation and skill_name in effort_allocation.skill_efforts:
+                    effort_config = effort_allocation.skill_efforts[skill_name]
+                    self._apply_effort_configuration(uif, skill, effort_config)
+                    uif.add_log_entry(f"Executing skill {i+1}/{len(plan)}: {skill_name} (effort: {effort_config.effort_level.value})")
+                else:
+                    uif.add_log_entry(f"Executing skill {i+1}/{len(plan)}: {skill_name}")
+
                 # Execute the skill with monitoring
-                uif.add_log_entry(f"Executing skill {i+1}/{len(plan)}: {skill_name}")
                 uif = skill.execute_with_monitoring(uif)
+
+                # Update effort allocation based on intermediate results
+                if effort_allocation and self._loss_balancer and i < len(plan) - 1:
+                    current_confidence = getattr(uif, 'current_confidence', 0.5)
+                    effort_allocation = self._loss_balancer.adapt_effort(
+                        effort_allocation,
+                        uif.executed_skills,
+                        current_confidence,
+                        plan[i+1:]
+                    )
                 
                 # Check if skill failed
                 if uif.status == UIFStatus.FAILURE:
@@ -440,3 +500,90 @@ class CoordinatorEngine:
         """
         # Use empty plan - will be generated dynamically
         return self.execute_plan([], uif, use_dynamic_planning=True)
+
+    def _assess_query_complexity(self, query: str) -> str:
+        """
+        Assess the complexity of a query for effort allocation.
+
+        Args:
+            query: The input query
+
+        Returns:
+            Complexity level: "simple", "medium", or "complex"
+        """
+        if not query:
+            return "medium"
+
+        query_lower = query.lower()
+
+        # Simple query indicators
+        simple_indicators = [
+            "what is", "who is", "when is", "where is",
+            "define", "meaning of", "explain briefly"
+        ]
+
+        # Complex query indicators
+        complex_indicators = [
+            "analyze", "compare", "evaluate", "synthesize",
+            "how does", "why does", "what are the implications",
+            "relationship between", "pros and cons"
+        ]
+
+        # Count indicators
+        simple_count = sum(1 for indicator in simple_indicators if indicator in query_lower)
+        complex_count = sum(1 for indicator in complex_indicators if indicator in query_lower)
+
+        # Length-based assessment
+        word_count = len(query.split())
+
+        if simple_count > 0 and word_count < 10:
+            return "simple"
+        elif complex_count > 0 or word_count > 20:
+            return "complex"
+        else:
+            return "medium"
+
+    def _apply_effort_configuration(self, uif: SAM_UIF, skill: BaseSkillModule, effort_config) -> None:
+        """
+        Apply effort configuration to a skill execution.
+
+        Args:
+            uif: Universal Interface Format
+            skill: The skill to configure
+            effort_config: Effort configuration to apply
+        """
+        # Store effort parameters in UIF for skill to use
+        if not hasattr(uif, 'effort_parameters'):
+            uif.effort_parameters = {}
+
+        uif.effort_parameters[skill.skill_name] = effort_config.parameter_adjustments
+
+        # Set timeout if specified
+        if effort_config.timeout_multiplier != 1.0:
+            current_timeout = getattr(uif, 'execution_timeout', 30.0)
+            uif.execution_timeout = current_timeout * effort_config.timeout_multiplier
+
+        # Log effort application
+        self.logger.debug(f"Applied {effort_config.effort_level.value} effort to {skill.skill_name}")
+
+    def get_loss_balancer_stats(self) -> Optional[Dict[str, Any]]:
+        """
+        Get statistics from the loss balancer.
+
+        Returns:
+            Loss balancer statistics or None if not enabled
+        """
+        if self._loss_balancer:
+            return self._loss_balancer.get_effort_statistics()
+        return None
+
+    def get_curriculum_status(self) -> Optional[Dict[str, Any]]:
+        """
+        Get curriculum status from the dynamic planner.
+
+        Returns:
+            Curriculum status or None if not available
+        """
+        if self._dynamic_planner:
+            return self._dynamic_planner.get_curriculum_status()
+        return None
