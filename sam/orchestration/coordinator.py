@@ -19,6 +19,7 @@ from .validator import PlanValidationEngine, PlanValidationReport
 from .planner import DynamicPlanner, PlanGenerationResult
 from .config import get_sof_config
 from .loss_balancer import LossBalancer, EffortAllocation
+from .domain_constraints import DomainConstraints, ConstraintSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,9 @@ class CoordinatorEngine:
     
     def __init__(self, fallback_generator: Optional[Callable[[str], str]] = None,
                  enable_dynamic_planning: bool = True,
-                 enable_loss_balancing: bool = True):
+                 enable_loss_balancing: bool = True,
+                 enable_domain_constraints: bool = True,
+                 constraints_config_path: Optional[str] = None):
         """
         Initialize the coordinator engine.
 
@@ -67,6 +70,8 @@ class CoordinatorEngine:
             fallback_generator: Optional fallback function for generating responses
             enable_dynamic_planning: Whether to enable dynamic plan generation
             enable_loss_balancing: Whether to enable PINN-inspired loss balancing
+            enable_domain_constraints: Whether to enable domain constraint enforcement
+            constraints_config_path: Path to domain constraints configuration file
         """
         self.logger = logging.getLogger(f"{__name__}.CoordinatorEngine")
         self._registered_skills: Dict[str, BaseSkillModule] = {}
@@ -78,10 +83,15 @@ class CoordinatorEngine:
         # PINN-inspired loss balancer for dynamic effort allocation
         self._loss_balancer = LossBalancer() if enable_loss_balancing else None
 
+        # Domain constraints for policy enforcement and safety compliance
+        self._domain_constraints = DomainConstraints(
+            config_path=constraints_config_path or "config/domain_constraints.yaml"
+        ) if enable_domain_constraints else None
+
         # Load configuration
         self._config = get_sof_config()
 
-        self.logger.info(f"CoordinatorEngine initialized (dynamic planning: {enable_dynamic_planning}, loss balancing: {enable_loss_balancing})")
+        self.logger.info(f"CoordinatorEngine initialized (dynamic planning: {enable_dynamic_planning}, loss balancing: {enable_loss_balancing}, constraints: {enable_domain_constraints})")
     
     def register_skill(self, skill: BaseSkillModule) -> None:
         """
@@ -129,7 +139,25 @@ class CoordinatorEngine:
         uif.start_time = datetime.now().isoformat()
         
         try:
-            # Phase 0: Dynamic plan generation if requested
+            # Phase 0: Domain constraint validation
+            if self._domain_constraints:
+                # Validate query constraints
+                query_validation = self._domain_constraints.validate_query(uif.input_query, {"user_profile": uif.active_profile})
+
+                if not query_validation.is_valid:
+                    critical_violations = [v for v in query_validation.violations if v.severity == ConstraintSeverity.CRITICAL]
+                    if critical_violations:
+                        error_msg = f"Critical constraint violations: {[v.violation_details for v in critical_violations]}"
+                        uif.set_error(error_msg)
+                        return self._handle_constraint_violation(plan, uif, query_validation, start_time)
+
+                # Log warnings
+                for warning in query_validation.warnings:
+                    uif.add_warning(f"Constraint warning: {warning}")
+
+                uif.add_log_entry(f"Query constraint validation completed with {len(query_validation.violations)} violations")
+
+            # Phase 1: Dynamic plan generation if requested
             if use_dynamic_planning and self._dynamic_planner:
                 plan_result = self._dynamic_planner.create_plan(uif)
                 if plan_result.plan:
@@ -138,13 +166,34 @@ class CoordinatorEngine:
                 else:
                     uif.add_warning("Dynamic planning failed, using provided plan")
 
-            # Phase 1: Validate the plan
+            # Phase 2: Plan constraint validation
+            if self._domain_constraints:
+                plan_validation = self._domain_constraints.validate_plan(plan, {"user_profile": uif.active_profile})
+
+                if not plan_validation.is_valid:
+                    critical_violations = [v for v in plan_validation.violations if v.severity == ConstraintSeverity.CRITICAL]
+                    if critical_violations:
+                        error_msg = f"Critical plan constraint violations: {[v.violation_details for v in critical_violations]}"
+                        uif.set_error(error_msg)
+                        return self._handle_constraint_violation(plan, uif, plan_validation, start_time)
+
+                # Apply constraint-based plan modifications
+                if plan_validation.blocked_skills:
+                    original_plan = plan.copy()
+                    plan = [skill for skill in plan if skill not in plan_validation.blocked_skills]
+                    uif.add_log_entry(f"Removed blocked skills from plan: {original_plan} → {plan}")
+
+                # Log constraint warnings
+                for warning in plan_validation.warnings:
+                    uif.add_warning(f"Plan constraint warning: {warning}")
+
+            # Phase 3: Validate the plan
             if self._config.enable_plan_validation:
                 validation_report = self._validator.validate_plan(plan, uif)
-                
+
                 if not validation_report.is_valid:
                     return self._handle_invalid_plan(plan, uif, validation_report, start_time)
-                
+
                 # Use optimized plan if available
                 execution_plan = validation_report.optimized_plan
                 uif.add_log_entry(f"Plan validated successfully, executing optimized plan: {execution_plan}")
@@ -153,10 +202,10 @@ class CoordinatorEngine:
                 execution_plan = plan
                 uif.add_log_entry("Plan validation disabled, executing original plan")
             
-            # Phase 2: Execute the plan
+            # Phase 4: Execute the plan
             execution_result = self._execute_validated_plan(execution_plan, uif)
-            
-            # Phase 3: Create execution report
+
+            # Phase 5: Create execution report
             execution_time = time.time() - start_time
             uif.end_time = datetime.now().isoformat()
             
@@ -209,6 +258,8 @@ class CoordinatorEngine:
 
         # Initialize effort allocation if loss balancer is enabled
         effort_allocation = None
+        execution_plan = plan  # May be modified by confidence weighting
+
         if self._loss_balancer:
             query_complexity = self._assess_query_complexity(uif.query)
             initial_confidence = getattr(uif, 'initial_confidence', 0.5)
@@ -217,9 +268,15 @@ class CoordinatorEngine:
                 initial_confidence=initial_confidence,
                 query_complexity=query_complexity
             )
-            uif.add_log_entry(f"Effort allocation initialized for {len(plan)} skills", "LossBalancer")
+
+            # Use optimized plan if confidence weighting provided one
+            if hasattr(effort_allocation, 'optimized_plan') and effort_allocation.optimized_plan:
+                execution_plan = effort_allocation.optimized_plan
+                uif.add_log_entry(f"Using confidence-weighted plan: {execution_plan}", "ConfidenceWeighting")
+
+            uif.add_log_entry(f"Effort allocation initialized for {len(execution_plan)} skills", "LossBalancer")
         
-        for i, skill_name in enumerate(plan):
+        for i, skill_name in enumerate(execution_plan):
             try:
                 # Check timeout
                 if self._is_execution_timeout(uif):
@@ -232,7 +289,7 @@ class CoordinatorEngine:
                         effort_allocation,
                         getattr(uif, 'current_confidence', 0.5),
                         uif.executed_skills,
-                        plan[i:]
+                        execution_plan[i:]
                     )):
                     uif.add_log_entry("Early termination triggered by high confidence", "LossBalancer")
                     break
@@ -261,13 +318,13 @@ class CoordinatorEngine:
                 uif = skill.execute_with_monitoring(uif)
 
                 # Update effort allocation based on intermediate results
-                if effort_allocation and self._loss_balancer and i < len(plan) - 1:
+                if effort_allocation and self._loss_balancer and i < len(execution_plan) - 1:
                     current_confidence = getattr(uif, 'current_confidence', 0.5)
                     effort_allocation = self._loss_balancer.adapt_effort(
                         effort_allocation,
                         uif.executed_skills,
                         current_confidence,
-                        plan[i+1:]
+                        execution_plan[i+1:]
                     )
                 
                 # Check if skill failed
@@ -408,7 +465,44 @@ class CoordinatorEngine:
                 self.logger.error(f"Fallback generator failed: {e}")
         
         return None
-    
+
+    def _handle_constraint_violation(
+        self,
+        plan: List[str],
+        uif: SAM_UIF,
+        validation_result,
+        start_time: float
+    ) -> ExecutionReport:
+        """Handle constraint violations during execution."""
+        # Record all violations
+        if self._domain_constraints:
+            for violation in validation_result.violations:
+                self._domain_constraints.record_violation(violation)
+
+        # Create error details
+        critical_violations = [v for v in validation_result.violations if v.severity == ConstraintSeverity.CRITICAL]
+        error_details = f"Constraint violations: {[v.violation_details for v in critical_violations]}"
+
+        uif.set_error(error_details)
+        execution_time = time.time() - start_time
+
+        # Try safe fallback if no critical violations
+        if not critical_violations and self._config.enable_fallback_plans:
+            fallback_result = self._try_fallback_execution(uif)
+            if fallback_result:
+                return fallback_result
+
+        return ExecutionReport(
+            result=ExecutionResult.FAILURE,
+            uif=uif,
+            executed_skills=[],
+            failed_skills=plan,
+            execution_time=execution_time,
+            validation_report=None,
+            fallback_used=False,
+            error_details=error_details
+        )
+
     def _get_default_safe_plan(self) -> List[str]:
         """
         Get a default safe execution plan.
@@ -586,4 +680,15 @@ class CoordinatorEngine:
         """
         if self._dynamic_planner:
             return self._dynamic_planner.get_curriculum_status()
+        return None
+
+    def get_constraint_statistics(self) -> Optional[Dict[str, Any]]:
+        """
+        Get constraint enforcement statistics.
+
+        Returns:
+            Constraint statistics or None if not enabled
+        """
+        if self._domain_constraints:
+            return self._domain_constraints.get_constraint_statistics()
         return None

@@ -21,6 +21,8 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
+from .confidence_weighting import ConfidenceWeighting, WeightingResult
+
 logger = logging.getLogger(__name__)
 
 class EffortLevel(Enum):
@@ -46,6 +48,7 @@ class EffortAllocation:
     total_effort_budget: float
     confidence_threshold: float
     early_termination_enabled: bool
+    optimized_plan: Optional[List[str]] = None  # Confidence-weighted plan order
 
 class LossBalancer:
     """
@@ -61,22 +64,30 @@ class LossBalancer:
         confidence_threshold: float = 0.8,
         effort_budget: float = 1.0,
         enable_early_termination: bool = True,
-        adaptation_rate: float = 0.3
+        adaptation_rate: float = 0.3,
+        enable_confidence_weighting: bool = True
     ):
         """
         Initialize the loss balancer.
-        
+
         Args:
             confidence_threshold: Threshold for reducing effort on subsequent skills
             effort_budget: Total computational effort budget
             enable_early_termination: Whether to enable early termination
             adaptation_rate: Rate of effort adaptation (0.0 to 1.0)
+            enable_confidence_weighting: Whether to enable confidence-based weighting
         """
         self.confidence_threshold = confidence_threshold
         self.effort_budget = effort_budget
         self.enable_early_termination = enable_early_termination
         self.adaptation_rate = adaptation_rate
-        
+
+        # PINN-inspired confidence weighting system
+        self.confidence_weighting = ConfidenceWeighting(
+            confidence_threshold=confidence_threshold,
+            weight_adaptation_rate=adaptation_rate
+        ) if enable_confidence_weighting else None
+
         # Effort allocation history for learning
         self.allocation_history: List[Dict[str, Any]] = []
         
@@ -126,26 +137,43 @@ class LossBalancer:
         """
         logger.info(f"Allocating effort for plan: {plan}")
         
+        # Apply confidence-based weighting if enabled
+        optimized_plan = plan
+        if self.confidence_weighting:
+            weighting_result = self.confidence_weighting.calculate_weighted_plan(
+                original_plan=plan,
+                current_confidence=initial_confidence,
+                executed_skills=[],
+                query_complexity=query_complexity
+            )
+            optimized_plan = weighting_result.weighted_plan
+            logger.info(f"Applied confidence weighting: {plan} → {optimized_plan}")
+
         # Determine base effort level from query complexity
         base_effort = self._determine_base_effort(query_complexity, initial_confidence)
-        
+
         # Allocate effort to each skill
         skill_efforts = {}
         remaining_budget = self.effort_budget
-        
-        for i, skill_name in enumerate(plan):
+
+        for i, skill_name in enumerate(optimized_plan):
             # Calculate effort for this skill
             effort_config = self._calculate_skill_effort(
                 skill_name=skill_name,
                 position=i,
-                total_skills=len(plan),
+                total_skills=len(optimized_plan),
                 base_effort=base_effort,
                 remaining_budget=remaining_budget
             )
-            
+
+            # Apply confidence weighting to effort if available
+            if self.confidence_weighting and hasattr(weighting_result, 'resource_allocation'):
+                resource_multiplier = weighting_result.resource_allocation.get(skill_name, 1.0)
+                effort_config = self._apply_resource_multiplier(effort_config, resource_multiplier)
+
             skill_efforts[skill_name] = effort_config
             remaining_budget -= self._get_effort_cost(effort_config.effort_level)
-            
+
             logger.debug(f"Allocated {effort_config.effort_level.value} effort to {skill_name}")
         
         allocation = EffortAllocation(
@@ -154,6 +182,9 @@ class LossBalancer:
             confidence_threshold=self.confidence_threshold,
             early_termination_enabled=self.enable_early_termination
         )
+
+        # Store optimized plan in allocation for coordinator to use
+        allocation.optimized_plan = optimized_plan
         
         return allocation
     
@@ -362,7 +393,35 @@ class LossBalancer:
                 adjusted[key] = max(1, int(value * factor))
         
         return adjusted
-    
+
+    def _apply_resource_multiplier(self, effort_config: SkillEffortConfig, multiplier: float) -> SkillEffortConfig:
+        """Apply resource multiplier to effort configuration."""
+        # Adjust effort level based on multiplier
+        if multiplier > 1.2:
+            # High resource allocation - increase effort
+            new_effort_level = self._adjust_effort_level(effort_config.effort_level, 1.5)
+        elif multiplier < 0.8:
+            # Low resource allocation - decrease effort
+            new_effort_level = self._adjust_effort_level(effort_config.effort_level, 0.5)
+        else:
+            new_effort_level = effort_config.effort_level
+
+        # Adjust timeout multiplier
+        new_timeout_multiplier = effort_config.timeout_multiplier * multiplier
+
+        # Adjust parameters
+        adjusted_params = effort_config.parameter_adjustments.copy()
+        for key, value in adjusted_params.items():
+            if isinstance(value, (int, float)) and key in ["max_results", "timeout", "max_tokens"]:
+                adjusted_params[key] = max(1, int(value * multiplier))
+
+        return SkillEffortConfig(
+            effort_level=new_effort_level,
+            timeout_multiplier=new_timeout_multiplier,
+            parameter_adjustments=adjusted_params,
+            early_termination_threshold=effort_config.early_termination_threshold
+        )
+
     def get_effort_statistics(self) -> Dict[str, Any]:
         """Get statistics about effort allocation."""
         base_stats = {
@@ -388,5 +447,10 @@ class LossBalancer:
             "average_final_confidence": avg_confidence,
             "early_termination_rate": early_terminations / total_allocations
         })
+
+        # Add confidence weighting statistics if enabled
+        if self.confidence_weighting:
+            weighting_stats = self.confidence_weighting.get_weighting_statistics()
+            base_stats["confidence_weighting"] = weighting_stats
 
         return base_stats
