@@ -3439,32 +3439,39 @@ def get_intelligent_web_system():
     """Get or create the intelligent web system instance."""
     try:
         from web_retrieval.intelligent_web_system import IntelligentWebSystem
-        from config.config_manager import ConfigManager
+        from web_retrieval.config import load_web_config
+        import os
 
-        # Load configuration
-        config_manager = ConfigManager()
-        config = config_manager.get_config()
+        logger.info("🔧 Initializing Intelligent Web System...")
 
-        # Initialize with API keys and configuration
+        # Load web retrieval configuration
+        web_config = load_web_config()
+        logger.info(f"📋 Web config loaded: {web_config}")
+
+        # Initialize with API keys from environment or config
         api_keys = {
-            'serper': config.serper_api_key if config.serper_api_key else None,
-            'newsapi': config.newsapi_api_key if config.newsapi_api_key else None
+            'serper': os.getenv('SAM_SERPER_API_KEY') or web_config.get('serper_api_key'),
+            'newsapi': os.getenv('SAM_NEWSAPI_API_KEY') or web_config.get('newsapi_api_key')
         }
 
-        # Web retrieval configuration
-        web_config = {
-            'cocoindex_search_provider': config.cocoindex_search_provider,
-            'cocoindex_num_pages': config.cocoindex_num_pages,
-            'web_retrieval_provider': config.web_retrieval_provider
-        }
+        # Log API key availability (without exposing keys)
+        logger.info(f"🔑 API Keys available: Serper={bool(api_keys['serper'])}, NewsAPI={bool(api_keys['newsapi'])}")
 
-        return IntelligentWebSystem(api_keys=api_keys, config=web_config)
+        # Create intelligent web system
+        intelligent_system = IntelligentWebSystem(api_keys=api_keys, config=web_config)
+        logger.info("✅ Intelligent Web System initialized successfully")
+
+        return intelligent_system
 
     except ImportError as e:
-        logger.error(f"Failed to import intelligent web system: {e}")
+        logger.error(f"❌ Failed to import intelligent web system: {e}")
+        logger.error("Make sure web_retrieval module is properly installed")
         raise
     except Exception as e:
-        logger.error(f"Failed to initialize intelligent web system: {e}")
+        logger.error(f"❌ Failed to initialize intelligent web system: {e}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
 def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
