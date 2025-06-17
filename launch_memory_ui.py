@@ -55,17 +55,19 @@ def launch_memory_ui():
             return False
         
         logger.info("🚀 Launching SAM Memory Control Center...")
-        logger.info("📱 The UI will open in your default web browser")
-        logger.info("🔗 URL: http://localhost:8501")
+        logger.info("🔗 Server starting at: http://localhost:8501")
+        logger.info("🔐 Authentication required - unlock SAM at http://localhost:8502 first")
+        logger.info("📱 Navigate to http://localhost:8501 after authentication")
         logger.info("⏹️  Press Ctrl+C to stop the server")
         
-        # Launch Streamlit
+        # Launch Streamlit (no auto-open since authentication is required)
         cmd = [
-            sys.executable, "-m", "streamlit", "run", 
+            sys.executable, "-m", "streamlit", "run",
             str(app_path),
             "--server.port", "8501",
             "--server.address", "localhost",
-            "--browser.gatherUsageStats", "false"
+            "--browser.gatherUsageStats", "false",
+            "--server.headless", "true"
         ]
         
         subprocess.run(cmd)
@@ -86,12 +88,18 @@ def main():
     print("Interactive Memory Control & Visualization")
     print("Sprint 12 Implementation")
     print("=" * 50)
-    
+
+    print("\n⚠️  **SECURITY NOTICE:**")
+    print("   The Memory Control Center requires authentication.")
+    print("   Make sure you have unlocked SAM at http://localhost:8502 first.")
+    print("   If not authenticated, you will be redirected to the secure interface.")
+    print("=" * 50)
+
     # Add current directory to Python path
     sys.path.insert(0, str(Path(__file__).parent))
-    
+
     success = launch_memory_ui()
-    
+
     if success:
         print("\n✅ Memory UI session completed successfully")
         return 0

@@ -21,10 +21,14 @@ import time
 import json
 import logging
 import requests
+import sys
 from enum import Enum
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, asdict
 from pathlib import Path
+
+# Add parent directory to path for sam module imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logger = logging.getLogger(__name__)
 
