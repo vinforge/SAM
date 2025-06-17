@@ -6636,6 +6636,80 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
         except Exception as e:
             logger.warning(f"SOF v2 integration not available: {e}")
 
+        # Phase 0.6: Enhanced Mathematical Query Detection (works independently of SOF v2)
+        import re
+        math_pattern = r'\d+\s*[\+\-\*\/]\s*\d+'
+        if re.search(math_pattern, prompt):
+            logger.info(f"🧮 Detected mathematical query: '{prompt}'")
+
+            try:
+                # Enhanced mathematical expression extraction
+                # Look for mathematical expressions in the query
+                # First try to find complete mathematical expressions
+                complete_expression_matches = re.findall(r'\d+(?:\s*[\+\-\*\/]\s*\d+)+', prompt)
+
+                # Also look for expressions with parentheses
+                paren_expression_matches = re.findall(r'\([^)]*\d+(?:\s*[\+\-\*\/]\s*\d+)+[^)]*\)', prompt)
+
+                # Combine all matches
+                expression_matches = complete_expression_matches + paren_expression_matches
+
+                # If no complete expressions found, fall back to the old method
+                if not expression_matches:
+                    expression_matches = re.findall(r'[\d\+\-\*\/\(\)\.\s]+', prompt)
+
+                # Find the most likely mathematical expression
+                best_expression = None
+                for match in expression_matches:
+                    cleaned = match.strip()
+                    # Must contain at least one operator and be valid
+                    if re.search(r'\d+\s*[\+\-\*\/]\s*\d+', cleaned) and re.match(r'^[\d\+\-\*\/\(\)\.\s]+$', cleaned):
+                        best_expression = cleaned
+                        break
+
+                if best_expression:
+                    try:
+                        # Safe evaluation of mathematical expression
+                        result = eval(best_expression)
+                        logger.info(f"✅ Mathematical calculation: {best_expression} = {result}")
+
+                        # Enhanced response with more context
+                        return f"""🧮 **Mathematical Calculation**
+
+**Question:** {prompt}
+**Expression:** {best_expression}
+**Result:** {result}
+
+I calculated this using SAM's built-in mathematical processor. I can handle:
+• Basic arithmetic: +, -, *, /
+• Parentheses for order of operations
+• Decimal numbers
+• More complex functions (ask me about sin, cos, log, sqrt, etc.)
+
+Is there anything else you'd like me to calculate?"""
+
+                    except Exception as calc_error:
+                        logger.warning(f"❌ Mathematical calculation failed: {calc_error}")
+                        return f"""🧮 **Mathematical Calculation**
+
+**Question:** {prompt}
+**Expression detected:** `{best_expression}`
+
+I encountered an error while calculating: {calc_error}
+
+This might be due to:
+• Invalid mathematical syntax
+• Division by zero
+• Unsupported operations
+
+Please check the expression and try again, or ask me to help with the calculation in a different way."""
+                else:
+                    logger.warning(f"❌ Could not extract valid mathematical expression from: {prompt}")
+
+            except Exception as e:
+                logger.warning(f"❌ Mathematical expression processing failed: {e}")
+                # Continue with normal processing
+
         # Phase 8.1: Perform unified search across all knowledge sources
         memory_results = search_unified_memory(query=prompt, max_results=5)
 
