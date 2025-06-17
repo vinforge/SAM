@@ -4,12 +4,20 @@
     "tpv_active_control": {
       "enabled": false,
       "required_tier": "pro",
-      "description": "Advanced TPV Active Reasoning Control"
+      "description": "Advanced TPV Active Reasoning Control",
+      "ui_label": "TPV Active Control"
     },
     "bulk_document_processing": {
       "enabled": false,
       "required_tier": "pro",
-      "description": "Bulk folder document processing"
+      "description": "Bulk folder document processing",
+      "ui_label": "Cognitive Automation"
+    },
+    "dream_canvas": {
+      "enabled": false,
+      "required_tier": "pro",
+      "description": "Cognitive Synthesis Visualization - Interactive memory landscape with UMAP projections and cluster analysis",
+      "ui_label": "Dream Canvas"
     }
   },
   "valid_key_hashes": [

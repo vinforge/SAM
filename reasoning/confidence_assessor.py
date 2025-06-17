@@ -54,14 +54,14 @@ class ConfidenceAssessor:
         """Initialize confidence assessor with configurable thresholds."""
         self.config = config or {}
         
-        # Sufficiency thresholds
-        self.min_results_confident = self.config.get('min_results_confident', 3)
-        self.min_results_acceptable = self.config.get('min_results_acceptable', 1)
-        
-        # Relevance thresholds (similarity scores)
-        self.high_relevance_threshold = self.config.get('high_relevance_threshold', 0.8)
-        self.medium_relevance_threshold = self.config.get('medium_relevance_threshold', 0.6)
-        self.low_relevance_threshold = self.config.get('low_relevance_threshold', 0.4)
+        # Sufficiency thresholds (made more strict to encourage web search)
+        self.min_results_confident = self.config.get('min_results_confident', 5)  # Increased from 3
+        self.min_results_acceptable = self.config.get('min_results_acceptable', 2)  # Increased from 1
+
+        # Relevance thresholds (similarity scores) - made more strict
+        self.high_relevance_threshold = self.config.get('high_relevance_threshold', 0.85)  # Increased from 0.8
+        self.medium_relevance_threshold = self.config.get('medium_relevance_threshold', 0.7)  # Increased from 0.6
+        self.low_relevance_threshold = self.config.get('low_relevance_threshold', 0.5)  # Increased from 0.4
         
         # Timeliness thresholds (days)
         self.recent_threshold_days = self.config.get('recent_threshold_days', 30)
@@ -440,27 +440,31 @@ class ConfidenceAssessor:
         return len(search_results) > 0
     
     def _determine_confidence_level(self, confidence_score: float) -> ConfidenceLevel:
-        """Map confidence score to confidence level."""
-        if confidence_score >= 0.9:
+        """Map confidence score to confidence level (adjusted to encourage web search)."""
+        if confidence_score >= 0.95:  # Increased from 0.9
             return ConfidenceLevel.VERY_HIGH
-        elif confidence_score >= 0.7:
+        elif confidence_score >= 0.8:   # Increased from 0.7
             return ConfidenceLevel.HIGH
-        elif confidence_score >= 0.5:
+        elif confidence_score >= 0.6:   # Increased from 0.5
             return ConfidenceLevel.MEDIUM
-        elif confidence_score >= 0.3:
+        elif confidence_score >= 0.4:   # Increased from 0.3
             return ConfidenceLevel.LOW
         else:
             return ConfidenceLevel.VERY_LOW
     
-    def _determine_recommendation(self, confidence_level: ConfidenceLevel, 
+    def _determine_recommendation(self, confidence_level: ConfidenceLevel,
                                 query_type: str, reasons: List[str]) -> RecommendationAction:
-        """Determine recommended action based on confidence and context."""
+        """Determine recommended action based on confidence and context (more aggressive web search)."""
         if confidence_level == ConfidenceLevel.VERY_HIGH:
+            # Even for very high confidence, suggest web search for news/temporal queries
+            if query_type in ['news', 'temporal'] or 'outdated_information' in reasons:
+                return RecommendationAction.OFFER_WEB_SEARCH
             return RecommendationAction.ANSWER_LOCALLY
         elif confidence_level == ConfidenceLevel.HIGH:
-            if query_type == 'temporal' or 'outdated_information' in reasons:
-                return RecommendationAction.ANSWER_WITH_CAVEAT
-            return RecommendationAction.ANSWER_LOCALLY
+            # More aggressive web search suggestions
+            if query_type in ['news', 'temporal'] or 'outdated_information' in reasons:
+                return RecommendationAction.OFFER_WEB_SEARCH
+            return RecommendationAction.ANSWER_WITH_CAVEAT
         elif confidence_level == ConfidenceLevel.MEDIUM:
             return RecommendationAction.OFFER_WEB_SEARCH
         elif confidence_level == ConfidenceLevel.LOW:

@@ -125,8 +125,8 @@ class BulkIngestionManager:
             st.error(f"Error updating source: {e}")
             return False
     
-    def get_ingestion_stats(self) -> Dict[str, Any]:
-        """Get ingestion statistics from the state database."""
+    def get_ingestion_stats(self, page: int = 1, page_size: int = 30) -> Dict[str, Any]:
+        """Get ingestion statistics from the state database with pagination."""
         try:
             if not self.state_db.exists():
                 return {
@@ -135,12 +135,17 @@ class BulkIngestionManager:
                     'avg_enrichment': 0.0,
                     'successful': 0,
                     'failed': 0,
-                    'recent_activity': []
+                    'recent_activity': [],
+                    'total_pages': 0,
+                    'current_page': 1,
+                    'has_next': False,
+                    'has_prev': False
                 }
-            
+
             with sqlite3.connect(self.state_db) as conn:
+                # Get summary statistics
                 cursor = conn.execute("""
-                    SELECT 
+                    SELECT
                         COUNT(*) as total_files,
                         SUM(chunks_created) as total_chunks,
                         AVG(enrichment_score) as avg_enrichment,
@@ -149,18 +154,24 @@ class BulkIngestionManager:
                     FROM processed_files
                 """)
                 result = cursor.fetchone()
-                
-                # Get recent activity
-                recent_cursor = conn.execute("""
-                    SELECT filepath, processed_at, status, enrichment_score, chunks_created
-                    FROM processed_files 
-                    ORDER BY processed_at DESC 
-                    LIMIT 10
-                """)
-                recent_activity = recent_cursor.fetchall()
-                
+
+                total_files = result[0] or 0
+                total_pages = (total_files + page_size - 1) // page_size if total_files > 0 else 1
+
+                # Calculate offset for pagination
+                offset = (page - 1) * page_size
+
+                # Get paginated activity
+                activity_cursor = conn.execute("""
+                    SELECT filepath, processed_at, status, enrichment_score, chunks_created, file_size
+                    FROM processed_files
+                    ORDER BY processed_at DESC
+                    LIMIT ? OFFSET ?
+                """, (page_size, offset))
+                activity_results = activity_cursor.fetchall()
+
                 return {
-                    'total_files': result[0] or 0,
+                    'total_files': total_files,
                     'total_chunks': result[1] or 0,
                     'avg_enrichment': result[2] or 0.0,
                     'successful': result[3] or 0,
@@ -171,15 +182,106 @@ class BulkIngestionManager:
                             'processed_at': row[1],
                             'status': row[2],
                             'enrichment_score': row[3],
-                            'chunks_created': row[4]
+                            'chunks_created': row[4],
+                            'file_size': row[5] if len(row) > 5 else 0
                         }
-                        for row in recent_activity
-                    ]
+                        for row in activity_results
+                    ],
+                    'total_pages': total_pages,
+                    'current_page': page,
+                    'has_next': page < total_pages,
+                    'has_prev': page > 1,
+                    'page_size': page_size
                 }
         except Exception as e:
             st.error(f"Error getting stats: {e}")
-            return {}
+            return {
+                'total_files': 0,
+                'total_chunks': 0,
+                'avg_enrichment': 0.0,
+                'successful': 0,
+                'failed': 0,
+                'recent_activity': [],
+                'total_pages': 0,
+                'current_page': 1,
+                'has_next': False,
+                'has_prev': False
+            }
     
+    def get_source_preview(self, source_path: str, file_types: List[str]) -> Dict[str, Any]:
+        """Get preview of what files would be processed vs skipped."""
+        try:
+            # Build command for dry run preview
+            cmd = [
+                sys.executable, "scripts/bulk_ingest.py",
+                "--source", source_path,
+                "--dry-run",
+                "--verbose"
+            ]
+
+            if file_types:
+                cmd.extend(["--file-types", ",".join(file_types)])
+
+            # Run command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent
+            )
+
+            # Parse output to extract file counts
+            stdout = result.stdout
+            processed_count = 0
+            skipped_count = 0
+            failed_count = 0
+            total_found = 0
+
+            if "Bulk Ingestion Summary:" in stdout:
+                lines = stdout.split('\n')
+                for line in lines:
+                    if "Processed:" in line:
+                        processed_count = int(line.split(':')[1].strip())
+                    elif "Skipped:" in line:
+                        skipped_count = int(line.split(':')[1].strip())
+                    elif "Failed:" in line:
+                        failed_count = int(line.split(':')[1].strip())
+                    elif "Total found:" in line:
+                        total_found = int(line.split(':')[1].strip())
+
+            return {
+                "success": result.returncode == 0,
+                "new_files": processed_count,
+                "already_processed": skipped_count,
+                "failed": failed_count,
+                "total_found": total_found,
+                "stdout": stdout,
+                "stderr": result.stderr,
+                "incremental_info": {
+                    "will_process": processed_count,
+                    "already_ingested": skipped_count,
+                    "total_discovered": total_found,
+                    "efficiency_ratio": f"{skipped_count}/{total_found}" if total_found > 0 else "0/0"
+                }
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "new_files": 0,
+                "already_processed": 0,
+                "failed": 0,
+                "total_found": 0,
+                "stdout": "",
+                "stderr": str(e),
+                "incremental_info": {
+                    "will_process": 0,
+                    "already_ingested": 0,
+                    "total_discovered": 0,
+                    "efficiency_ratio": "0/0"
+                }
+            }
+
     def run_bulk_ingestion(self, source_path: str, file_types: List[str], dry_run: bool = False) -> Dict[str, Any]:
         """Run bulk ingestion for a specific source."""
         try:
@@ -522,7 +624,68 @@ Error details: {path_validation.get('error_details', 'None')}
                         if st.button("🔍", key=f"scan_{source['id']}", help="Scan this source"):
                             st.session_state[f"scan_source_{source['id']}"] = True
                             st.rerun()
+
+                        if st.button("👁️", key=f"preview_{source['id']}", help="Preview what files would be processed"):
+                            st.session_state[f"preview_source_{source['id']}"] = True
+                            st.rerun()
                     
+                    # Handle individual source scanning
+                    if st.session_state.get(f"scan_source_{source['id']}", False):
+                        st.session_state[f"scan_source_{source['id']}"] = False
+
+                        with st.spinner(f"Processing {source['name']}..."):
+                            result = self.manager.run_bulk_ingestion(
+                                source["path"],
+                                source["file_types"],
+                                dry_run=False
+                            )
+
+                        self._display_scan_result(source["name"], result, dry_run=False)
+
+                    # Handle individual source preview
+                    if st.session_state.get(f"preview_source_{source['id']}", False):
+                        st.session_state[f"preview_source_{source['id']}"] = False
+
+                        with st.spinner(f"Analyzing {source['name']}..."):
+                            preview = self.manager.get_source_preview(
+                                source["path"],
+                                source["file_types"]
+                            )
+
+                        if preview["success"]:
+                            st.success(f"📊 Analysis complete for {source['name']}")
+
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("📄 New Files", preview["new_files"])
+                            with col2:
+                                st.metric("⏭️ Already Processed", preview["already_processed"])
+                            with col3:
+                                st.metric("📊 Total Found", preview["total_found"])
+                            with col4:
+                                if preview["total_found"] > 0:
+                                    new_pct = (preview["new_files"] / preview["total_found"]) * 100
+                                    st.metric("🆕 New %", f"{new_pct:.1f}%")
+                                else:
+                                    st.metric("🆕 New %", "0%")
+
+                            if preview["new_files"] > 0:
+                                st.info(f"✨ {preview['new_files']} new files ready to process!")
+                                if st.button(f"🚀 Process {preview['new_files']} new files", key=f"process_new_{source['id']}"):
+                                    with st.spinner(f"Processing {preview['new_files']} new files..."):
+                                        result = self.manager.run_bulk_ingestion(
+                                            source["path"],
+                                            source["file_types"],
+                                            dry_run=False
+                                        )
+                                    self._display_scan_result(source["name"], result, dry_run=False)
+                            else:
+                                st.info("✅ All files in this source have already been processed!")
+                        else:
+                            st.error(f"❌ Failed to analyze {source['name']}")
+                            if preview["stderr"]:
+                                st.error(preview["stderr"])
+
                     st.divider()
         else:
             st.info("📝 No sources configured. Add a source above to get started.")
@@ -737,7 +900,10 @@ Error details: {path_validation.get('error_details', 'None')}
         """Render the manual scan interface."""
         st.markdown("### 🚀 Manual Scan Operations")
         st.markdown("Trigger bulk ingestion scans manually")
-        
+
+        # Add incremental processing information
+        st.info("💡 **Smart Incremental Processing:** SAM only processes new or modified files, automatically skipping files that have already been processed. This makes subsequent scans much faster!")
+
         config = self.manager.load_config()
         sources = config.get("sources", [])
         enabled_sources = [s for s in sources if s["enabled"]]
@@ -752,9 +918,16 @@ Error details: {path_validation.get('error_details', 'None')}
         with col1:
             st.markdown("#### 🔄 Scan All Sources")
             st.markdown("Process all enabled sources in sequence")
-            
-            dry_run_all = st.checkbox("Dry Run (Preview Only)", key="dry_run_all")
-            
+
+            col1a, col1b = st.columns(2)
+
+            with col1a:
+                if st.button("👁️ Preview All", key="preview_all_sources_button", help="See what files would be processed across all sources"):
+                    self._preview_all_sources(enabled_sources)
+
+            with col1b:
+                dry_run_all = st.checkbox("Dry Run", key="dry_run_all", help="Preview only, don't actually process")
+
             if st.button("🚀 Scan All Sources", type="primary", key="scan_all_sources_button"):
                 self._run_scan_all(enabled_sources, dry_run_all)
         
@@ -784,12 +957,23 @@ Error details: {path_validation.get('error_details', 'None')}
                     )
                 
                 with col2:
-                    if st.button(
-                        "🚀 Scan Source",
-                        key=f"scan_btn_{source['id']}",
-                        type="secondary"
-                    ):
-                        self._run_individual_scan(source, dry_run)
+                    col2a, col2b = st.columns(2)
+
+                    with col2a:
+                        if st.button(
+                            "👁️ Preview",
+                            key=f"preview_btn_{source['id']}",
+                            help="See what files would be processed"
+                        ):
+                            self._show_source_preview(source)
+
+                    with col2b:
+                        if st.button(
+                            "🚀 Scan",
+                            key=f"scan_btn_{source['id']}",
+                            type="secondary"
+                        ):
+                            self._run_individual_scan(source, dry_run)
         
         # Check for scan triggers from source management
         for source in sources:
@@ -822,9 +1006,65 @@ Error details: {path_validation.get('error_details', 'None')}
         status_text.text("✅ All scans completed!")
         progress_bar.progress(1.0)
     
+    def _show_source_preview(self, source: Dict):
+        """Show preview of what files would be processed for a source."""
+        with st.spinner(f"Analyzing {source['name']}..."):
+            preview = self.manager.get_source_preview(
+                source["path"],
+                source["file_types"]
+            )
+
+        if preview["success"]:
+            st.success(f"📊 Analysis complete for {source['name']}")
+
+            # Show metrics with efficiency information
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📄 Total Found", preview["total_found"])
+            with col2:
+                st.metric("🆕 New/Modified", preview["new_files"],
+                         help="Files that need processing")
+            with col3:
+                st.metric("⏭️ Already Processed", preview["already_processed"],
+                         help="Files skipped due to incremental processing")
+            with col4:
+                if preview["total_found"] > 0:
+                    efficiency = (preview["already_processed"] / preview["total_found"]) * 100
+                    st.metric("⚡ Efficiency", f"{efficiency:.1f}%",
+                             help="Percentage of files skipped")
+                else:
+                    st.metric("⚡ Efficiency", "0%")
+
+            # Show efficiency message
+            if preview["already_processed"] > 0:
+                st.info(f"⚡ **Incremental Processing Benefit:** {preview['already_processed']} files already processed and will be skipped, saving significant time!")
+
+            # Show action buttons based on results
+            if preview["new_files"] > 0:
+                st.info(f"✨ {preview['new_files']} new files ready to process!")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button(f"🔍 Dry Run {preview['new_files']} files", key=f"dry_run_new_{source['id']}"):
+                        self._run_individual_scan(source, dry_run=True)
+
+                with col2:
+                    if st.button(f"🚀 Process {preview['new_files']} files", key=f"process_new_{source['id']}", type="primary"):
+                        self._run_individual_scan(source, dry_run=False)
+            else:
+                st.info("✅ All files in this source have already been processed!")
+                st.markdown("**Options:**")
+                st.markdown("- Add new files to the source folder")
+                st.markdown("- Modify existing files (they will be re-processed)")
+                st.markdown("- Check other sources for new content")
+        else:
+            st.error(f"❌ Failed to analyze {source['name']}")
+            if preview["stderr"]:
+                st.error(preview["stderr"])
+
     def _run_individual_scan(self, source: Dict, dry_run: bool):
         """Run scan for an individual source."""
-        with st.spinner(f"Scanning {source['name']}..."):
+        with st.spinner(f"{'Previewing' if dry_run else 'Processing'} {source['name']}..."):
             result = self.manager.run_bulk_ingestion(
                 source["path"],
                 source["file_types"],
@@ -835,25 +1075,80 @@ Error details: {path_validation.get('error_details', 'None')}
             self._display_scan_result(source["name"], result, dry_run, use_expander=False)
     
     def _display_scan_result(self, source_name: str, result: Dict, dry_run: bool, use_expander: bool = True):
-        """Display the result of a scan operation."""
+        """Display the result of a scan operation with enhanced incremental processing information."""
         if result["success"]:
             st.success(f"✅ {source_name}: Scan completed successfully")
 
-            # Parse output for summary
+            # Parse output for summary and extract key metrics
             stdout = result["stdout"]
+            processed_count = 0
+            skipped_count = 0
+            failed_count = 0
+            total_found = 0
+
+            # Extract metrics from output
+            if "Bulk Ingestion Summary:" in stdout:
+                lines = stdout.split('\n')
+                for line in lines:
+                    if "Processed:" in line:
+                        try:
+                            processed_count = int(line.split(':')[1].strip())
+                        except:
+                            pass
+                    elif "Skipped:" in line:
+                        try:
+                            skipped_count = int(line.split(':')[1].strip())
+                        except:
+                            pass
+                    elif "Failed:" in line:
+                        try:
+                            failed_count = int(line.split(':')[1].strip())
+                        except:
+                            pass
+                    elif "Total found:" in line:
+                        try:
+                            total_found = int(line.split(':')[1].strip())
+                        except:
+                            pass
+
+            # Display enhanced metrics if we have data
+            if total_found > 0:
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.metric("📄 Total Found", total_found)
+
+                with col2:
+                    st.metric("🆕 New/Modified", processed_count,
+                             help="Files that will be or were processed")
+
+                with col3:
+                    st.metric("⏭️ Already Processed", skipped_count,
+                             help="Files skipped because they haven't changed")
+
+                with col4:
+                    efficiency = (skipped_count / total_found * 100) if total_found > 0 else 0
+                    st.metric("⚡ Efficiency", f"{efficiency:.1f}%",
+                             help="Percentage of files skipped due to incremental processing")
+
+                # Show efficiency message
+                if skipped_count > 0:
+                    st.info(f"⚡ **Incremental Processing Benefit:** Skipped {skipped_count} unchanged files, saving significant processing time!")
+
+            # Show detailed output in expander
             if "Bulk Ingestion Summary:" in stdout:
                 summary_start = stdout.find("Bulk Ingestion Summary:")
                 summary_section = stdout[summary_start:summary_start+500]
 
                 if use_expander:
-                    with st.expander(f"📊 {source_name} Results"):
+                    with st.expander(f"📊 {source_name} Detailed Results"):
                         st.code(summary_section)
 
                         if dry_run:
                             st.info("🔍 This was a dry run - no files were actually processed")
                 else:
                     # Display directly without expander (we're already inside one)
-                    st.markdown(f"**📊 {source_name} Results:**")
+                    st.markdown(f"**📊 {source_name} Detailed Results:**")
                     st.code(summary_section)
 
                     if dry_run:
@@ -877,53 +1172,208 @@ Error details: {path_validation.get('error_details', 'None')}
                     st.code(result["stdout"])
     
     def _render_statistics(self):
-        """Render the statistics interface."""
+        """Render the statistics interface with pagination."""
         st.markdown("### 📊 Ingestion Statistics")
-        
-        stats = self.manager.get_ingestion_stats()
-        
-        if stats:
-            # Overview metrics
-            col1, col2, col3, col4 = st.columns(4)
-            
+
+        # Add information about incremental processing
+        with st.expander("ℹ️ About Incremental Processing", expanded=False):
+            st.markdown("""
+            **SAM's Smart Incremental Processing:**
+
+            🔄 **Only New Files Processed:** SAM automatically skips files that have already been processed
+            📊 **File Change Detection:** Uses SHA256 hashing and modification timestamps to detect changes
+            ⚡ **Efficiency:** Dramatically reduces processing time for subsequent scans
+            📈 **Statistics Tracking:** Complete history of all processed files with pagination
+
+            **What gets processed:**
+            - ✅ New files that haven't been seen before
+            - ✅ Existing files that have been modified since last processing
+            - ⏭️ Unchanged files are automatically skipped
+            """)
+
+        # Initialize pagination state
+        if 'stats_page' not in st.session_state:
+            st.session_state.stats_page = 1
+
+        # Page size selector and refresh button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col1:
+            page_size = st.selectbox(
+                "Files per page",
+                options=[10, 30, 50, 100],
+                index=1,  # Default to 30
+                key="stats_page_size"
+            )
+
+        with col2:
+            st.markdown("") # Spacer
+
+        with col3:
+            if st.button("🔄 Refresh Stats", help="Reload statistics from database"):
+                st.rerun()
+
+        # Get statistics with pagination
+        stats = self.manager.get_ingestion_stats(
+            page=st.session_state.stats_page,
+            page_size=page_size
+        )
+
+        if stats and stats['total_files'] > 0:
+            # Overview metrics with pagination info
+            col1, col2, col3, col4, col5 = st.columns(5)
+
             with col1:
                 st.metric("Total Files", stats['total_files'])
-            
+
             with col2:
                 st.metric("Memory Chunks", stats['total_chunks'])
-            
+
             with col3:
-                st.metric("Success Rate", f"{stats['successful']}/{stats['total_files']}")
-            
+                success_rate = f"{stats['successful']}/{stats['total_files']}"
+                success_pct = (stats['successful'] / stats['total_files'] * 100) if stats['total_files'] > 0 else 0
+                st.metric("Success Rate", success_rate, f"{success_pct:.1f}%")
+
             with col4:
                 avg_score = stats['avg_enrichment']
                 st.metric("Avg Enrichment", f"{avg_score:.2f}")
-            
-            # Recent activity
+
+            with col5:
+                # Pagination info as a metric
+                current_page = stats['current_page']
+                total_pages = stats['total_pages']
+                st.metric("Page", f"{current_page} of {total_pages}")
+
+            # Prominent pagination status
+            if stats['total_pages'] > 1:
+                st.info(f"📄 Showing files {((stats['current_page']-1) * stats['page_size']) + 1} to {min(stats['current_page'] * stats['page_size'], stats['total_files'])} of {stats['total_files']} total files")
+
+            # File listing with pagination
             if stats['recent_activity']:
-                st.markdown("#### 📋 Recent Activity")
-                
-                for activity in stats['recent_activity']:
-                    col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
-                    
-                    with col1:
-                        filename = Path(activity['filepath']).name
-                        st.markdown(f"**{filename}**")
-                        st.caption(activity['filepath'])
-                    
-                    with col2:
-                        processed_date = activity['processed_at'][:10]
-                        st.caption(f"📅 {processed_date}")
-                    
-                    with col3:
-                        status_icon = "✅" if activity['status'] == 'success' else "❌"
-                        st.markdown(f"{status_icon} {activity['status']}")
-                    
-                    with col4:
-                        score = activity['enrichment_score']
-                        chunks = activity['chunks_created']
-                        st.caption(f"Score: {score:.2f}")
-                        st.caption(f"Chunks: {chunks}")
+                # Pagination controls (top)
+                col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+
+                with col1:
+                    if st.button("⏮️ First", disabled=not stats['has_prev'], key="first_page"):
+                        st.session_state.stats_page = 1
+                        st.rerun()
+
+                with col2:
+                    if st.button("⬅️ Prev", disabled=not stats['has_prev'], key="prev_page"):
+                        st.session_state.stats_page = max(1, st.session_state.stats_page - 1)
+                        st.rerun()
+
+                with col3:
+                    st.markdown(f"**Page {stats['current_page']} of {stats['total_pages']}** ({stats['total_files']} total files)")
+
+                with col4:
+                    if st.button("Next ➡️", disabled=not stats['has_next'], key="next_page"):
+                        st.session_state.stats_page = min(stats['total_pages'], st.session_state.stats_page + 1)
+                        st.rerun()
+
+                with col5:
+                    if st.button("Last ⏭️", disabled=not stats['has_next'], key="last_page"):
+                        st.session_state.stats_page = stats['total_pages']
+                        st.rerun()
+
+                st.markdown("#### 📋 Processed Files")
+
+                # File listing
+                for i, activity in enumerate(stats['recent_activity']):
+                    with st.container():
+                        col1, col2, col3, col4, col5 = st.columns([3, 2, 1, 1, 1])
+
+                        with col1:
+                            filename = Path(activity['filepath']).name
+                            st.markdown(f"**{filename}**")
+                            st.caption(activity['filepath'])
+
+                        with col2:
+                            processed_date = activity['processed_at'][:10]
+                            processed_time = activity['processed_at'][11:19]
+                            st.caption(f"📅 {processed_date}")
+                            st.caption(f"🕐 {processed_time}")
+
+                        with col3:
+                            status_icon = "✅" if activity['status'] == 'success' else "❌"
+                            st.markdown(f"{status_icon} {activity['status']}")
+
+                            # File size
+                            file_size = activity.get('file_size', 0)
+                            if file_size > 0:
+                                if file_size > 1024 * 1024:
+                                    size_str = f"{file_size / (1024 * 1024):.1f} MB"
+                                elif file_size > 1024:
+                                    size_str = f"{file_size / 1024:.1f} KB"
+                                else:
+                                    size_str = f"{file_size} B"
+                                st.caption(f"📦 {size_str}")
+
+                        with col4:
+                            score = activity['enrichment_score']
+                            st.caption(f"Score: {score:.2f}")
+
+                            # Score indicator
+                            if score >= 0.8:
+                                st.caption("🟢 Excellent")
+                            elif score >= 0.6:
+                                st.caption("🟡 Good")
+                            elif score >= 0.4:
+                                st.caption("🟠 Fair")
+                            else:
+                                st.caption("🔴 Poor")
+
+                        with col5:
+                            chunks = activity['chunks_created']
+                            st.caption(f"Chunks: {chunks}")
+
+                            # Chunks indicator
+                            if chunks > 10:
+                                st.caption("📚 Large")
+                            elif chunks > 5:
+                                st.caption("📖 Medium")
+                            elif chunks > 0:
+                                st.caption("📄 Small")
+                            else:
+                                st.caption("❌ None")
+
+                        st.divider()
+
+                # Pagination controls (bottom)
+                col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+
+                with col1:
+                    if st.button("⏮️ First", disabled=not stats['has_prev'], key="first_page_bottom"):
+                        st.session_state.stats_page = 1
+                        st.rerun()
+
+                with col2:
+                    if st.button("⬅️ Prev", disabled=not stats['has_prev'], key="prev_page_bottom"):
+                        st.session_state.stats_page = max(1, st.session_state.stats_page - 1)
+                        st.rerun()
+
+                with col3:
+                    # Jump to page input
+                    target_page = st.number_input(
+                        "Jump to page:",
+                        min_value=1,
+                        max_value=stats['total_pages'],
+                        value=stats['current_page'],
+                        key="jump_to_page"
+                    )
+                    if st.button("Go", key="jump_page"):
+                        st.session_state.stats_page = target_page
+                        st.rerun()
+
+                with col4:
+                    if st.button("Next ➡️", disabled=not stats['has_next'], key="next_page_bottom"):
+                        st.session_state.stats_page = min(stats['total_pages'], st.session_state.stats_page + 1)
+                        st.rerun()
+
+                with col5:
+                    if st.button("Last ⏭️", disabled=not stats['has_next'], key="last_page_bottom"):
+                        st.session_state.stats_page = stats['total_pages']
+                        st.rerun()
+
         else:
             st.info("📝 No ingestion statistics available yet. Run some scans to see data here.")
     

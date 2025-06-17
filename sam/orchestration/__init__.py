@@ -31,6 +31,7 @@ from .skills.conflict_detector import ConflictDetectorSkill
 from .skills.calculator_tool import CalculatorTool
 from .skills.web_browser_tool import AgentZeroWebBrowserTool
 from .skills.content_vetting import ContentVettingSkill
+from .skills.reasoning.implicit_knowledge import ImplicitKnowledgeSkill
 from .validator import PlanValidationEngine, PlanValidationReport, ValidationResult
 from .coordinator import CoordinatorEngine, ExecutionReport, ExecutionResult
 from .planner import DynamicPlanner, PlanGenerationResult, PlanCacheEntry
@@ -63,6 +64,9 @@ __all__ = [
     'CalculatorTool',
     'AgentZeroWebBrowserTool',
     'ContentVettingSkill',
+
+    # Reasoning skills
+    'ImplicitKnowledgeSkill',
 
     # Phase B: Coordination and validation
     'PlanValidationEngine',

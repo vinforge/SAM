@@ -20,6 +20,7 @@ from .skills.conflict_detector import ConflictDetectorSkill
 from .skills.calculator_tool import CalculatorTool
 from .skills.web_browser_tool import AgentZeroWebBrowserTool
 from .skills.content_vetting import ContentVettingSkill
+from .skills.reasoning.implicit_knowledge import ImplicitKnowledgeSkill
 from .config import get_sof_config, is_sof_enabled
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,14 @@ class SOFIntegration:
             self.logger.debug("ContentVettingSkill registered")
         except Exception as e:
             self.logger.warning(f"Failed to register ContentVettingSkill: {e}")
+
+        # Implicit Knowledge Skill (Reasoning)
+        try:
+            implicit_knowledge_skill = ImplicitKnowledgeSkill()
+            core_skills.append(implicit_knowledge_skill)
+            self.logger.debug("ImplicitKnowledgeSkill registered")
+        except Exception as e:
+            self.logger.warning(f"Failed to register ImplicitKnowledgeSkill: {e}")
 
         # Register all successfully created skills
         if core_skills:

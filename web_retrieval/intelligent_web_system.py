@@ -191,36 +191,70 @@ class IntelligentWebSystem:
         """Execute news API tool."""
         num_articles = parameters.get('num_articles', 20)
         result = tool.get_news(query, num_articles)
-        
+
         if result['success']:
+            # Convert articles to chunks format for consistency
+            chunks = []
+            for article in result['articles']:
+                chunk = {
+                    'content': f"{article.get('title', '')}\n\n{article.get('description', '')}",
+                    'title': article.get('title', ''),
+                    'source_url': article.get('url', ''),
+                    'source_name': article.get('source', {}).get('name', '') if isinstance(article.get('source'), dict) else str(article.get('source', '')),
+                    'timestamp': article.get('timestamp', ''),
+                    'published_at': article.get('published_at', ''),
+                    'tool_source': 'news_api_tool',
+                    'content_type': 'news_article'
+                }
+                chunks.append(chunk)
+
             return {
                 'success': True,
                 'tool_used': 'news_api_tool',
-                'articles': result['articles'],
+                'articles': result['articles'],  # Keep original articles
+                'chunks': chunks,  # Add chunks format
                 'total_articles': len(result['articles']),
+                'total_chunks': len(chunks),
                 'source': result.get('source', 'news_api'),
                 'timestamp': datetime.now().isoformat()
             }
-        
+
         return result
     
     def _execute_rss_tool(self, tool: RSSReaderTool, query: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute RSS reader tool."""
         # Get relevant RSS feeds based on query and parameters
         rss_feeds = self._get_rss_feeds_for_query(query, parameters)
-        
+
         result = tool.read_multiple_feeds(rss_feeds, max_items_per_feed=10)
-        
+
         if result['success']:
+            # Convert articles to chunks format for consistency
+            chunks = []
+            for article in result['articles']:
+                chunk = {
+                    'content': f"{article.get('title', '')}\n\n{article.get('description', '')}",
+                    'title': article.get('title', ''),
+                    'source_url': article.get('link', ''),
+                    'source_name': article.get('source', ''),
+                    'timestamp': article.get('timestamp', ''),
+                    'pub_date': article.get('pub_date', ''),
+                    'tool_source': 'rss_reader_tool',
+                    'content_type': 'news_article'
+                }
+                chunks.append(chunk)
+
             return {
                 'success': True,
                 'tool_used': 'rss_reader_tool',
-                'articles': result['articles'],
+                'articles': result['articles'],  # Keep original articles
+                'chunks': chunks,  # Add chunks format
                 'total_articles': len(result['articles']),
+                'total_chunks': len(chunks),
                 'successful_feeds': result['successful_feeds'],
                 'timestamp': datetime.now().isoformat()
             }
-        
+
         return result
     
     def _execute_url_tool(self, tool: URLContentExtractor, query: str, parameters: Dict[str, Any]) -> Dict[str, Any]:

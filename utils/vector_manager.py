@@ -88,7 +88,8 @@ class VectorManager:
                     self.index = faiss.read_index(str(self.index_path))
 
                     # Load metadata
-                    with open(self.metadata_path, 'r') as f:
+                    import builtins
+                    with builtins.open(self.metadata_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         self.metadata_store = data.get('metadata_store', {})
                         self.id_to_chunk_id = {int(k): v for k, v in data.get('id_to_chunk_id', {}).items()}
@@ -101,10 +102,11 @@ class VectorManager:
             else:
                 # Load simple vector storage
                 if self.vectors_path.exists() and self.metadata_path.exists():
-                    with open(self.vectors_path, 'rb') as f:
+                    import builtins
+                    with builtins.open(self.vectors_path, 'rb') as f:
                         self.vectors = pickle.load(f)
 
-                    with open(self.metadata_path, 'r') as f:
+                    with builtins.open(self.metadata_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         self.metadata_store = data.get('metadata_store', {})
 
@@ -128,6 +130,9 @@ class VectorManager:
     def save_index(self):
         """Save vector index and metadata to disk."""
         try:
+            # Ensure directories exist
+            self.vector_store_path.mkdir(parents=True, exist_ok=True)
+
             if self.use_faiss:
                 # Save FAISS index
                 faiss.write_index(self.index, str(self.index_path))
@@ -140,26 +145,31 @@ class VectorManager:
                     'next_id': self.next_id
                 }
 
-                with open(self.metadata_path, 'w') as f:
+                # Use explicit builtin open function to avoid any shadowing issues
+                import builtins
+                with builtins.open(self.metadata_path, 'w', encoding='utf-8') as f:
                     json.dump(metadata_data, f, indent=2)
 
                 logger.debug(f"Saved FAISS index with {self.index.ntotal} vectors")
             else:
                 # Save simple vector storage
-                with open(self.vectors_path, 'wb') as f:
+                import builtins
+                with builtins.open(self.vectors_path, 'wb') as f:
                     pickle.dump(self.vectors, f)
 
                 metadata_data = {
                     'metadata_store': self.metadata_store
                 }
 
-                with open(self.metadata_path, 'w') as f:
+                with builtins.open(self.metadata_path, 'w', encoding='utf-8') as f:
                     json.dump(metadata_data, f, indent=2)
 
                 logger.debug(f"Saved simple vector store with {len(self.vectors)} vectors")
 
         except Exception as e:
             logger.error(f"Error saving vector index: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     def add_chunk(self, chunk_id: str, chunk_text: str, vector: np.ndarray, metadata: Dict[str, Any]):
         """

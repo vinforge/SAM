@@ -134,6 +134,17 @@ class SAMSecurityUI:
             if success:
                 st.success("✅ SAM Secure Enclave initialized successfully!")
                 st.balloons()
+
+                # Create shared session for cross-port authentication
+                try:
+                    from .shared_session import get_shared_session_manager
+                    shared_session = get_shared_session_manager()
+                    shared_session.create_session("sam_user")
+                    shared_session.register_port_access(8502)  # Register current port
+                except Exception as e:
+                    # Don't fail setup if shared session creation fails
+                    pass
+
                 time.sleep(1)
                 st.rerun()
             else:
@@ -195,6 +206,17 @@ class SAMSecurityUI:
             if success:
                 st.success("✅ SAM unlocked successfully!")
                 st.session_state.unlock_attempts = 0
+
+                # Create shared session for cross-port authentication
+                try:
+                    from .shared_session import get_shared_session_manager
+                    shared_session = get_shared_session_manager()
+                    shared_session.create_session("sam_user")
+                    shared_session.register_port_access(8502)  # Register current port
+                except Exception as e:
+                    # Don't fail unlock if shared session creation fails
+                    pass
+
                 time.sleep(1)
                 st.rerun()
             else:

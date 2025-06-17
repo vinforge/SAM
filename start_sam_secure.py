@@ -138,17 +138,24 @@ def launch_secure_web_ui():
 def launch_memory_ui():
     """Launch memory control center."""
     print("\n🧠 Launching Memory Control Center...")
-    
+    print("\n⚠️  **SECURITY NOTICE:**")
+    print("   The Memory Control Center requires authentication.")
+    print("   1. First unlock SAM at http://localhost:8502")
+    print("   2. Then navigate to http://localhost:8501")
+    print("   3. If not authenticated, you will be redirected to the secure interface.")
+    print("\n🔗 Server will start at: http://localhost:8501 (no auto-open)")
+
     try:
-        # Launch memory UI
+        # Launch memory UI (no auto-open since authentication is required)
         subprocess.run([
-            sys.executable, "-m", "streamlit", "run", 
+            sys.executable, "-m", "streamlit", "run",
             "ui/memory_app.py",
             "--server.port=8501",
             "--server.address=0.0.0.0",
-            "--browser.gatherUsageStats=false"
+            "--browser.gatherUsageStats=false",
+            "--server.headless=true"
         ])
-        
+
     except KeyboardInterrupt:
         print("\n👋 Memory Control Center stopped by user")
     except Exception as e:
@@ -158,47 +165,54 @@ def launch_full_suite():
     """Launch full SAM suite with security."""
     print("\n🚀 Launching Full SAM Secure Suite...")
     print("This will start:")
+    print("  📱 Secure Streamlit App (port 8502) - Primary authentication interface")
     print("  🌐 Secure Web UI (port 5001)")
-    print("  🧠 Memory Control Center (port 8501)")
-    print("  📱 Secure Streamlit App (port 8502)")
-    
+    print("  🧠 Memory Control Center (port 8501) - Requires authentication")
+
     processes = []
-    
+
     try:
-        # Launch Web UI
-        print("\n🌐 Starting Secure Web UI...")
-        web_process = subprocess.Popen([sys.executable, "web_ui/app.py"])
-        processes.append(("Web UI", web_process))
-        time.sleep(2)
-        
-        # Launch Memory UI
-        print("🧠 Starting Memory Control Center...")
-        memory_process = subprocess.Popen([
-            sys.executable, "-m", "streamlit", "run", 
-            "ui/memory_app.py",
-            "--server.port=8501",
-            "--server.address=0.0.0.0",
-            "--browser.gatherUsageStats=false"
-        ])
-        processes.append(("Memory UI", memory_process))
-        time.sleep(2)
-        
-        # Launch Secure Streamlit
-        print("📱 Starting Secure Streamlit App...")
+        # Launch Secure Streamlit FIRST (primary authentication interface)
+        print("\n📱 Starting Secure Streamlit App (Primary Interface)...")
         streamlit_process = subprocess.Popen([
-            sys.executable, "-m", "streamlit", "run", 
+            sys.executable, "-m", "streamlit", "run",
             "secure_streamlit_app.py",
             "--server.port=8502",
             "--server.address=0.0.0.0",
             "--browser.gatherUsageStats=false"
         ])
         processes.append(("Secure Streamlit", streamlit_process))
-        
+        time.sleep(3)  # Give more time for primary interface to start
+
+        # Launch Web UI (no auto-open)
+        print("🌐 Starting Secure Web UI...")
+        web_process = subprocess.Popen([sys.executable, "web_ui/app.py"])
+        processes.append(("Web UI", web_process))
+        time.sleep(2)
+
+        # Launch Memory UI (requires authentication, no auto-open)
+        print("🧠 Starting Memory Control Center...")
+        memory_process = subprocess.Popen([
+            sys.executable, "-m", "streamlit", "run",
+            "ui/memory_app.py",
+            "--server.port=8501",
+            "--server.address=0.0.0.0",
+            "--browser.gatherUsageStats=false",
+            "--server.headless=true"
+        ])
+        processes.append(("Memory UI", memory_process))
+
         print("\n✅ All services started successfully!")
-        print("\n🌐 Access points:")
-        print("  • Secure Web UI: http://localhost:5001")
-        print("  • Memory Control Center: http://localhost:8501")
-        print("  • Secure Streamlit App: http://localhost:8502")
+        print("\n🔐 **IMPORTANT - Authentication Required:**")
+        print("  1. SAM will open automatically at: http://localhost:8502")
+        print("  2. Enter your master password to unlock SAM")
+        print("  3. Use the navigation buttons in SAM to access other interfaces")
+        print("\n🌐 Available interfaces:")
+        print("  • 🔑 Secure SAM Interface: http://localhost:8502 (OPENS AUTOMATICALLY)")
+        print("  • 🌐 Secure Web UI: http://localhost:5001")
+        print("  • 🧠 Memory Control Center: http://localhost:8501 (requires auth)")
+        print("\n💡 **Tip**: After authentication, use the navigation buttons in the")
+        print("    SAM sidebar to easily access the Memory Control Center and Web UI.")
         print("\n⚠️  Press Ctrl+C to stop all services")
         
         # Wait for processes

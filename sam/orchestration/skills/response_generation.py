@@ -35,7 +35,8 @@ class ResponseGenerationSkill(BaseSkillModule):
     required_inputs = ["input_query"]
     optional_inputs = [
         "memory_results", "tool_outputs", "user_context", "active_profile",
-        "retrieved_documents", "external_content", "use_tpv_control"
+        "retrieved_documents", "external_content", "use_tpv_control",
+        "unified_context", "implicit_knowledge_summary"
     ]
     output_keys = ["final_response", "response_confidence", "reasoning_trace", "tpv_analysis"]
     
@@ -206,7 +207,16 @@ class ResponseGenerationSkill(BaseSkillModule):
         documents = uif.intermediate_data.get("retrieved_documents", [])
         if documents:
             context["documents"] = documents
-        
+
+        # Add implicit knowledge context (from ImplicitKnowledgeSkill)
+        unified_context = uif.intermediate_data.get("unified_context")
+        if unified_context:
+            context["implicit_knowledge"] = {
+                "unified_context": unified_context,
+                "summary": uif.intermediate_data.get("implicit_knowledge_summary", ""),
+                "confidence": uif.intermediate_data.get("implicit_knowledge_confidence", 0.0)
+            }
+
         return context
     
     def _format_memory_context(self, memory_results: Dict[str, Any]) -> Dict[str, Any]:
@@ -254,10 +264,21 @@ class ResponseGenerationSkill(BaseSkillModule):
                 session_id=uif.session_id
             )
             
+            # Enhance reasoning trace with implicit knowledge information
+            enhanced_reasoning_trace = list(tpv_result.reasoning_steps)
+
+            # Add implicit knowledge transparency
+            implicit_knowledge = context.get("implicit_knowledge", {})
+            if implicit_knowledge:
+                enhanced_reasoning_trace.append("🧠 Implicit Knowledge Integration:")
+                enhanced_reasoning_trace.append(f"   Summary: {implicit_knowledge.get('summary', 'N/A')}")
+                enhanced_reasoning_trace.append(f"   Confidence: {implicit_knowledge.get('confidence', 0.0):.2f}")
+                enhanced_reasoning_trace.append("   TPV reasoning enhanced with discovered knowledge connections")
+
             return {
                 "response": tpv_result.response,
                 "confidence": tpv_result.confidence,
-                "reasoning_trace": tpv_result.reasoning_steps,
+                "reasoning_trace": enhanced_reasoning_trace,
                 "tpv_analysis": {
                     "reasoning_quality": tpv_result.reasoning_quality,
                     "intervention_triggered": tpv_result.intervention_triggered,
@@ -295,10 +316,21 @@ class ResponseGenerationSkill(BaseSkillModule):
             # Calculate confidence based on available context
             confidence = self._calculate_response_confidence(context)
             
+            # Build reasoning trace with implicit knowledge transparency
+            reasoning_trace = [f"Generated response using standard LLM for query: {query[:50]}..."]
+
+            # Add implicit knowledge information to reasoning trace
+            implicit_knowledge = context.get("implicit_knowledge", {})
+            if implicit_knowledge:
+                reasoning_trace.append("🧠 Implicit Knowledge Integration:")
+                reasoning_trace.append(f"   Summary: {implicit_knowledge.get('summary', 'N/A')}")
+                reasoning_trace.append(f"   Confidence: {implicit_knowledge.get('confidence', 0.0):.2f}")
+                reasoning_trace.append("   Enhanced reasoning with discovered connections between knowledge chunks")
+
             return {
                 "response": response,
                 "confidence": confidence,
-                "reasoning_trace": [f"Generated response using standard LLM for query: {query[:50]}..."],
+                "reasoning_trace": reasoning_trace,
                 "tpv_analysis": {}
             }
             
@@ -345,9 +377,19 @@ class ResponseGenerationSkill(BaseSkillModule):
             prompt_parts.append("External Information:")
             prompt_parts.append(str(external)[:500] + "...")
             prompt_parts.append("")
-        
+
+        # Add implicit knowledge context
+        implicit_knowledge = context.get("implicit_knowledge", {})
+        if implicit_knowledge:
+            prompt_parts.append("Implicit Knowledge Connections:")
+            prompt_parts.append(f"Summary: {implicit_knowledge.get('summary', '')}")
+            prompt_parts.append("Enhanced Context:")
+            prompt_parts.append(implicit_knowledge.get("unified_context", "")[:800] + "...")
+            prompt_parts.append("")
+
         prompt_parts.extend([
             "Please provide a comprehensive, helpful response based on the available information.",
+            "If implicit knowledge connections are provided, use them to enhance your reasoning and provide deeper insights.",
             "If you're uncertain about something, please indicate your level of confidence.",
             "",
             "Response:"
@@ -411,5 +453,11 @@ class ResponseGenerationSkill(BaseSkillModule):
         external = context.get("external", {})
         if external:
             base_confidence += 0.1
-        
+
+        # Boost confidence based on implicit knowledge connections
+        implicit_knowledge = context.get("implicit_knowledge", {})
+        if implicit_knowledge:
+            ik_confidence = implicit_knowledge.get("confidence", 0.0)
+            base_confidence += ik_confidence * 0.25  # Weight implicit knowledge contribution
+
         return min(1.0, base_confidence)

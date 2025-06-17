@@ -22,6 +22,7 @@ from typing import Optional, Callable
 from .crypto_utils import SAMCrypto
 from .key_manager import KeyManager, KeyDerivationError
 from .keystore_manager import KeystoreManager, KeystoreError
+from .shared_session import get_shared_session_manager
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -65,13 +66,17 @@ class SecureStateManager:
         self.crypto = SAMCrypto()
         self.key_manager = KeyManager()
         self.keystore_manager = KeystoreManager()
-        
+
+        # Shared session management
+        self.shared_session = get_shared_session_manager()
+        self.current_session_token: Optional[str] = None
+
         # State change callbacks
         self._state_change_callbacks = []
-        
+
         # Initialize state
         self._initialize_state()
-        
+
         logger.info("Secure state manager initialized")
     
     def _initialize_state(self) -> None:
@@ -107,11 +112,30 @@ class SecureStateManager:
     def is_unlocked(self) -> bool:
         """
         Check if application is currently unlocked.
-        
+
+        This checks both local state and shared session state to enable
+        cross-port authentication.
+
         Returns:
             True if unlocked, False otherwise
         """
-        return self.get_state() == ApplicationState.UNLOCKED
+        # Check local state first
+        local_unlocked = self.get_state() == ApplicationState.UNLOCKED
+
+        # If locally unlocked, return true
+        if local_unlocked:
+            return True
+
+        # Check shared session state for cross-port authentication
+        try:
+            if self.shared_session.validate_session(self.current_session_token):
+                # Shared session is valid - sync local state
+                self._sync_from_shared_session()
+                return True
+        except Exception as e:
+            logger.error(f"Failed to check shared session: {e}")
+
+        return False
     
     def is_setup_required(self) -> bool:
         """
@@ -163,13 +187,20 @@ class SecureStateManager:
                 self.state = ApplicationState.UNLOCKED
                 self.unlock_timestamp = time.time()
                 self.failed_attempts = 0
-                
+
+                # Create shared session for cross-port authentication
+                try:
+                    self.current_session_token = self.shared_session.create_session()
+                    logger.info("Shared session created during setup")
+                except Exception as e:
+                    logger.warning(f"Failed to create shared session during setup: {e}")
+
                 # Record successful setup
                 self.keystore_manager.update_unlock_attempt(True)
-                
+
                 # Notify state change
                 self._notify_state_change(ApplicationState.UNLOCKED)
-                
+
                 logger.info("Master password setup completed successfully")
                 return True
                 
@@ -221,13 +252,20 @@ class SecureStateManager:
                     self.state = ApplicationState.UNLOCKED
                     self.unlock_timestamp = time.time()
                     self.failed_attempts = 0
-                    
+
+                    # Create shared session for cross-port authentication
+                    try:
+                        self.current_session_token = self.shared_session.create_session()
+                        logger.info("Shared session created for cross-port authentication")
+                    except Exception as e:
+                        logger.warning(f"Failed to create shared session: {e}")
+
                     # Record successful unlock
                     self.keystore_manager.update_unlock_attempt(True)
-                    
+
                     # Notify state change
                     self._notify_state_change(ApplicationState.UNLOCKED)
-                    
+
                     logger.info("Application unlocked successfully")
                     return True
                 else:
@@ -259,11 +297,20 @@ class SecureStateManager:
         """Internal method to lock application (no logging)."""
         # Clear session key from memory
         self.crypto.clear_session_key()
-        
+
+        # Invalidate shared session
+        try:
+            if self.current_session_token:
+                self.shared_session.invalidate_session()
+                self.current_session_token = None
+                logger.debug("Shared session invalidated")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate shared session: {e}")
+
         # Update state
         self.state = ApplicationState.LOCKED
         self.unlock_timestamp = None
-        
+
         # Notify state change
         self._notify_state_change(ApplicationState.LOCKED)
     
@@ -274,7 +321,41 @@ class SecureStateManager:
         with self._lock:
             if self.state == ApplicationState.UNLOCKED:
                 self.unlock_timestamp = time.time()
+
+                # Also extend shared session
+                try:
+                    self.shared_session.extend_session()
+                except Exception as e:
+                    logger.warning(f"Failed to extend shared session: {e}")
+
                 logger.debug("Session extended")
+
+    def _sync_from_shared_session(self) -> None:
+        """
+        Sync local state from shared session.
+
+        This is called when a shared session is valid but local state is locked,
+        enabling cross-port authentication.
+        """
+        try:
+            session_info = self.shared_session.get_session_info()
+
+            if session_info.get("is_active", False):
+                # Don't fully unlock (no crypto key), but mark as authenticated
+                # This allows UI access while maintaining security
+                self.state = ApplicationState.UNLOCKED
+                self.unlock_timestamp = time.time()
+
+                # Store the session token
+                if not self.current_session_token:
+                    # We don't have the token, but session is valid
+                    # This happens when another process created the session
+                    pass
+
+                logger.debug("Local state synced from shared session")
+
+        except Exception as e:
+            logger.error(f"Failed to sync from shared session: {e}")
     
     def get_session_info(self) -> dict:
         """

@@ -45,14 +45,16 @@ class PlanGenerationResult:
 
 class DynamicPlanner:
     """
-    Generates custom execution plans using LLM-as-a-Planner approach.
-    
+    Enhanced graph-aware planner for SAM's Cognitive Memory Core.
+
     Features:
     - Intelligent plan generation based on query analysis
+    - Graph-aware skill selection and retrieval mode optimization
     - Plan caching to reduce LLM overhead
     - Fallback to default plans when generation fails
-    - Context-aware skill selection
-    - Performance optimization
+    - Context-aware skill selection with memory mode intelligence
+    - Performance optimization with dual-mode retrieval
+    - Integration with Cognitive Memory Core (Phase B)
     """
     
     def __init__(self):
@@ -61,7 +63,9 @@ class DynamicPlanner:
         self._registered_skills: Dict[str, BaseSkillModule] = {}
         self._plan_cache: Dict[str, PlanCacheEntry] = {}
         self._llm_model = None
+        self._graph_database = None
         self._initialize_llm()
+        self._initialize_graph_awareness()
     
     def _initialize_llm(self) -> None:
         """Initialize the language model for plan generation."""
@@ -77,6 +81,21 @@ class DynamicPlanner:
         except Exception as e:
             self.logger.error(f"Error initializing LLM: {e}")
             self._llm_model = None
+
+    def _initialize_graph_awareness(self) -> None:
+        """Initialize graph database awareness for enhanced planning."""
+        try:
+            from sam.memory.graph.graph_database import get_graph_database
+
+            self._graph_database = get_graph_database()
+            self.logger.info("Graph database awareness initialized for planning")
+
+        except ImportError:
+            self.logger.info("Graph database not available for planning")
+            self._graph_database = None
+        except Exception as e:
+            self.logger.warning(f"Error initializing graph awareness: {e}")
+            self._graph_database = None
     
     def register_skill(self, skill: BaseSkillModule) -> None:
         """
@@ -270,6 +289,7 @@ class DynamicPlanner:
             "4. Always include ResponseGenerationSkill as the final step to create the user response",
             "5. Consider including MemoryRetrievalSkill if the query might benefit from stored knowledge",
             "6. Include ConflictDetectorSkill if multiple information sources might conflict",
+            "7. Include ImplicitKnowledgeSkill for multi-hop questions that require connecting disparate pieces of information",
             "",
             "Response Format (JSON only):",
             "{",
@@ -342,21 +362,34 @@ class DynamicPlanner:
     
     def _generate_fallback_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
         """
-        Generate a fallback plan using rule-based logic.
-        
+        Generate an enhanced graph-aware fallback plan using rule-based logic.
+
         Returns:
             Fallback plan generation result
         """
         plan = []
         reasoning_parts = []
-        
+
         # Analyze query for plan generation
         query_lower = uif.input_query.lower()
-        
-        # Always start with memory retrieval if available
+
+        # Determine optimal retrieval mode and configure memory retrieval
         if "MemoryRetrievalSkill" in self._registered_skills:
+            retrieval_mode = self._determine_retrieval_mode(query_lower)
+
+            # Configure search context with retrieval mode
+            search_context = uif.intermediate_data.get("search_context", {})
+            search_context["retrieval_mode"] = retrieval_mode
+
+            # Add graph-specific parameters if graph mode
+            if retrieval_mode in ["GRAPH", "HYBRID"] and self._graph_database:
+                search_context["graph_depth"] = self._determine_graph_depth(query_lower)
+                search_context["max_results"] = 15  # Increase for graph queries
+
+            uif.intermediate_data["search_context"] = search_context
+
             plan.append("MemoryRetrievalSkill")
-            reasoning_parts.append("Added memory retrieval for context")
+            reasoning_parts.append(f"Added {retrieval_mode.lower()} memory retrieval for context")
         
         # Add conflict detection if query suggests multiple sources
         conflict_indicators = ["compare", "versus", "different", "conflicting", "sources"]
@@ -364,7 +397,19 @@ class DynamicPlanner:
             if "ConflictDetectorSkill" in self._registered_skills:
                 plan.append("ConflictDetectorSkill")
                 reasoning_parts.append("Added conflict detection for comparison query")
-        
+
+        # Add implicit knowledge skill for multi-hop questions
+        multi_hop_indicators = [
+            "how does", "what is the relationship", "connect", "link", "relate",
+            "why does", "what causes", "how are", "what connects", "bridge",
+            "underlying", "implicit", "hidden connection", "between"
+        ]
+        if any(indicator in query_lower for indicator in multi_hop_indicators):
+            if "ImplicitKnowledgeSkill" in self._registered_skills:
+                # Insert before response generation
+                plan.append("ImplicitKnowledgeSkill")
+                reasoning_parts.append("Added implicit knowledge skill for multi-hop reasoning")
+
         # Always end with response generation
         if "ResponseGenerationSkill" in self._registered_skills:
             plan.append("ResponseGenerationSkill")
@@ -512,3 +557,124 @@ class DynamicPlanner:
     def get_registered_skills(self) -> List[str]:
         """Get list of registered skill names."""
         return list(self._registered_skills.keys())
+
+    # ========================================================================
+    # GRAPH-AWARE PLANNING METHODS (Cognitive Memory Core Phase B)
+    # ========================================================================
+
+    def _determine_retrieval_mode(self, query_lower: str) -> str:
+        """
+        Determine the optimal retrieval mode based on query characteristics.
+
+        Args:
+            query_lower: Lowercase query string
+
+        Returns:
+            Optimal retrieval mode: VECTOR, GRAPH, HYBRID, or AUTO
+        """
+        # If graph database not available, use vector mode
+        if not self._graph_database:
+            return "VECTOR"
+
+        # Graph mode indicators (relationship and connection queries)
+        graph_indicators = [
+            "how", "why", "what causes", "relationship", "connection", "related to",
+            "because", "leads to", "results in", "depends on", "influences",
+            "who works", "where is", "when did", "which company", "what technology",
+            "connects", "links", "associates", "correlates", "impacts"
+        ]
+
+        # Vector mode indicators (similarity and content queries)
+        vector_indicators = [
+            "similar to", "like", "about", "regarding", "concerning",
+            "find documents", "search for", "show me", "tell me about",
+            "content", "text", "document", "file", "information"
+        ]
+
+        # Hybrid mode indicators (complex analytical queries)
+        hybrid_indicators = [
+            "explain", "analyze", "compare", "contrast", "overview",
+            "summary", "comprehensive", "detailed", "complete picture",
+            "understand", "breakdown", "elaborate", "describe fully"
+        ]
+
+        # Count indicators
+        graph_score = sum(1 for indicator in graph_indicators if indicator in query_lower)
+        vector_score = sum(1 for indicator in vector_indicators if indicator in query_lower)
+        hybrid_score = sum(1 for indicator in hybrid_indicators if indicator in query_lower)
+
+        # Determine mode based on scores
+        if hybrid_score > 0 or (graph_score > 0 and vector_score > 0):
+            return "HYBRID"
+        elif graph_score > vector_score:
+            return "GRAPH"
+        elif vector_score > 0:
+            return "VECTOR"
+        else:
+            return "AUTO"  # Let MemoryRetrievalSkill decide
+
+    def _determine_graph_depth(self, query_lower: str) -> int:
+        """
+        Determine optimal graph traversal depth based on query complexity.
+
+        Args:
+            query_lower: Lowercase query string
+
+        Returns:
+            Graph traversal depth (1-4)
+        """
+        # Deep traversal indicators
+        deep_indicators = [
+            "comprehensive", "complete", "all", "everything", "thorough",
+            "detailed", "full picture", "entire", "whole", "extensive"
+        ]
+
+        # Multi-hop indicators
+        multi_hop_indicators = [
+            "chain", "sequence", "path", "route", "journey", "process",
+            "step by step", "how does", "what leads", "cascade", "ripple"
+        ]
+
+        # Simple relationship indicators
+        simple_indicators = [
+            "direct", "immediate", "first", "primary", "main", "basic"
+        ]
+
+        # Count indicators
+        deep_count = sum(1 for indicator in deep_indicators if indicator in query_lower)
+        multi_hop_count = sum(1 for indicator in multi_hop_indicators if indicator in query_lower)
+        simple_count = sum(1 for indicator in simple_indicators if indicator in query_lower)
+
+        # Determine depth
+        if deep_count > 0:
+            return 4  # Maximum depth for comprehensive queries
+        elif multi_hop_count > 0:
+            return 3  # Multi-hop traversal
+        elif simple_count > 0:
+            return 1  # Direct relationships only
+        else:
+            return 2  # Default moderate depth
+
+    def is_graph_aware(self) -> bool:
+        """
+        Check if the planner has graph database awareness.
+
+        Returns:
+            True if graph-aware, False otherwise
+        """
+        return self._graph_database is not None
+
+    def get_graph_status(self) -> Dict[str, Any]:
+        """
+        Get graph database status for planning.
+
+        Returns:
+            Dictionary with graph status information
+        """
+        return {
+            "graph_available": self._graph_database is not None,
+            "graph_aware_planning": True,
+            "supported_modes": ["VECTOR", "GRAPH", "HYBRID", "AUTO"] if self._graph_database else ["VECTOR"],
+            "default_graph_depth": 2,
+            "max_graph_depth": 4
+        }

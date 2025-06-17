@@ -49,32 +49,57 @@ class WebRetrievalSuggester:
     def should_suggest_web_retrieval(self, query: str, context_results: List[Any]) -> bool:
         """
         Determine if web retrieval should be suggested.
-        
+
         Args:
             query: User's query
             context_results: Results from local knowledge search
-            
+
         Returns:
             True if web retrieval should be suggested
         """
-        # Suggest if no local results found
-        if not context_results or len(context_results) == 0:
-            return True
-        
-        # Suggest if results are very limited
-        if len(context_results) < 2:
-            return True
-        
-        # Check for time-sensitive queries
-        time_indicators = ['latest', 'recent', 'current', 'today', 'now', '2024', '2025']
-        if any(indicator in query.lower() for indicator in time_indicators):
-            return True
-        
-        # Check for news-related queries
-        news_indicators = ['news', 'breaking', 'update', 'announcement']
-        if any(indicator in query.lower() for indicator in news_indicators):
-            return True
-        
+        query_lower = query.lower()
+
+        # CRITICAL FIX: Don't suggest web retrieval for basic queries that LLM can handle
+        basic_query_indicators = [
+            'tell me a joke', 'joke', 'funny', 'humor',
+            'what is', 'calculate', 'compute', 'math', '+', '-', '*', '/',
+            'hello', 'hi', 'how are you', 'good morning', 'good afternoon',
+            'explain', 'define', 'meaning of', 'what does', 'how to',
+            'write', 'create', 'generate', 'make', 'help me',
+            'story', 'poem', 'essay', 'letter', 'email',
+            'translate', 'language', 'grammar', 'spelling'
+        ]
+
+        # If it's a basic query the LLM can handle, don't suggest web retrieval
+        if any(indicator in query_lower for indicator in basic_query_indicators):
+            return False
+
+        # Don't suggest for very short queries (likely basic questions)
+        if len(query.split()) <= 3:
+            return False
+
+        # Only suggest web retrieval for specific types of queries that need current information
+        web_retrieval_indicators = [
+            'latest', 'recent', 'current', 'today', 'now', '2024', '2025',
+            'news', 'breaking', 'update', 'announcement',
+            'price', 'stock', 'weather', 'forecast',
+            'who is', 'biography', 'profile of', 'information about',
+            'research', 'study', 'paper', 'article',
+            'company', 'organization', 'website', 'official'
+        ]
+
+        # Check if query explicitly needs web information
+        needs_web_info = any(indicator in query_lower for indicator in web_retrieval_indicators)
+
+        # Only suggest web retrieval if:
+        # 1. Query explicitly needs web information AND
+        # 2. No local results found OR very limited results
+        if needs_web_info:
+            if not context_results or len(context_results) == 0:
+                return True
+            if len(context_results) < 2:
+                return True
+
         return False
     
     def generate_search_url(self, query: str, engine: str = 'google') -> str:
@@ -259,3 +284,16 @@ class WebRetrievalSuggester:
             'domain_categories': list(self.domain_suggestions.keys()),
             'total_domain_suggestions': sum(len(domains) for domains in self.domain_suggestions.values())
         }
+
+
+# Global instance
+_web_retrieval_suggester = None
+
+def get_web_retrieval_suggester() -> WebRetrievalSuggester:
+    """Get or create a global web retrieval suggester instance."""
+    global _web_retrieval_suggester
+
+    if _web_retrieval_suggester is None:
+        _web_retrieval_suggester = WebRetrievalSuggester()
+
+    return _web_retrieval_suggester
