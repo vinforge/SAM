@@ -69,8 +69,20 @@
 git clone http://172.16.20.246:3000/Forge/SAM.git
 cd SAM
 
-# Run the secure installer
+# Run the setup launcher (recommended for new users)
+python setup.py
+```
+
+**Or choose a specific setup method:**
+```bash
+# Option 1: Interactive Script (Recommended)
+python setup_sam.py
+
+# Option 2: Quick Setup
 python install_sam.py
+
+# Option 3: Encryption Only
+python setup_encryption.py
 ```
 
 ### 2. Start SAM (Secure Mode)
@@ -96,6 +108,12 @@ python start_sam_secure.py --mode memory-center  # Memory center only
 4. **Try Multi-Step Queries**: Experience autonomous problem-solving
 
 That's it! SAM will guide you through the secure setup process.
+
+### 🔐 **Encryption Setup for New Users**
+For detailed encryption setup instructions, see:
+- **📋 Quick Setup**: [`docs/QUICK_ENCRYPTION_SETUP.md`](docs/QUICK_ENCRYPTION_SETUP.md) - 5-minute setup guide
+- **📖 Complete Guide**: [`docs/ENCRYPTION_SETUP_GUIDE.md`](docs/ENCRYPTION_SETUP_GUIDE.md) - Comprehensive encryption documentation
+- **🔒 Secure Installation**: [`docs/README_SECURE_INSTALLATION.md`](docs/README_SECURE_INSTALLATION.md) - Full security features overview
 
 ## 🌟 Revolutionary Breakthroughs (2025)
 
@@ -254,6 +272,12 @@ SAM uses a simple JSON configuration file at `config/sam_config.json`:
 - Ensure PDFs are not password-protected
 - Check file size (large files may take time to process)
 - Verify sufficient disk space
+
+**Encryption/Security issues:**
+- **Forgot master password**: No recovery possible - all encrypted data is lost
+- **Keystore corrupted**: Delete `security/keystore.json` and restart (loses all data)
+- **Permission errors**: Run `chmod 700 security/` and `chmod 600 security/keystore.json`
+- **Setup issues**: See [`docs/ENCRYPTION_SETUP_GUIDE.md`](docs/ENCRYPTION_SETUP_GUIDE.md)
 
 ### Getting Help
 1. **Check the logs**: `logs/sam.log` contains detailed error information

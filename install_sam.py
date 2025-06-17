@@ -204,20 +204,79 @@ def setup_configuration():
     
     return True
 
-def launch_sam():
-    """Launch SAM for first-time setup."""
-    print("\n🚀 Ready to launch SAM!")
-    print("\nChoose your preferred interface:")
+def get_setup_method():
+    """Get user's preferred setup method."""
+    print("\n🚀 Choose Setup Method:")
+    print("=" * 50)
+    print("  1. 🎯 Interactive Setup (Recommended)")
+    print("     • Guided configuration wizard")
+    print("     • Automatic encryption setup")
+    print("     • System optimization")
+    print("     • Beginner-friendly")
+    print()
+    print("  2. ⚡ Quick Launch")
+    print("     • Use current configuration")
+    print("     • Launch SAM immediately")
+    print("     • For experienced users")
+    print()
+    print("  3. ⚙️  Setup Only")
+    print("     • Complete setup without launching")
+    print("     • Manual launch later")
+
+    while True:
+        try:
+            choice = input("\nEnter your choice (1-3) [1]: ").strip()
+            if not choice:
+                return 1  # Default to interactive
+
+            choice_num = int(choice)
+            if 1 <= choice_num <= 3:
+                return choice_num
+            else:
+                print("❌ Please enter 1, 2, or 3")
+        except ValueError:
+            print("❌ Please enter a valid number")
+
+def run_interactive_setup():
+    """Run the interactive setup process."""
+    print("\n🎯 Starting Interactive Setup...")
+    print("This will guide you through SAM's complete configuration.")
+
+    try:
+        # Check if setup_sam.py exists
+        if not Path("setup_sam.py").exists():
+            print("❌ Interactive setup script not found")
+            print("Using fallback quick setup...")
+            return launch_sam_quick()
+
+        # Run interactive setup
+        result = subprocess.run([sys.executable, "setup_sam.py"], check=True)
+        print("✅ Interactive setup completed!")
+        return True
+
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Interactive setup failed: {e}")
+        print("Falling back to quick setup...")
+        return launch_sam_quick()
+    except KeyboardInterrupt:
+        print("\n👋 Setup cancelled by user")
+        return False
+
+def launch_sam_quick():
+    """Quick launch SAM with current configuration."""
+    print("\n⚡ Quick Launch")
+    print("Choose your preferred interface:")
     print("  1. 🌐 Full Suite (Web UI + Streamlit + Memory Center)")
     print("  2. 📱 Streamlit App (Modern interface)")
     print("  3. 🌐 Web UI (Traditional interface)")
     print("  4. 🧠 Memory Center (Memory management)")
-    print("  5. ⚙️  Setup only (don't launch)")
-    
+
     while True:
         try:
-            choice = input("\nEnter your choice (1-5): ").strip()
-            
+            choice = input("\nEnter your choice (1-4) [1]: ").strip()
+            if not choice:
+                choice = "1"  # Default to full suite
+
             if choice == "1":
                 launch_command = [sys.executable, "start_sam_secure.py", "--mode", "full"]
                 break
@@ -230,23 +289,19 @@ def launch_sam():
             elif choice == "4":
                 launch_command = [sys.executable, "start_sam_secure.py", "--mode", "memory"]
                 break
-            elif choice == "5":
-                print("\n✅ Setup completed! Launch SAM anytime with:")
-                print("   python start_sam_secure.py --mode full")
-                return True
             else:
-                print("❌ Invalid choice. Please enter 1-5.")
+                print("❌ Invalid choice. Please enter 1-4.")
                 continue
-                
+
         except KeyboardInterrupt:
             print("\n\n👋 Setup cancelled by user")
             return False
-    
+
     print(f"\n🚀 Launching SAM...")
     print("📝 On first launch, you'll be prompted to create a master password")
     print("🔒 This password encrypts all your data - choose carefully!")
     print("\n⚠️  Press Ctrl+C to stop SAM when you're done")
-    
+
     try:
         subprocess.run(launch_command)
         return True
@@ -257,6 +312,27 @@ def launch_sam():
         print(f"❌ Failed to launch SAM: {e}")
         return False
 
+def launch_sam():
+    """Main launch function with setup method selection."""
+    setup_method = get_setup_method()
+
+    if setup_method == 1:
+        # Interactive Setup
+        return run_interactive_setup()
+
+    elif setup_method == 2:
+        # Quick Launch
+        return launch_sam_quick()
+
+    elif setup_method == 3:
+        # Setup Only
+        print("\n✅ Setup completed! Launch SAM anytime with:")
+        print("   python start_sam_secure.py --mode full")
+        print("\n📖 Documentation:")
+        print("   • docs/QUICK_ENCRYPTION_SETUP.md - Quick start guide")
+        print("   • docs/ENCRYPTION_SETUP_GUIDE.md - Complete guide")
+        return True
+
 def main():
     """Main installation function."""
     print_banner()
@@ -265,6 +341,7 @@ def main():
     print("   • Check system requirements")
     print("   • Install dependencies")
     print("   • Set up SAM configuration")
+    print("   • Offer interactive setup (recommended)")
     print("   • Launch SAM for first-time setup")
     
     # Confirm installation
@@ -312,12 +389,19 @@ def main():
     print("   • Use the security dashboard to monitor encryption")
     
     print("\n📚 Documentation:")
-    print("   • README_SECURE_INSTALLATION.md - Complete guide")
-    print("   • docs/ - Detailed documentation")
+    print("   • docs/QUICK_ENCRYPTION_SETUP.md - 5-minute setup guide")
+    print("   • docs/ENCRYPTION_SETUP_GUIDE.md - Complete encryption guide")
+    print("   • docs/README_SECURE_INSTALLATION.md - Full installation guide")
+    print("   • docs/ - Complete documentation")
     print("   • start_sam_secure.py --help - Command options")
-    
+
     print("\n🚀 Launch SAM anytime with:")
     print("   python start_sam_secure.py --mode full")
+
+    print("\n🎯 Setup Options:")
+    print("   • Interactive: python setup_sam.py")
+    print("   • Quick: python install_sam.py")
+    print("   • Encryption only: python setup_encryption.py")
 
 if __name__ == "__main__":
     main()
