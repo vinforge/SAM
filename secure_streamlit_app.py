@@ -38,6 +38,25 @@ except ImportError as e:
     ENTITLEMENTS_AVAILABLE = False
     logger.warning(f"Entitlement system not available: {e}")
 
+# Import Memory Center components
+try:
+    from ui.memory_browser import MemoryBrowserUI
+    from ui.memory_editor import MemoryEditor
+    from ui.memory_graph import MemoryGraphVisualizer
+    from ui.memory_commands import MemoryCommandProcessor, get_command_processor
+    from ui.role_memory_filter import RoleBasedMemoryFilter, get_role_filter
+    from ui.bulk_ingestion_ui import render_bulk_ingestion
+    from ui.api_key_manager import render_api_key_manager
+    from memory.memory_vectorstore import get_memory_store
+    from memory.memory_reasoning import get_memory_reasoning_engine
+    from config.agent_mode import get_mode_controller
+    from agents.task_router import AgentRole
+    MEMORY_CENTER_AVAILABLE = True
+    logger.info("Memory Center components loaded successfully")
+except ImportError as e:
+    MEMORY_CENTER_AVAILABLE = False
+    logger.warning(f"Memory Center components not available: {e}")
+
 def main():
     """Main Streamlit application with security integration."""
     
@@ -103,7 +122,7 @@ def render_main_sam_application():
                 return
     
     # Main application tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "📚 Documents", "🧠 Memory", "🔍 Vetting", "🛡️ Security"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "📚 Documents", "🧠 Memory Center", "🔍 Vetting", "🛡️ Security"])
 
     with tab1:
         render_chat_interface()
@@ -112,7 +131,7 @@ def render_main_sam_application():
         render_document_interface()
 
     with tab3:
-        render_memory_interface()
+        render_integrated_memory_center()
 
     with tab4:
         render_vetting_interface()
@@ -367,28 +386,9 @@ def render_navigation_section():
     if is_authenticated:
         st.success("🔓 **Authenticated** - All interfaces available")
 
-        # Navigation button
-        st.markdown("""
-        <a href="http://localhost:8501" target="_blank" style="text-decoration: none;">
-            <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                text-align: center;
-                font-weight: 600;
-                margin: 4px 0;
-                transition: transform 0.2s ease;
-                cursor: pointer;
-                border: none;
-                width: 100%;
-                box-sizing: border-box;
-            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                🧠 Memory Center
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
-        st.caption("🧠🎨 Access Dream Canvas, API keys, bulk processing, and advanced memory features")
+        # Memory Center is now integrated
+        st.info("🧠 **Memory Center** is now integrated into the main interface!")
+        st.caption("Access all memory features through the '🧠 Memory Center' tab above")
 
         # Session info
         if st.session_state.security_manager:
@@ -3474,8 +3474,12 @@ def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
         data = result.get('data', {})
 
         content_parts = []
-        content_parts.append(f"**Web Search Results for: {query}**")
-        content_parts.append(f"*Method: {tool_used.replace('_', ' ').title()}*")
+        content_parts.append(f"🌐 Web Search Results for: {query}")
+        content_parts.append(f"Method: {tool_used.replace('_', ' ').title()}")
+        content_parts.append("")
+
+        # Add success indicator
+        content_parts.append("✅ Web search completed successfully!")
         content_parts.append("")
 
         # Format based on tool type
@@ -3493,7 +3497,7 @@ def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
                 relevance_score = chunk.get('relevance_score', 0.0)
 
                 if title:
-                    chunk_parts.append(f"**{i}. {title}**")
+                    chunk_parts.append(f"{i}. {title}")
 
                 if content:
                     # Limit content for display
@@ -3520,7 +3524,7 @@ def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
 
                 title = article.get('title', '').strip()
                 if title:
-                    article_parts.append(f"**{i}. {title}**")
+                    article_parts.append(f"{i}. {title}")
 
                 description = article.get('description', '').strip()
                 if description:
@@ -3550,7 +3554,7 @@ def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
             content_parts.append("")
 
             for i, result_item in enumerate(search_results[:5], 1):
-                content_parts.append(f"**{i}. {result_item.get('title', 'No title')}**")
+                content_parts.append(f"{i}. {result_item.get('title', 'No title')}")
                 if result_item.get('snippet'):
                     content_parts.append(result_item['snippet'])
                 content_parts.append(f"*Source: {result_item.get('url', 'No URL')}*")
@@ -3561,7 +3565,7 @@ def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
             metadata = data.get('metadata', {})
 
             if metadata.get('title'):
-                content_parts.append(f"**{metadata['title']}**")
+                content_parts.append(f"{metadata['title']}")
 
             if content:
                 # Limit content for display
@@ -3573,6 +3577,13 @@ def format_intelligent_web_result(result: Dict[str, Any], query: str) -> str:
         # Remove last separator
         if content_parts and content_parts[-1] == "---":
             content_parts.pop()
+
+        # Add footer with quarantine information
+        content_parts.append("")
+        content_parts.append("---")
+        content_parts.append("🛡️ Content Security Notice:")
+        content_parts.append("This web content has been saved to quarantine for security analysis.")
+        content_parts.append("Visit the Content Vetting page to review and approve the content.")
 
         return "\n".join(content_parts)
 
@@ -3828,7 +3839,9 @@ Important guidelines:
 - Be factual and objective, focusing on the actual content retrieved
 - Mention that this information comes from current web sources
 - Summarize key points while maintaining accuracy
-- Include relevant details from multiple sources when available"""
+- Include relevant details from multiple sources when available
+- Use plain text formatting without bold (**) or other markdown formatting to maintain consistent font sizes
+- Keep formatting simple and clean for better readability"""
 
         user_prompt = f"""Based on the following current web content retrieved using intelligent web retrieval, please answer this question: "{query}"
 
@@ -3837,20 +3850,33 @@ Web content summary:
 
 Please provide a comprehensive, well-organized response based on this current web information. Focus on the most relevant and important content."""
 
-        ollama_response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
-                "prompt": f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:",
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "max_tokens": 800
-                }
-            },
-            timeout=90
-        )
+        try:
+            ollama_response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                    "prompt": f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "max_tokens": 800
+                    }
+                },
+                timeout=15  # Reduced timeout to 15 seconds for faster fallback to clean formatting
+            )
+        except requests.exceptions.Timeout:
+            logger.warning("Ollama LLM request timed out, using fallback response")
+            # Still return a successful response with fallback formatting
+            fallback_response = format_intelligent_web_result(result, query)
+            logger.info("✅ Using fallback formatting due to Ollama timeout, but web search was successful")
+            return fallback_response
+        except requests.exceptions.ConnectionError:
+            logger.warning("Ollama LLM connection failed, using fallback response")
+            # Still return a successful response with fallback formatting
+            fallback_response = format_intelligent_web_result(result, query)
+            logger.info("✅ Using fallback formatting due to Ollama connection error, but web search was successful")
+            return fallback_response
 
         if ollama_response.status_code == 200:
             response_data = ollama_response.json()
@@ -3862,15 +3888,15 @@ Please provide a comprehensive, well-organized response based on this current we
                 content_count = count_content_items(result)
                 tool_used = result.get('tool_used', 'intelligent_web_system')
 
-                sources_text = "\n\n**🌐 Sources:**\n" + "\n".join([f"• {source}" for source in sources[:5]])
+                sources_text = "\n\n🌐 Sources:\n" + "\n".join([f"• {source}" for source in sources[:5]])
 
-                web_enhanced_response = f"""🌐 **Based on current web sources:**
+                web_enhanced_response = f"""🌐 Based on current web sources:
 
 {ai_response}
 
 {sources_text}
 
-*Information retrieved using {tool_used.replace('_', ' ').title()} from {content_count} sources.*"""
+Information retrieved using {tool_used.replace('_', ' ').title()} from {content_count} sources."""
 
                 return web_enhanced_response
 
@@ -4049,16 +4075,23 @@ def perform_rss_extraction(query: str, rss_urls: List[str]) -> Dict[str, Any]:
         for url in rss_urls:
             try:
                 logger.info(f"Fetching RSS feed: {url}")
-                rss_content = fetch_rss_content(url)
 
-                if rss_content['success'] and rss_content.get('content'):
-                    # Parse the RSS content to extract news items
-                    news_items = parse_rss_content_to_articles(rss_content['content'], url)
-                    all_news_items.extend(news_items)
-                    successful_sources.append(url)
-                    logger.info(f"Successfully extracted {len(news_items)} items from {url}")
-                else:
-                    logger.warning(f"Failed to fetch RSS content from {url}")
+                # Fetch raw RSS content directly
+                import requests
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml'
+                }
+
+                response = requests.get(url, headers=headers, timeout=20)
+                response.raise_for_status()
+                raw_content = response.content.decode('utf-8', errors='ignore')
+
+                # Parse the RSS content to extract news items using the working parser
+                news_items = parse_rss_content_to_articles(raw_content, url)
+                all_news_items.extend(news_items)
+                successful_sources.append(url)
+                logger.info(f"Successfully extracted {len(news_items)} items from {url}")
 
             except Exception as e:
                 logger.error(f"Error processing RSS feed {url}: {e}")
@@ -4203,8 +4236,8 @@ def format_rss_articles_for_response(articles: List[Dict[str, Any]], query: str)
         content_parts = []
 
         # Header
-        content_parts.append(f"**Latest News Results for: {query}**")
-        content_parts.append(f"*Found {len(articles)} articles from RSS feeds*")
+        content_parts.append(f"Latest News Results for: {query}")
+        content_parts.append(f"Found {len(articles)} articles from RSS feeds")
         content_parts.append("")
 
         # Articles
@@ -4214,7 +4247,7 @@ def format_rss_articles_for_response(articles: List[Dict[str, Any]], query: str)
             # Title
             title = article.get('title', '').strip()
             if title:
-                article_content.append(f"**{i}. {title}**")
+                article_content.append(f"{i}. {title}")
 
             # Description
             description = article.get('description', '').strip()
@@ -7334,6 +7367,285 @@ def process_secure_document(uploaded_file) -> dict:
             'success': False,
             'error': str(e)
         }
+
+def render_integrated_memory_center():
+    """Render the integrated Memory Center with all features."""
+    if not MEMORY_CENTER_AVAILABLE:
+        st.error("❌ Memory Center components not available")
+        st.markdown("""
+        The Memory Center requires additional components that are not currently loaded.
+        Please ensure all memory management modules are properly installed.
+        """)
+        return
+
+    try:
+        # Initialize Memory Center components
+        memory_store = get_memory_store()
+        memory_reasoning = get_memory_reasoning_engine()
+        mode_controller = get_mode_controller()
+        command_processor = get_command_processor()
+        role_filter = get_role_filter()
+
+        # Memory Center header
+        st.markdown("## 🧠 SAM Memory Control Center")
+        st.markdown("*Integrated memory management, visualization, and advanced features*")
+
+        # Quick stats in header
+        col1, col2, col3, col4 = st.columns(4)
+        try:
+            stats = memory_store.get_memory_stats()
+            with col1:
+                st.metric("Total Memories", stats['total_memories'])
+            with col2:
+                st.metric("Storage Size", f"{stats['total_size_mb']:.1f} MB")
+            with col3:
+                current_mode = mode_controller.get_current_mode()
+                st.metric("Current Mode", current_mode.value.title())
+            with col4:
+                if stats['memory_types']:
+                    top_type = max(stats['memory_types'].items(), key=lambda x: x[1])
+                    st.metric("Top Type", f"{top_type[0]} ({top_type[1]})")
+        except Exception as e:
+            st.warning(f"Could not load memory stats: {e}")
+
+        st.markdown("---")
+
+        # Memory Center navigation
+        memory_page = st.selectbox(
+            "Memory Center Features",
+            options=[
+                "💬 Enhanced Chat",
+                "📁 Bulk Ingestion",
+                "🔑 API Key Manager",
+                "🧠🎨 Dream Canvas",
+                "📚 Memory Browser",
+                "✏️ Memory Editor",
+                "🕸️ Memory Graph",
+                "💬 Command Interface",
+                "🎭 Role-Based Access",
+                "🏆 Memory Ranking",
+                "📝 Citation Engine",
+                "📊 Smart Summaries",
+                "📈 Memory Insights",
+                "🧠 Thought Settings",
+                "🔧 System Status"
+            ],
+            index=0,
+            help="Select a Memory Center feature to access"
+        )
+
+        # Render selected page
+        if memory_page == "💬 Enhanced Chat":
+            render_memory_enhanced_chat()
+        elif memory_page == "📁 Bulk Ingestion":
+            render_bulk_ingestion()
+        elif memory_page == "🔑 API Key Manager":
+            render_api_key_manager()
+        elif memory_page == "🧠🎨 Dream Canvas":
+            render_memory_dream_canvas()
+        elif memory_page == "📚 Memory Browser":
+            render_memory_browser_integrated()
+        elif memory_page == "✏️ Memory Editor":
+            render_memory_editor_integrated()
+        elif memory_page == "🕸️ Memory Graph":
+            render_memory_graph_integrated()
+        elif memory_page == "💬 Command Interface":
+            render_memory_command_interface()
+        elif memory_page == "🎭 Role-Based Access":
+            render_memory_role_access()
+        elif memory_page == "🏆 Memory Ranking":
+            render_memory_ranking()
+        elif memory_page == "📝 Citation Engine":
+            render_memory_citation_engine()
+        elif memory_page == "📊 Smart Summaries":
+            render_memory_smart_summaries()
+        elif memory_page == "📈 Memory Insights":
+            render_memory_insights()
+        elif memory_page == "🧠 Thought Settings":
+            render_memory_thought_settings()
+        elif memory_page == "🔧 System Status":
+            render_memory_system_status()
+
+    except Exception as e:
+        st.error(f"❌ Error loading Memory Center: {e}")
+        logger.error(f"Memory Center error: {e}")
+
+def render_memory_enhanced_chat():
+    """Render enhanced chat interface with memory integration."""
+    st.subheader("💬 Enhanced Chat with Memory")
+    st.markdown("Interactive conversation with comprehensive memory integration and diagnostic information")
+
+    # Chat settings
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        show_diagnostics = st.checkbox("🔍 Show Diagnostics", value=True)
+    with col2:
+        show_memory_context = st.checkbox("🧠 Show Memory Context", value=True)
+    with col3:
+        show_reasoning_trace = st.checkbox("🤔 Show Reasoning Trace", value=True)
+
+    # Initialize chat history for memory center
+    if 'memory_chat_history' not in st.session_state:
+        st.session_state.memory_chat_history = []
+
+    # Chat input
+    user_input = st.chat_input("Ask SAM anything... (Use !commands for memory operations)")
+
+    if user_input:
+        # Add user message
+        st.session_state.memory_chat_history.append({"role": "user", "content": user_input})
+
+        # Process with memory reasoning
+        try:
+            memory_reasoning = get_memory_reasoning_engine()
+            command_processor = get_command_processor()
+
+            if user_input.startswith('!'):
+                # Memory command
+                result = command_processor.process_command(user_input)
+                if result.success:
+                    response = f"✅ **Command Result:**\n\n{result.message}"
+                else:
+                    response = f"❌ **Command Error:**\n\n{result.message}"
+            else:
+                # Memory-driven reasoning
+                reasoning_session = memory_reasoning.reason_with_memory(
+                    query=user_input,
+                    user_id="secure_streamlit_user",
+                    session_id=f"memory_session_{len(st.session_state.memory_chat_history)}"
+                )
+
+                if reasoning_session:
+                    response = reasoning_session.final_response
+                    if reasoning_session.memory_context.memory_count > 0:
+                        response += f"\n\n*💭 Recalled {reasoning_session.memory_context.memory_count} relevant memories*"
+                else:
+                    response = "I'm here to help! You can ask me questions or use memory commands."
+
+            # Add response
+            st.session_state.memory_chat_history.append({"role": "assistant", "content": response})
+
+        except Exception as e:
+            st.error(f"Error processing message: {e}")
+
+    # Display chat history
+    for message in st.session_state.memory_chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Quick actions
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("🗑️ Clear Chat", key="clear_memory_chat"):
+            st.session_state.memory_chat_history = []
+            st.rerun()
+    with col2:
+        if st.button("📊 Memory Stats", key="memory_stats_btn"):
+            try:
+                memory_store = get_memory_store()
+                stats = memory_store.get_memory_stats()
+                st.session_state.memory_chat_history.append({
+                    "role": "assistant",
+                    "content": f"📊 **Memory Statistics:**\n\n- Total Memories: {stats['total_memories']}\n- Storage Size: {stats['total_size_mb']:.1f} MB\n- Memory Types: {len(stats['memory_types'])}"
+                })
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error getting stats: {e}")
+    with col3:
+        if st.button("🧠 System Overview", key="system_overview_btn"):
+            st.session_state.memory_chat_history.append({
+                "role": "assistant",
+                "content": "🧠 **SAM Memory System Overview:**\n\nI'm your integrated memory assistant with access to all your stored knowledge, conversations, and documents. I can help you recall information, analyze patterns, and provide insights based on your personal knowledge base."
+            })
+            st.rerun()
+
+def render_memory_browser_integrated():
+    """Render integrated memory browser."""
+    try:
+        browser = MemoryBrowserUI()
+        browser.render()
+    except Exception as e:
+        st.error(f"Error loading memory browser: {e}")
+
+def render_memory_editor_integrated():
+    """Render integrated memory editor."""
+    try:
+        st.subheader("✏️ Memory Editor")
+        editor = MemoryEditor()
+
+        if hasattr(st.session_state, 'editing_memory') and st.session_state.editing_memory:
+            editor.render_edit_interface(st.session_state.editing_memory)
+        elif hasattr(st.session_state, 'deleting_memory') and st.session_state.deleting_memory:
+            editor.render_delete_interface(st.session_state.deleting_memory)
+        else:
+            st.info("Select a memory from the Memory Browser to edit or delete it.")
+            col1, col2 = st.columns(2)
+            with col1:
+                editor.render_undo_interface()
+            with col2:
+                editor.render_audit_log()
+    except Exception as e:
+        st.error(f"Error loading memory editor: {e}")
+
+def render_memory_graph_integrated():
+    """Render integrated memory graph."""
+    try:
+        visualizer = MemoryGraphVisualizer()
+        visualizer.render()
+    except Exception as e:
+        st.error(f"Error loading memory graph: {e}")
+
+def render_memory_dream_canvas():
+    """Render Dream Canvas with Pro license check."""
+    st.subheader("🧠🎨 Dream Canvas - Cognitive Synthesis Visualization")
+
+    # Check if Dream Canvas is available (requires SAM Pro)
+    if ENTITLEMENTS_AVAILABLE and not is_feature_available("dream_canvas"):
+        st.warning("🔒 **Dream Canvas** requires SAM Pro activation")
+        st.markdown("Activate SAM Pro in the sidebar to unlock cognitive synthesis visualization.")
+        return
+
+    try:
+        # Import and render Dream Canvas
+        from ui.dream_canvas import render_dream_canvas as render_canvas
+        render_canvas()
+    except ImportError:
+        st.error("❌ Dream Canvas module not available")
+    except Exception as e:
+        st.error(f"Error loading Dream Canvas: {e}")
+
+# Placeholder functions for other Memory Center features
+def render_memory_command_interface():
+    st.subheader("💬 Memory Command Interface")
+    st.info("Memory command interface will be implemented here")
+
+def render_memory_role_access():
+    st.subheader("🎭 Role-Based Memory Access")
+    st.info("Role-based access control will be implemented here")
+
+def render_memory_ranking():
+    st.subheader("🏆 Memory Ranking")
+    st.info("Memory ranking system will be implemented here")
+
+def render_memory_citation_engine():
+    st.subheader("📝 Citation Engine")
+    st.info("Citation engine will be implemented here")
+
+def render_memory_smart_summaries():
+    st.subheader("📊 Smart Summaries")
+    st.info("Smart summaries will be implemented here")
+
+def render_memory_insights():
+    st.subheader("📈 Memory Insights")
+    st.info("Memory insights will be implemented here")
+
+def render_memory_thought_settings():
+    st.subheader("🧠 Thought Settings")
+    st.info("Thought settings will be implemented here")
+
+def render_memory_system_status():
+    st.subheader("🔧 System Status")
+    st.info("System status will be implemented here")
 
 if __name__ == "__main__":
     main()

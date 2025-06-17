@@ -1488,18 +1488,20 @@ def generate_standard_response(message):
         transparency_score = context_assembly.transparency_score
 
         # Check if we should suggest web retrieval (Phase 7.1)
-        if web_retrieval_suggester and web_retrieval_suggester.should_suggest_web_retrieval(message, context_assembly.memories):
+        # CRITICAL FIX: Only suggest web retrieval for specific queries, not general ones
+        if (web_retrieval_suggester and
+            web_retrieval_suggester.should_suggest_web_retrieval(message, getattr(context_assembly, 'ranked_memories', []))):
             logger.info(f"Suggesting web retrieval for query: {message[:50]}...")
             return web_retrieval_suggester.format_retrieval_suggestion(message)
 
         # Prepare context for prompt
-        context = f"\n\n{context_text}" if context_text else ""
+        context = f"\n\n{context_text}" if context_text and context_text.strip() else ""
 
         # Determine query type from context assembly
         query_type = "general"
-        if "document" in context_text.lower():
+        if context_text and "document" in context_text.lower():
             query_type = "document_specific"
-        elif "memory" in context_text.lower() or "conversation" in context_text.lower():
+        elif context_text and ("memory" in context_text.lower() or "conversation" in context_text.lower()):
             query_type = "memory_search"
 
         # Create enhanced system prompt and user message for chat API
@@ -1510,7 +1512,12 @@ def generate_standard_response(message):
             system_prompt = f"You are SAM, an intelligent assistant with conversation memory. Use the provided ranked memory context to answer appropriately.\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.\n\n{context}"
             user_message = message
         else:
-            system_prompt = f"You are SAM, an intelligent multimodal assistant. Answer the user's question helpfully and accurately.\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.{context if context.strip() else ''}"
+            # CRITICAL FIX: Ensure general queries are handled properly even without context
+            base_prompt = "You are SAM, an intelligent multimodal assistant. Answer the user's question helpfully and accurately. You can handle a wide variety of questions including jokes, math problems, explanations, creative writing, and general knowledge questions."
+            if context.strip():
+                system_prompt = f"{base_prompt}\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.\n\nAdditional context from your knowledge base:{context}"
+            else:
+                system_prompt = f"{base_prompt}\n\nWhen thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer."
             user_message = message
 
         # Debug: Check which model is being used
@@ -2353,8 +2360,34 @@ def trigger_synthesis():
             'timestamp': result.timestamp,
             'clusters_found': result.clusters_found,
             'insights_generated': result.insights_generated,
-            'output_file': result.output_file
+            'output_file': result.output_file,
+            'memory_count': len(memory_store.get_all_memories())
         }
+
+        # Add cluster summary for Dream Canvas
+        if hasattr(result, 'concept_clusters') and result.concept_clusters:
+            cluster_summary = []
+            for i, cluster in enumerate(result.concept_clusters[:6]):  # Top 6 clusters
+                cluster_info = {
+                    'id': cluster.cluster_id,
+                    'name': f"Cluster {i+1}",  # Simple naming for now
+                    'memory_count': cluster.size,
+                    'coherence': cluster.coherence_score,
+                    'themes': cluster.dominant_themes[:3] if cluster.dominant_themes else [],
+                    'connections': len(cluster.chunks),
+                    'memories': [
+                        {
+                            'title': chunk.content[:50] + "..." if len(chunk.content) > 50 else chunk.content,
+                            'content': chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
+                            'type': chunk.memory_type.value,
+                            'score': chunk.importance_score
+                        }
+                        for chunk in cluster.chunks[:5]  # Top 5 memories per cluster
+                    ]
+                }
+                cluster_summary.append(cluster_info)
+
+            response_data['cluster_summary'] = cluster_summary
 
         # Add visualization data if requested
         if visualize and result.visualization_data:
@@ -2430,6 +2463,72 @@ def get_visualization_data(run_id):
 
     except Exception as e:
         logger.error(f"Error getting visualization data: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/sof/execute', methods=['POST'])
+@optional_security
+def execute_sof_plan():
+    """Execute a SOF (SAM Orchestration Framework) plan."""
+    try:
+        data = request.get_json() or {}
+
+        # Extract plan and input data
+        plan = data.get('plan', [])
+        input_query = data.get('input_query', '')
+        explicit_knowledge_chunks = data.get('explicit_knowledge_chunks', [])
+
+        if not plan:
+            return jsonify({
+                'status': 'error',
+                'error': 'No execution plan provided'
+            }), 400
+
+        if not input_query:
+            return jsonify({
+                'status': 'error',
+                'error': 'No input query provided'
+            }), 400
+
+        # Import SOF components
+        from sam.orchestration import get_sof_integration
+
+        # Get SOF integration
+        sof = get_sof_integration()
+        if not sof.initialize():
+            return jsonify({
+                'status': 'error',
+                'error': 'Failed to initialize SOF'
+            }), 500
+
+        # Create UIF with input data
+        from sam.orchestration import SAM_UIF
+        uif = SAM_UIF(input_query=input_query)
+
+        # Add explicit knowledge chunks if provided
+        if explicit_knowledge_chunks:
+            uif.intermediate_data['explicit_knowledge_chunks'] = explicit_knowledge_chunks
+
+        # Execute the plan
+        execution_report = sof._coordinator.execute_plan(plan, uif)
+
+        # Return execution results
+        return jsonify({
+            'status': 'success',
+            'execution_report': {
+                'result': execution_report.result.value,
+                'execution_time': execution_report.execution_time,
+                'skills_executed': execution_report.skills_executed,
+                'intermediate_data': dict(uif.intermediate_data),
+                'final_response': getattr(uif, 'final_response', None),
+                'confidence_score': getattr(uif, 'confidence_score', None)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error executing SOF plan: {e}")
         return jsonify({
             'status': 'error',
             'error': str(e)

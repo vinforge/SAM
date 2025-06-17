@@ -11,6 +11,7 @@ os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
 
 import streamlit as st
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
@@ -30,6 +31,254 @@ from memory.memory_reasoning import get_memory_reasoning_engine
 from config.agent_mode import get_mode_controller
 from agents.task_router import AgentRole
 
+def check_authentication():
+    """
+    Check if user is authenticated via the secure SAM interface.
+
+    Returns:
+        bool: True if authenticated, False otherwise
+    """
+    try:
+        # First check shared session (cross-port authentication)
+        from security.shared_session import get_shared_session_manager
+        shared_session = get_shared_session_manager()
+
+        # Check if there's a valid shared session from port 8502
+        if shared_session.validate_session():
+            # Register this port access
+            shared_session.register_port_access(8501)
+
+            # Also initialize security manager for compatibility
+            from security import SecureStateManager
+            security_manager = SecureStateManager()
+            if 'security_manager' not in st.session_state:
+                st.session_state.security_manager = security_manager
+
+            return True
+
+        # Fallback to local security manager check
+        from security import SecureStateManager
+        security_manager = SecureStateManager()
+        is_authenticated = security_manager.is_unlocked()
+
+        # Store security manager in session state for future use
+        if 'security_manager' not in st.session_state:
+            st.session_state.security_manager = security_manager
+
+        # If locally authenticated, create shared session for cross-port access
+        if is_authenticated:
+            try:
+                shared_session.create_session("sam_user")
+                shared_session.register_port_access(8501)
+            except Exception as e:
+                # Don't fail authentication if session creation fails
+                pass
+
+        return is_authenticated
+
+    except ImportError:
+        # Security module not available - allow access for development
+        st.warning("⚠️ Security module not available - running in development mode")
+        return True
+    except Exception as e:
+        # Log error and deny access
+        st.error(f"❌ Authentication check failed: {e}")
+        return False
+
+def render_authentication_required():
+    """Render the authentication required page."""
+    st.title("🔒 Authentication Required")
+    st.markdown("---")
+
+    st.error("🚫 **Access Denied**")
+    st.markdown("""
+    The SAM Memory Control Center requires authentication through the secure SAM interface.
+
+    **To access this application:**
+    1. Go to the [Secure SAM Interface](http://localhost:8502)
+    2. Enter your master password to unlock SAM
+    3. Return to this page
+
+    **Why is this required?**
+    - Your memory data is encrypted and requires authentication to access
+    - This ensures your personal information remains secure
+    - All SAM components share the same security system
+    """)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🔓 Go to Secure SAM Interface", type="primary", use_container_width=True):
+            st.markdown("""
+            <script>
+            window.open('http://localhost:8502', '_blank');
+            </script>
+            """, unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        if st.button("🔄 Check Authentication Status", use_container_width=True):
+            st.rerun()
+
+    # Show security status
+    try:
+        from security import SecureStateManager
+        security_manager = SecureStateManager()
+        session_info = security_manager.get_session_info()
+
+        st.markdown("### 🔍 Security Status")
+        status_col1, status_col2 = st.columns(2)
+
+        with status_col1:
+            st.metric("Application State", session_info['state'].title())
+            st.metric("Failed Attempts", f"{session_info['failed_attempts']}/{session_info['max_attempts']}")
+
+        with status_col2:
+            if session_info['is_unlocked']:
+                st.metric("Session Time Remaining", f"{session_info['time_remaining']} seconds")
+            else:
+                st.metric("Authentication Status", "🔒 Locked")
+
+    except Exception as e:
+        st.warning(f"Could not retrieve security status: {e}")
+
+def render_security_status_indicator():
+    """Render a compact security status indicator in the header."""
+    try:
+        if 'security_manager' in st.session_state:
+            security_manager = st.session_state.security_manager
+            session_info = security_manager.get_session_info()
+
+            if session_info['is_unlocked']:
+                time_remaining = session_info['time_remaining']
+                minutes_remaining = time_remaining // 60
+
+                # Color code based on time remaining
+                if minutes_remaining > 30:
+                    status_color = "🟢"
+                elif minutes_remaining > 10:
+                    status_color = "🟡"
+                else:
+                    status_color = "🔴"
+
+                st.markdown(f"""
+                <div style="text-align: right; padding: 10px; background-color: #f0f2f6; border-radius: 5px; margin-top: 10px;">
+                    <small><strong>{status_color} Authenticated</strong><br>
+                    Session: {minutes_remaining}m remaining</small>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="text-align: right; padding: 10px; background-color: #ffebee; border-radius: 5px; margin-top: 10px;">
+                    <small><strong>🔒 Session Expired</strong><br>
+                    <a href="http://localhost:8502" target="_blank">Re-authenticate</a></small>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="text-align: right; padding: 10px; background-color: #fff3e0; border-radius: 5px; margin-top: 10px;">
+                <small><strong>⚠️ Development Mode</strong><br>
+                Security disabled</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+    except Exception as e:
+        st.markdown(f"""
+        <div style="text-align: right; padding: 10px; background-color: #ffebee; border-radius: 5px; margin-top: 10px;">
+            <small><strong>❌ Security Error</strong><br>
+            {str(e)[:30]}...</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+def is_dream_canvas_available():
+    """Check if Dream Canvas feature is available (requires SAM Pro)."""
+    try:
+        from sam.entitlements.validator import EntitlementValidator
+        validator = EntitlementValidator()
+        return validator.is_pro_unlocked()
+    except Exception as e:
+        # If entitlement system is not available, allow access (development mode)
+        return True
+
+def render_dream_canvas_locked():
+    """Render the locked Dream Canvas interface for non-Pro users."""
+    st.markdown("---")
+
+    # Locked feature display
+    st.markdown("""
+    <div style="
+        border: 2px solid #FF6B6B;
+        border-radius: 12px;
+        padding: 30px;
+        margin: 20px 0;
+        background: linear-gradient(135deg, #FF6B6B15, #FF6B6B05);
+        text-align: center;
+    ">
+        <h2 style="color: #FF6B6B; margin: 0 0 15px 0;">🔒 Premium Feature</h2>
+        <h3 style="color: #333; margin: 0 0 20px 0;">Dream Canvas - Cognitive Synthesis Visualization</h3>
+        <p style="font-size: 1.1rem; color: #666; margin: 0 0 25px 0;">
+            Unlock SAM's revolutionary cognitive synthesis engine that analyzes your memory landscape
+            and generates insights from concept clusters.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Feature highlights
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### 🌟 Dream Canvas Features")
+        st.markdown("""
+        - **🧠 Cognitive Synthesis**: AI-powered insight generation from memory clusters
+        - **🎨 Interactive Visualization**: UMAP projections with color-coded concept clusters
+        - **🔍 Cluster Explorer**: Deep dive into knowledge domains with "So What" insights
+        - **⚡ Smart Parameters**: Research-backed optimal clustering with AI suggestions
+        - **📊 Knowledge Discovery**: Identify cross-domain patterns and emerging themes
+        """)
+
+    with col2:
+        st.markdown("### 💡 Why Dream Canvas?")
+        st.markdown("""
+        - **Discover Hidden Patterns**: Find connections across your knowledge base
+        - **Generate New Insights**: Synthesize emergent understanding from concept clusters
+        - **Visualize Knowledge**: See your memory landscape as an interactive star chart
+        - **Optimize Learning**: Identify knowledge gaps and concentration areas
+        - **Research Intelligence**: Cross-domain analysis for deeper understanding
+        """)
+
+    # Activation call-to-action
+    st.markdown("---")
+    st.warning("🔒 **Dream Canvas** requires SAM Pro activation")
+    st.markdown("""
+    **Activate SAM Pro to unlock:**
+    - 🧠 Cognitive synthesis and insight generation
+    - 🎨 Interactive memory landscape visualization
+    - 🔍 Advanced cluster analysis with "So What" insights
+    - ⚡ AI-powered parameter optimization
+    - 📊 Cross-domain knowledge discovery
+
+    💡 **Activate SAM Pro in the secure interface at [http://localhost:8502](http://localhost:8502)**
+    """)
+
+    # Demo preview (static)
+    st.markdown("### 🎬 Preview: What You'll Unlock")
+    st.markdown("""
+    <div style="
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        background: #f8f9fa;
+        margin: 15px 0;
+    ">
+        <h4>🎨 Interactive Memory Landscape</h4>
+        <p><strong>Memory Points:</strong> 10,594 | <strong>Clusters Discovered:</strong> 12 | <strong>Memories Clustered:</strong> 8,247 (78%)</p>
+        <p style="color: #666; font-style: italic;">
+            "This cluster represents a convergence of ideas around <strong>machine learning, algorithms</strong>,
+            drawing from 3 different types of sources. <strong>So What:</strong> This represents a major knowledge
+            domain for SAM - consider this cluster when asking questions about machine learning."
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
 def main():
     """Main Streamlit application for memory management."""
 
@@ -42,17 +291,37 @@ def main():
             initial_sidebar_state="expanded"
         )
         st.session_state.page_config_set = True
-    
+
+    # Security check - require authentication from secure SAM interface
+    if not check_authentication():
+        render_authentication_required()
+        return
+
+    # Periodic authentication check (every 5 minutes)
+    if 'last_auth_check' not in st.session_state:
+        st.session_state.last_auth_check = time.time()
+
+    # Check if 5 minutes have passed since last check
+    if time.time() - st.session_state.last_auth_check > 300:  # 5 minutes
+        if not check_authentication():
+            st.rerun()  # This will trigger the authentication required page
+        st.session_state.last_auth_check = time.time()
+
     # Initialize components
     memory_store = get_memory_store()
     memory_reasoning = get_memory_reasoning_engine()
     mode_controller = get_mode_controller()
     command_processor = get_command_processor()
     role_filter = get_role_filter()
-    
-    # Main header
-    st.title("🧠 SAM Memory Control Center")
-    st.markdown("Interactive memory management, visualization, and role-based access control")
+
+    # Main header with security status
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("🧠 SAM Memory Control Center")
+        st.markdown("Interactive memory management, visualization, and role-based access control")
+
+    with col2:
+        render_security_status_indicator()
     
     # Sidebar navigation
     with st.sidebar:
@@ -69,12 +338,13 @@ def main():
         
         # Navigation menu
         page = st.selectbox(
-            "Select Page",
+            "Navigation",
             options=[
                 "💬 Enhanced Chat",
                 "Chat with SAM",
                 "📁 Bulk Ingestion",
                 "🔑 API Key Manager",
+                "🧠🎨 Dream Canvas",
                 "Memory Browser",
                 "Memory Editor",
                 "Memory Graph",
@@ -140,6 +410,8 @@ def main():
         render_bulk_ingestion()
     elif page == "🔑 API Key Manager":
         render_api_key_manager()
+    elif page == "🧠🎨 Dream Canvas":
+        render_dream_canvas()
     elif page == "Memory Browser":
         render_memory_browser()
     elif page == "Memory Editor":
@@ -2020,6 +2292,876 @@ def format_memory_overview(overview_info):
 *Generated: {overview_info.get('timestamp', 'unknown')}*"""
 
     return overview_msg
+
+def render_dream_canvas():
+    """Render the Dream Canvas interface for cognitive synthesis visualization."""
+    try:
+        st.subheader("🧠🎨 Dream Canvas - Cognitive Synthesis Visualization")
+        st.markdown("Explore SAM's memory landscape through interactive visualization and cognitive synthesis")
+
+        # Check if Dream Canvas feature is available (SAM Pro required)
+        if not is_dream_canvas_available():
+            render_dream_canvas_locked()
+            return
+
+        # Dream Canvas Controls Section
+        st.markdown("### 🎛️ Dream Canvas Controls")
+
+        # Clustering Parameter Controls
+        with st.expander("🔧 Advanced Clustering Parameters", expanded=False):
+            # Smart parameter suggestion
+            col_suggest, col_preset, col_manual = st.columns([1, 1, 2])
+
+            with col_suggest:
+                if st.button("🤔 Suggest Optimal Parameters", use_container_width=True, help="Use AI to analyze your memory data and suggest optimal clustering parameters"):
+                    suggest_optimal_parameters()
+
+            with col_preset:
+                if st.button("⚡ Apply Research Preset", use_container_width=True, help="Apply scientifically optimal parameters for UMAP+DBSCAN clustering"):
+                    apply_research_preset()
+
+            with col_manual:
+                st.markdown("**Manual Parameter Control:**")
+
+            # Parameter sliders
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Use session state for parameter persistence
+                if 'cluster_radius' not in st.session_state:
+                    st.session_state.cluster_radius = 0.15  # Much smaller for UMAP data
+
+                cluster_radius = st.slider(
+                    "Cluster Radius (eps)",
+                    min_value=0.1,
+                    max_value=2.0,
+                    value=st.session_state.cluster_radius,
+                    step=0.1,
+                    help="Maximum distance between memories in a cluster. Lower = more clusters, Higher = fewer clusters",
+                    key="eps_slider"
+                )
+                st.session_state.cluster_radius = cluster_radius
+
+                if 'min_cluster_size' not in st.session_state:
+                    st.session_state.min_cluster_size = 15  # Larger for meaningful clusters
+
+                min_cluster_size = st.slider(
+                    "Minimum Cluster Size",
+                    min_value=3,
+                    max_value=50,
+                    value=st.session_state.min_cluster_size,
+                    step=1,
+                    help="Minimum number of memories required to form a cluster",
+                    key="min_size_slider"
+                )
+                st.session_state.min_cluster_size = min_cluster_size
+
+            with col2:
+                if 'min_samples' not in st.session_state:
+                    st.session_state.min_samples = 8  # Higher for dense clusters
+
+                min_samples = st.slider(
+                    "Core Point Threshold",
+                    min_value=2,
+                    max_value=20,
+                    value=st.session_state.min_samples,
+                    step=1,
+                    help="Minimum neighbors for a memory to be a cluster core point",
+                    key="min_samples_slider"
+                )
+                st.session_state.min_samples = min_samples
+
+                if 'max_clusters' not in st.session_state:
+                    st.session_state.max_clusters = 15
+
+                max_clusters = st.slider(
+                    "Maximum Clusters",
+                    min_value=5,
+                    max_value=50,
+                    value=st.session_state.max_clusters,
+                    step=1,
+                    help="Maximum number of clusters to discover",
+                    key="max_clusters_slider"
+                )
+                st.session_state.max_clusters = max_clusters
+
+            # Show current parameter summary
+            st.markdown(f"""
+            **Current Settings:** eps={cluster_radius}, min_samples={min_samples}, min_size={min_cluster_size}, max_clusters={max_clusters}
+            """)
+
+            # Show parameter suggestions if available
+            if 'parameter_suggestions' in st.session_state:
+                suggestions = st.session_state.parameter_suggestions
+                st.success(f"💡 **AI Suggestion:** eps={suggestions['eps']:.3f}, min_samples={suggestions['min_samples']}, min_size={suggestions['min_cluster_size']}")
+                if st.button("✨ Apply Suggested Parameters", use_container_width=True):
+                    apply_suggested_parameters(suggestions)
+
+        # Main Action Buttons
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            if st.button("🌙 Enter Dream State", type="primary", use_container_width=True, help="Trigger cognitive synthesis"):
+                trigger_synthesis_with_params(cluster_radius, min_samples, min_cluster_size, max_clusters)
+
+        with col2:
+            if st.button("🎨 Generate Visualization", use_container_width=True, help="Create interactive memory map"):
+                trigger_visualization_with_params(cluster_radius, min_samples, min_cluster_size, max_clusters)
+
+        with col3:
+            if st.button("🔄 Refresh Memory", use_container_width=True, help="Refresh memory store data"):
+                # Clear any cached memory store data
+                if hasattr(st.session_state, 'memory_store'):
+                    del st.session_state.memory_store
+                st.rerun()
+
+        with col4:
+            if st.button("📚 Refresh History", use_container_width=True, help="Update synthesis statistics"):
+                refresh_synthesis_history()
+
+        # Status dashboard
+        st.subheader("📊 Memory Landscape Status")
+
+        try:
+            # Get memory statistics
+            memory_store = get_memory_store()
+            stats = memory_store.get_memory_stats()
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.metric("Total Memories", stats.get('total_memories', 0))
+
+            with col2:
+                st.metric("Memory Types", len(stats.get('memory_types', {})))
+
+            with col3:
+                # Check for synthesis history
+                synthesis_count = get_synthesis_run_count()
+                st.metric("Synthesis Runs", synthesis_count)
+
+            with col4:
+                # Check for synthetic memories
+                synthetic_count = get_synthetic_memory_count()
+                st.metric("Synthetic Insights", synthetic_count)
+
+        except Exception as e:
+            st.warning(f"Could not load memory statistics: {e}")
+
+        # Synthesis history
+        st.subheader("🔮 Synthesis History")
+
+        try:
+            history = get_synthesis_history()
+
+            if history:
+                for run in history[-5:]:  # Show last 5 runs
+                    with st.expander(f"Run {run.get('run_id', 'Unknown')[:8]}... - {run.get('timestamp', 'Unknown')}"):
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.metric("Clusters Found", run.get('clusters_found', 0))
+                            st.metric("Insights Generated", run.get('insights_generated', 0))
+
+                        with col2:
+                            st.metric("Processing Time", f"{run.get('processing_time_ms', 0)}ms")
+                            visualization_status = "✅ Yes" if run.get('visualization_enabled') else "❌ No"
+                            st.metric("Visualization", visualization_status)
+
+                        if run.get('status') == 'success':
+                            st.success("✅ Synthesis completed successfully")
+                        else:
+                            st.error(f"❌ Synthesis failed: {run.get('error', 'Unknown error')}")
+            else:
+                st.info("🌙 No synthesis runs yet. Click 'Enter Dream State' to begin cognitive synthesis.")
+
+        except Exception as e:
+            st.warning(f"Could not load synthesis history: {e}")
+
+        # Visualization display area
+        st.subheader("🎨 Interactive Visualization")
+
+        # Check if we have visualization data
+        if 'dream_canvas_data' in st.session_state and st.session_state.dream_canvas_data:
+            render_dream_canvas_visualization(st.session_state.dream_canvas_data)
+        else:
+            st.info("🎨 No visualization data available. Generate a visualization to see SAM's memory landscape.")
+
+            # Placeholder visualization area
+            st.markdown("""
+            <div style="
+                border: 2px dashed #ccc;
+                border-radius: 10px;
+                padding: 60px;
+                text-align: center;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                margin: 20px 0;
+            ">
+                <h3>🌌 Dream Canvas Awaits</h3>
+                <p>Trigger synthesis and visualization to explore SAM's cognitive landscape</p>
+                <p style="font-size: 0.9rem; opacity: 0.8;">
+                    Interactive UMAP projection • Memory clusters • Synthetic insights
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Information panel
+        with st.expander("ℹ️ About Dream Canvas", expanded=False):
+            st.markdown("""
+            **Dream Canvas** is SAM's revolutionary cognitive synthesis visualization system:
+
+            🧠 **Cognitive Synthesis:**
+            - Analyzes memory clusters for emergent patterns
+            - Generates synthetic insights from concept relationships
+            - Creates new understanding from existing knowledge
+
+            🎨 **Interactive Visualization:**
+            - UMAP 2D projection of memory landscape
+            - Color-coded concept clusters
+            - Golden stars for synthetic insights
+            - Interactive exploration with hover details
+
+            🌙 **Dream State Process:**
+            1. **Memory Clustering** - Groups related concepts
+            2. **Pattern Discovery** - Identifies emergent relationships
+            3. **Insight Generation** - Creates synthetic understanding
+            4. **Visualization** - Maps the cognitive landscape
+
+            This represents the **first AI system** with visual cognitive transparency!
+            """)
+
+    except Exception as e:
+        st.error(f"Error loading Dream Canvas: {e}")
+        import traceback
+        st.error(f"Details: {traceback.format_exc()}")
+
+def trigger_synthesis_with_params(eps, min_samples, min_cluster_size, max_clusters):
+    """Trigger cognitive synthesis process with custom parameters."""
+    try:
+        st.info(f"🎛️ Using custom parameters: eps={eps}, min_samples={min_samples}, min_size={min_cluster_size}, max_clusters={max_clusters}")
+        with st.spinner("🌙 Entering dream state... Analyzing memory clusters..."):
+            # Import synthesis components
+            try:
+                from memory.synthesis import SynthesisEngine, SynthesisConfig
+                from memory.memory_vectorstore import get_memory_store
+            except ImportError as e:
+                st.error(f"❌ Synthesis components not available: {e}")
+                st.info("💡 Make sure the synthesis module is properly installed")
+                return
+
+            # Get memory store (force refresh)
+            memory_store = get_memory_store()
+
+            # Force reload the memory store to get latest data
+            try:
+                memory_store._reload_memories()  # Try to reload if method exists
+            except:
+                pass  # If reload method doesn't exist, continue
+
+            # Debug: Show memory store information
+            all_memories = memory_store.get_all_memories()
+            st.info(f"📊 Memory store contains {len(all_memories)} memories (refreshed)")
+
+            # Check memory types and sources
+            memory_types = {}
+            sources = set()
+            embeddings_count = 0
+
+            for memory in all_memories[:100]:  # Sample first 100 for performance
+                mem_type = memory.memory_type.value
+                memory_types[mem_type] = memory_types.get(mem_type, 0) + 1
+                sources.add(memory.source)
+                if memory.embedding and len(memory.embedding) > 0:
+                    embeddings_count += 1
+
+            st.info(f"🔍 Sample analysis: {embeddings_count}/100 memories have embeddings, {len(sources)} unique sources, {len(memory_types)} memory types")
+
+            # Configure synthesis with user-specified parameters
+            config = SynthesisConfig(
+                clustering_eps=eps,  # User-controlled cluster radius
+                clustering_min_samples=min_samples,  # User-controlled core point threshold
+                min_cluster_size=min_cluster_size,  # User-controlled minimum cluster size
+                max_clusters=max_clusters,  # User-controlled maximum clusters
+                quality_threshold=0.4,  # Moderate quality threshold
+                min_insight_quality=0.3,  # Lower insight quality threshold for testing
+                enable_reingestion=True
+            )
+
+            # Debug: Show configuration
+            st.info(f"🔧 Using clustering parameters: eps={config.clustering_eps}, min_samples={config.clustering_min_samples}, min_size={config.min_cluster_size}")
+
+            # Create synthesis engine
+            synthesis_engine = SynthesisEngine(config=config)
+
+            # Additional debugging: Check memory embeddings
+            sample_memories = all_memories[:10]
+            embedding_info = []
+            for i, memory in enumerate(sample_memories):
+                has_embedding = memory.embedding is not None and len(memory.embedding) > 0
+                embedding_dim = len(memory.embedding) if has_embedding else 0
+                embedding_info.append(f"Memory {i}: {has_embedding} (dim: {embedding_dim})")
+
+            st.info(f"🔍 Sample embedding check:\n" + "\n".join(embedding_info))
+
+            # Run synthesis without visualization first
+            result = synthesis_engine.run_synthesis(memory_store, visualize=False)
+
+            # Check status from synthesis_log
+            status = result.synthesis_log.get('status', 'unknown')
+
+            if status == 'completed':
+                st.success(f"✅ Dream state completed! Generated {result.insights_generated} insights from {result.clusters_found} clusters")
+
+                # Store result for history
+                if 'synthesis_history' not in st.session_state:
+                    st.session_state.synthesis_history = []
+
+                st.session_state.synthesis_history.append({
+                    'run_id': result.run_id,
+                    'timestamp': result.timestamp,
+                    'clusters_found': result.clusters_found,
+                    'insights_generated': result.insights_generated,
+                    'processing_time_ms': 0,  # Not tracked in current implementation
+                    'status': status,
+                    'visualization_enabled': False
+                })
+
+                st.rerun()
+            else:
+                error_reason = result.synthesis_log.get('reason', 'Unknown error')
+                st.error(f"❌ Synthesis failed: {error_reason}")
+
+    except Exception as e:
+        st.error(f"❌ Failed to enter dream state: {e}")
+
+def trigger_synthesis():
+    """Trigger cognitive synthesis process with default parameters."""
+    trigger_synthesis_with_params(0.15, 8, 15, 15)  # Optimal parameters for UMAP data
+
+def trigger_visualization_with_params(eps, min_samples, min_cluster_size, max_clusters):
+    """Trigger visualization generation with custom parameters."""
+    try:
+        st.info(f"🎛️ Using custom parameters: eps={eps}, min_samples={min_samples}, min_size={min_cluster_size}, max_clusters={max_clusters}")
+        with st.spinner("🎨 Generating memory landscape visualization..."):
+            # Import synthesis components
+            try:
+                from memory.synthesis import SynthesisEngine, SynthesisConfig
+                from memory.memory_vectorstore import get_memory_store
+            except ImportError as e:
+                st.error(f"❌ Synthesis components not available: {e}")
+                st.info("💡 Make sure the synthesis module is properly installed")
+                return
+
+            # Get memory store
+            memory_store = get_memory_store()
+
+            # Configure synthesis with visualization - user-specified parameters
+            config = SynthesisConfig(
+                clustering_eps=eps,  # User-controlled cluster radius
+                clustering_min_samples=min_samples,  # User-controlled core point threshold
+                min_cluster_size=min_cluster_size,  # User-controlled minimum cluster size
+                max_clusters=max_clusters,  # User-controlled maximum clusters
+                quality_threshold=0.4,  # Moderate quality threshold
+                min_insight_quality=0.3,  # Lower insight quality threshold for testing
+                enable_reingestion=False  # Skip re-ingestion for visualization
+            )
+
+            # Debug: Show configuration
+            st.info(f"🔧 Using clustering parameters: eps={config.clustering_eps}, min_samples={config.clustering_min_samples}, min_size={config.min_cluster_size}")
+
+            # Create synthesis engine
+            synthesis_engine = SynthesisEngine(config=config)
+
+            # Run synthesis with visualization
+            result = synthesis_engine.run_synthesis(memory_store, visualize=True)
+
+            # Check status from synthesis_log
+            status = result.synthesis_log.get('status', 'unknown')
+
+            if status == 'completed' and result.visualization_data:
+                st.success(f"✅ Visualization generated! {len(result.visualization_data)} memory points mapped")
+
+                # Store visualization data
+                st.session_state.dream_canvas_data = result.visualization_data
+
+                # Store result for history
+                if 'synthesis_history' not in st.session_state:
+                    st.session_state.synthesis_history = []
+
+                st.session_state.synthesis_history.append({
+                    'run_id': result.run_id,
+                    'timestamp': result.timestamp,
+                    'clusters_found': result.clusters_found,
+                    'insights_generated': result.insights_generated,
+                    'processing_time_ms': 0,  # Not tracked in current implementation
+                    'status': status,
+                    'visualization_enabled': True
+                })
+
+                st.rerun()
+            else:
+                error_reason = result.synthesis_log.get('reason', 'No visualization data generated')
+                st.error(f"❌ Visualization failed: {error_reason}")
+
+    except Exception as e:
+        st.error(f"❌ Failed to generate visualization: {e}")
+
+def trigger_visualization():
+    """Trigger visualization generation with default parameters."""
+    trigger_visualization_with_params(0.15, 8, 15, 15)  # Optimal parameters for UMAP data
+
+def suggest_optimal_parameters():
+    """Call the backend API to suggest optimal clustering parameters."""
+    try:
+        with st.spinner("🤔 Analyzing your memory data to suggest optimal parameters..."):
+            import requests
+
+            # Call the suggest-eps API endpoint
+            response = requests.post(
+                "http://localhost:5001/api/synthesis/suggest-eps",
+                json={
+                    "min_samples": st.session_state.get('min_samples', 5),
+                    "target_clusters": 10
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data['status'] == 'success':
+                    suggestions = data['suggestions']
+                    st.session_state.parameter_suggestions = suggestions
+
+                    st.success(f"🎯 **Optimal Parameters Found!**")
+                    st.info(f"📊 {data['analysis_summary']}")
+                    st.info(f"💡 **Recommended:** eps={suggestions['eps']:.3f}, min_samples={suggestions['min_samples']}, min_cluster_size={suggestions['min_cluster_size']}")
+
+                    # Show distance statistics
+                    if 'distance_stats' in suggestions:
+                        stats = suggestions['distance_stats']
+                        st.markdown(f"""
+                        **Distance Analysis:**
+                        - Min distance: {stats.get('min', 0):.4f}
+                        - Median distance: {stats.get('median', 0):.4f}
+                        - 90th percentile: {stats.get('percentile_90', 0):.4f}
+                        - Max distance: {stats.get('max', 0):.4f}
+                        """)
+
+                    st.rerun()
+                else:
+                    st.error(f"❌ Parameter suggestion failed: {data.get('error', 'Unknown error')}")
+            else:
+                st.error(f"❌ API request failed: {response.status_code}")
+
+    except Exception as e:
+        st.error(f"❌ Error suggesting parameters: {e}")
+
+def apply_suggested_parameters(suggestions):
+    """Apply the suggested parameters to the sliders."""
+    try:
+        # Update session state with suggested values
+        st.session_state.cluster_radius = suggestions['eps']
+        st.session_state.min_samples = suggestions['min_samples']
+        st.session_state.min_cluster_size = suggestions['min_cluster_size']
+        st.session_state.max_clusters = suggestions['max_clusters']
+
+        st.success("✨ Suggested parameters applied! Click 'Enter Dream State' to test them.")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Error applying parameters: {e}")
+
+def apply_research_preset():
+    """Apply scientifically optimal parameters for UMAP+DBSCAN clustering."""
+    try:
+        # Research-backed optimal parameters for high-dimensional embeddings with UMAP projection
+        st.session_state.cluster_radius = 0.15    # Small eps for UMAP cosine similarity
+        st.session_state.min_samples = 8          # Higher for dense, meaningful clusters
+        st.session_state.min_cluster_size = 15    # Substantial clusters for synthesis
+        st.session_state.max_clusters = 20        # Allow more clusters to be discovered
+
+        st.success("⚡ **Research Preset Applied!**")
+        st.info("📚 **Parameters based on:** UMAP + DBSCAN clustering research for high-dimensional embeddings")
+        st.info("🎯 **Expected result:** 5-20 distinct clusters instead of 1 massive cluster")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Error applying research preset: {e}")
+
+def generate_cluster_insight(contents, sources, cluster_id):
+    """Generate meaningful 'So What' insights from cluster content."""
+    try:
+        # Analyze content patterns
+        content_text = " ".join(contents)
+
+        # Extract key themes using simple keyword analysis
+        common_words = []
+        for content in contents:
+            words = content.lower().split()
+            # Filter for meaningful words (longer than 3 chars, not common stop words)
+            meaningful_words = [w for w in words if len(w) > 3 and w not in ['this', 'that', 'with', 'from', 'they', 'have', 'been', 'were', 'will', 'would', 'could', 'should']]
+            common_words.extend(meaningful_words)
+
+        # Count word frequency
+        word_freq = {}
+        for word in common_words:
+            word_freq[word] = word_freq.get(word, 0) + 1
+
+        # Get top themes
+        top_themes = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:3]
+        theme_words = [theme[0] for theme in top_themes if theme[1] > 1]
+
+        # Analyze source diversity
+        source_types = []
+        for source in sources:
+            if 'document:' in source:
+                source_types.append('document')
+            elif 'web:' in source:
+                source_types.append('web')
+            elif 'synthesis:' in source:
+                source_types.append('synthetic')
+            else:
+                source_types.append('memory')
+
+        source_diversity = len(set(source_types))
+
+        # Generate insight based on patterns
+        if len(theme_words) >= 2:
+            themes_str = ", ".join(theme_words[:2])
+            if source_diversity > 1:
+                insight = f"This cluster represents a convergence of ideas around **{themes_str}**, drawing from {source_diversity} different types of sources. This suggests a cross-domain pattern that SAM has identified as conceptually related."
+            else:
+                insight = f"This cluster focuses on **{themes_str}** within a specific domain. The concentration of similar content suggests this is a core knowledge area in SAM's memory."
+        elif len(contents) > 5:
+            insight = f"This is a large cluster with {len(contents)} related memories. While the specific themes are diverse, SAM has identified underlying conceptual similarities that group these memories together."
+        else:
+            insight = f"This cluster contains {len(contents)} closely related memories. The tight grouping suggests these concepts are frequently accessed together or share important contextual relationships."
+
+        # Add actionable "So What"
+        if len(contents) > 10:
+            insight += f" **So What:** This represents a major knowledge domain for SAM - consider this cluster when asking questions about {theme_words[0] if theme_words else 'this topic'}."
+        else:
+            insight += f" **So What:** This is a specialized knowledge cluster that could provide focused insights for specific queries."
+
+        return insight
+
+    except Exception as e:
+        return f"This cluster contains {len(contents)} related memories that SAM has grouped based on conceptual similarity. **So What:** These memories likely share important thematic or contextual relationships."
+
+def refresh_synthesis_history():
+    """Refresh synthesis history display."""
+    st.success("📚 History refreshed!")
+    st.rerun()
+
+def get_synthesis_run_count():
+    """Get the number of synthesis runs."""
+    try:
+        history = st.session_state.get('synthesis_history', [])
+        return len(history)
+    except:
+        return 0
+
+def get_synthetic_memory_count():
+    """Get the count of synthetic memories."""
+    try:
+        from memory.memory_vectorstore import get_memory_store, MemoryType
+        memory_store = get_memory_store()
+
+        # Get all memories and count synthetic ones
+        all_memories = memory_store.get_all_memories()
+        synthetic_count = sum(1 for memory in all_memories if memory.memory_type == MemoryType.SYNTHESIS)
+        return synthetic_count
+    except:
+        return 0
+
+def get_synthesis_history():
+    """Get synthesis history."""
+    return st.session_state.get('synthesis_history', [])
+
+def render_dream_canvas_visualization(visualization_data):
+    """Render the interactive Dream Canvas visualization."""
+    try:
+        st.markdown("### 🌌 Interactive Memory Landscape")
+
+        # Display basic statistics
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Memory Points", len(visualization_data))
+
+        with col2:
+            cluster_ids = set(point.get('cluster_id', -1) for point in visualization_data)
+            cluster_count = len([c for c in cluster_ids if c != -1])
+            noise_count = sum(1 for point in visualization_data if point.get('cluster_id', -1) == -1)
+            st.metric("Clusters Discovered", cluster_count)
+
+        with col3:
+            clustered_count = len(visualization_data) - noise_count
+            clustered_percentage = (clustered_count / len(visualization_data)) * 100 if visualization_data else 0
+            st.metric("Memories Clustered", f"{clustered_count} ({clustered_percentage:.1f}%)")
+
+        with col4:
+            noise_percentage = (noise_count / len(visualization_data)) * 100 if visualization_data else 0
+            st.metric("Noise Points", f"{noise_count} ({noise_percentage:.1f}%)")
+
+        # Create actual Plotly visualization
+        try:
+            import plotly.express as px
+            import plotly.graph_objects as go
+            import pandas as pd
+
+            # Convert visualization data to DataFrame
+            df_data = []
+            for point in visualization_data:
+                # Ensure cluster_id is an integer
+                cluster_id = point.get('cluster_id', -1)
+                if isinstance(cluster_id, str):
+                    try:
+                        cluster_id = int(cluster_id)
+                    except (ValueError, TypeError):
+                        cluster_id = -1
+
+                df_data.append({
+                    'x': float(point['coordinates']['x']),
+                    'y': float(point['coordinates']['y']),
+                    'cluster_id': cluster_id,
+                    'content_snippet': str(point['content_snippet'])[:100],
+                    'memory_type': str(point['memory_type']),
+                    'source': str(point['source']),
+                    'importance_score': float(point.get('importance_score', 0.5)),
+                    'is_synthetic': bool(point.get('is_synthetic', False))
+                })
+
+            df = pd.DataFrame(df_data)
+
+            # Create enhanced color mapping for clusters
+            # Use a vibrant color palette that makes clusters pop
+            cluster_colors = [
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+                '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+                '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
+            ]
+
+            def get_cluster_color(cluster_id):
+                try:
+                    if cluster_id >= 0:
+                        return cluster_colors[int(cluster_id) % len(cluster_colors)]
+                    else:
+                        return '#CCCCCC'  # Light gray for noise points
+                except (TypeError, ValueError):
+                    return '#CCCCCC'
+
+            df['color'] = df['cluster_id'].apply(get_cluster_color)
+
+            # Create the scatter plot
+            fig = go.Figure()
+
+            # Add points by cluster
+            for cluster_id in df['cluster_id'].unique():
+                cluster_data = df[df['cluster_id'] == cluster_id]
+                cluster_name = f"Cluster {cluster_id}" if cluster_id >= 0 else "Noise"
+
+                fig.add_trace(go.Scatter(
+                    x=cluster_data['x'],
+                    y=cluster_data['y'],
+                    mode='markers',
+                    name=cluster_name,
+                    marker=dict(
+                        size=8 + cluster_data['importance_score'] * 4,
+                        color=cluster_data['color'].iloc[0] if len(cluster_data) > 0 else '#cccccc',
+                        opacity=0.7,
+                        line=dict(width=1, color='white')
+                    ),
+                    text=cluster_data['content_snippet'],
+                    hovertemplate='<b>%{text}</b><br>' +
+                                  'Source: %{customdata[0]}<br>' +
+                                  'Type: %{customdata[1]}<br>' +
+                                  'Importance: %{customdata[2]:.2f}<br>' +
+                                  '<extra></extra>',
+                    customdata=cluster_data[['source', 'memory_type', 'importance_score']].values
+                ))
+
+            # Update layout with proper text colors for white background
+            fig.update_layout(
+                title={
+                    'text': f'🧠 SAM\'s Memory Landscape ({len(visualization_data)} memories)',
+                    'x': 0.5,
+                    'font': {'size': 18, 'color': '#333333'}  # Dark text for white background
+                },
+                xaxis=dict(
+                    title='UMAP Dimension 1',
+                    titlefont={'color': '#333333'},  # Dark axis title
+                    tickfont={'color': '#333333'},   # Dark tick labels
+                    showgrid=True,
+                    gridcolor='#e0e0e0'
+                ),
+                yaxis=dict(
+                    title='UMAP Dimension 2',
+                    titlefont={'color': '#333333'},  # Dark axis title
+                    tickfont={'color': '#333333'},   # Dark tick labels
+                    showgrid=True,
+                    gridcolor='#e0e0e0'
+                ),
+                hovermode='closest',
+                showlegend=True,
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=1.01,
+                    font={'color': '#333333'},  # Dark legend text
+                    bgcolor='rgba(255,255,255,0.9)',
+                    bordercolor='#cccccc',
+                    borderwidth=1
+                ),
+                plot_bgcolor='#fafafa',
+                paper_bgcolor='white',
+                font={'color': '#333333'},  # Default font color for all text
+                height=600
+            )
+
+            # Display the interactive plot
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Add interactive cluster legend
+            if cluster_count > 1:
+                st.markdown("### 🎨 Cluster Explorer")
+
+                # Create cluster summary with insights
+                cluster_summary = []
+                for cluster_id in sorted([c for c in cluster_ids if c != -1]):
+                    cluster_data = df[df['cluster_id'] == cluster_id]
+                    cluster_color = get_cluster_color(cluster_id)
+
+                    # Extract meaningful content from cluster
+                    cluster_contents = cluster_data['content_snippet'].tolist()
+                    cluster_sources = cluster_data['source'].tolist()
+
+                    # Generate cluster insight
+                    cluster_insight = generate_cluster_insight(cluster_contents, cluster_sources, cluster_id)
+
+                    cluster_summary.append({
+                        'id': cluster_id,
+                        'color': cluster_color,
+                        'count': len(cluster_data),
+                        'avg_importance': cluster_data['importance_score'].mean(),
+                        'insight': cluster_insight,
+                        'contents': cluster_contents[:3],  # Sample contents
+                        'sources': list(set(cluster_sources))[:3]  # Unique sources
+                    })
+
+                # Display cluster list with insights
+                for i, cluster in enumerate(cluster_summary):
+                    with st.expander(f"🔵 Cluster {cluster['id']} - {cluster['count']} memories", expanded=False):
+                        # Cluster insight
+                        st.markdown(f"""
+                        <div style="
+                            border-left: 4px solid {cluster['color']};
+                            padding: 15px;
+                            margin: 10px 0;
+                            background: linear-gradient(135deg, {cluster['color']}15, {cluster['color']}05);
+                            border-radius: 0 8px 8px 0;
+                        ">
+                            <h4 style="color: {cluster['color']}; margin: 0 0 10px 0;">💡 Key Insight</h4>
+                            <p style="margin: 0; font-size: 1rem; line-height: 1.4;">
+                                {cluster['insight']}
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        # Cluster details
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.markdown("**📊 Cluster Stats:**")
+                            st.write(f"• **{cluster['count']} memories** in this cluster")
+                            st.write(f"• **Avg importance:** {cluster['avg_importance']:.2f}")
+                            st.write(f"• **Sources:** {len(cluster['sources'])} unique")
+
+                        with col2:
+                            st.markdown("**📝 Sample Content:**")
+                            for j, content in enumerate(cluster['contents'][:2]):
+                                st.write(f"• {content[:80]}...")
+
+                        # Sources
+                        if cluster['sources']:
+                            st.markdown("**📚 Key Sources:**")
+                            for source in cluster['sources'][:3]:
+                                source_name = source.split('/')[-1] if '/' in source else source
+                                st.write(f"• {source_name}")
+
+                        st.divider()
+
+                # Add noise points summary if any
+                if noise_count > 0:
+                    st.markdown(f"""
+                    <div style="
+                        border: 2px solid #CCCCCC;
+                        border-radius: 8px;
+                        padding: 10px;
+                        margin: 10px 0;
+                        background: linear-gradient(135deg, #CCCCCC20, #CCCCCC10);
+                    ">
+                        <h4 style="color: #666666; margin: 0;">⚪ Noise Points</h4>
+                        <p style="margin: 5px 0; font-size: 0.9rem;">
+                            <strong>{noise_count} isolated memories</strong><br>
+                            These memories don't fit into any cluster
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"Error creating visualization: {e}")
+            # Fallback to placeholder
+            st.markdown(f"""
+            <div style="
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                padding: 40px;
+                text-align: center;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                margin: 20px 0;
+            ">
+                <h4>🎨 Interactive Visualization</h4>
+                <p>Memory landscape with {len(visualization_data)} points</p>
+                <p style="font-size: 0.9rem; color: #666;">
+                    • Color-coded clusters • Interactive hover • Synthetic insights highlighted
+                </p>
+                <p style="font-size: 0.8rem; color: #888;">
+                    Plotly visualization error - using fallback display
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Data exploration
+        with st.expander("🔍 Explore Visualization Data", expanded=False):
+            # Sample data points
+            st.markdown("**Sample Memory Points:**")
+
+            for i, point in enumerate(visualization_data[:5]):
+                st.markdown(f"**Point {i+1}:**")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.caption(f"Type: {point.get('memory_type', 'Unknown')}")
+                    st.caption(f"Cluster: {point.get('cluster_id', 'None')}")
+                    st.caption(f"Synthetic: {'Yes' if point.get('is_synthetic') else 'No'}")
+
+                with col2:
+                    coords = point.get('coordinates', {})
+                    st.caption(f"X: {coords.get('x', 0):.3f}")
+                    st.caption(f"Y: {coords.get('y', 0):.3f}")
+                    st.caption(f"Source: {point.get('source', 'Unknown')}")
+
+                content = point.get('content_snippet', '')
+                if content:
+                    st.caption(f"Content: {content[:100]}...")
+
+                st.divider()
+
+    except Exception as e:
+        st.error(f"Error rendering visualization: {e}")
 
 if __name__ == "__main__":
     main()
