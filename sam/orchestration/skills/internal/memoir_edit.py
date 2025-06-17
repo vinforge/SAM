@@ -23,6 +23,7 @@ from ...uif import SAM_UIF, UIFStatus
 from ....core.model_layers import ResidualMemoryLayer, MEMOIRTransformerBlock
 from ....core.fingerprinter import TopHashFingerprinter
 from ....memory.edit_mask_db import EditMaskDatabase
+from ....core.diagnostics import GradientLogger, GradientHealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,15 @@ class MEMOIR_EditSkill(BaseSkillModule):
             'average_training_time': 0.0,
             'average_convergence_steps': 0.0
         }
-        
+
+        # Gradient health monitoring
+        self.gradient_monitor = GradientHealthMonitor(
+            vanishing_threshold=1e-7,
+            exploding_threshold=100.0,
+            noise_window=10,
+            stall_window=5
+        )
+
         logger.info(f"MEMOIR_EditSkill initialized with hidden_size={hidden_size}")
     
     def execute(self, uif: SAM_UIF) -> SAM_UIF:
@@ -174,9 +183,31 @@ class MEMOIR_EditSkill(BaseSkillModule):
             if edit_result["success"]:
                 self.successful_edits += 1
                 uif.add_log_entry(f"MEMOIR edit completed successfully", self.skill_name)
+
+                # Add gradient health information if available
+                training_metrics = edit_result.get("training_metrics", {})
+                if "gradient_pathology" in training_metrics:
+                    pathology = training_metrics["gradient_pathology"]
+                    if pathology != "healthy":
+                        uif.add_log_entry(f"Gradient health: {pathology}", self.skill_name)
             else:
                 self.failed_edits += 1
-                uif.add_warning(f"MEMOIR edit failed: {edit_result.get('error', 'Unknown error')}")
+                error_msg = edit_result.get('error', 'Unknown error')
+
+                # Enhanced error reporting with gradient health information
+                training_metrics = edit_result.get("training_metrics", {})
+                if "gradient_health" in training_metrics:
+                    health_report = training_metrics["gradient_health"]
+                    if health_report and health_report.pathology.value != "healthy":
+                        error_msg += f" | Gradient issue: {health_report.description}"
+                        uif.error_details = {
+                            "gradient_pathology": health_report.pathology.value,
+                            "gradient_severity": health_report.severity,
+                            "gradient_recommendations": health_report.recommendations,
+                            "original_error": edit_result.get('error', 'Unknown error')
+                        }
+
+                uif.add_warning(f"MEMOIR edit failed: {error_msg}")
             
             self.edit_count += 1
             
@@ -373,61 +404,95 @@ class MEMOIR_EditSkill(BaseSkillModule):
         edit_params = [target_layer.edit_weights[current_slot]]
         optimizer = optim.Adam(edit_params, lr=self.learning_rate)
         
-        # Training loop
+        # Training loop with gradient monitoring
         training_metrics = {
             "steps": 0,
             "losses": [],
             "converged": False,
-            "final_loss": float('inf')
+            "final_loss": float('inf'),
+            "gradient_health": None,
+            "gradient_pathology": None
         }
-        
-        for step in range(self.max_training_steps):
-            optimizer.zero_grad()
-            
-            # Generate synthetic training data
-            # In real implementation, this would be actual model forward/backward pass
-            hidden_states = self._generate_activations(edit_prompt, edit_context)
-            hidden_states = hidden_states.unsqueeze(0).unsqueeze(0)  # Add batch and sequence dims
-            
-            # Forward pass through residual memory layer
-            residual_output = target_layer(
-                hidden_states, 
-                edit_mask=edit_mask,
-                edit_id=None  # Use all active edits
-            )
-            
-            # Compute loss (simplified - real implementation would use language modeling loss)
-            target_activation = torch.ones_like(residual_output) * 0.1  # Target small positive activation
-            loss = nn.MSELoss()(residual_output, target_activation)
-            
-            # Backward pass
-            loss.backward()
-            
-            # Apply gradient only to the masked positions
-            with torch.no_grad():
-                grad = target_layer.edit_weights.grad[current_slot]
-                masked_grad = grad * edit_mask
-                target_layer.edit_weights.grad[current_slot] = masked_grad
-            
-            optimizer.step()
-            
-            # Track metrics
-            current_loss = loss.item()
-            training_metrics["losses"].append(current_loss)
-            training_metrics["steps"] = step + 1
-            
-            # Check convergence
-            if current_loss < self.convergence_threshold:
-                training_metrics["converged"] = True
-                break
-            
-            # Check for improvement
-            if step > 2 and len(training_metrics["losses"]) >= 3:
-                recent_losses = training_metrics["losses"][-3:]
-                if all(abs(recent_losses[i] - recent_losses[i-1]) < self.convergence_threshold 
-                       for i in range(1, len(recent_losses))):
+
+        # Initialize gradient logger for monitoring
+        with GradientLogger(
+            model=target_layer,
+            target_layers=['edit_weights'],
+            log_frequency=1
+        ) as gradient_logger:
+
+            for step in range(self.max_training_steps):
+                optimizer.zero_grad()
+
+                # Generate synthetic training data
+                # In real implementation, this would be actual model forward/backward pass
+                hidden_states = self._generate_activations(edit_prompt, edit_context)
+                hidden_states = hidden_states.unsqueeze(0).unsqueeze(0)  # Add batch and sequence dims
+
+                # Forward pass through residual memory layer
+                residual_output = target_layer(
+                    hidden_states,
+                    edit_mask=edit_mask,
+                    edit_id=None  # Use all active edits
+                )
+
+                # Compute loss (simplified - real implementation would use language modeling loss)
+                target_activation = torch.ones_like(residual_output) * 0.1  # Target small positive activation
+                loss = nn.MSELoss()(residual_output, target_activation)
+
+                # Backward pass
+                loss.backward()
+
+                # Log gradient information for monitoring
+                gradient_logger.log_step(
+                    loss_value=loss.item(),
+                    learning_rate=self.learning_rate
+                )
+
+                # Apply gradient only to the masked positions
+                with torch.no_grad():
+                    grad = target_layer.edit_weights.grad[current_slot]
+                    masked_grad = grad * edit_mask
+                    target_layer.edit_weights.grad[current_slot] = masked_grad
+
+                optimizer.step()
+
+                # Track metrics
+                current_loss = loss.item()
+                training_metrics["losses"].append(current_loss)
+                training_metrics["steps"] = step + 1
+
+                # Check convergence
+                if current_loss < self.convergence_threshold:
                     training_metrics["converged"] = True
                     break
+
+                # Check for improvement
+                if step > 2 and len(training_metrics["losses"]) >= 3:
+                    recent_losses = training_metrics["losses"][-3:]
+                    if all(abs(recent_losses[i] - recent_losses[i-1]) < self.convergence_threshold
+                           for i in range(1, len(recent_losses))):
+                        training_metrics["converged"] = True
+                        break
+
+            # Analyze gradient health after training
+            gradient_snapshots = gradient_logger.get_snapshots()
+            if gradient_snapshots:
+                health_report = self.gradient_monitor.analyze_gradient_health(gradient_snapshots)
+                training_metrics["gradient_health"] = health_report
+                training_metrics["gradient_pathology"] = health_report.pathology.value
+
+                # Log gradient health summary
+                health_summary = self.gradient_monitor.get_health_summary(health_report)
+                logger.info(f"Gradient health analysis: {health_summary}")
+
+                # If severe pathology detected, log detailed recommendations
+                if health_report.severity > 0.7:
+                    logger.warning(f"Severe gradient pathology detected: {health_report.description}")
+                    for recommendation in health_report.recommendations:
+                        logger.warning(f"  Recommendation: {recommendation}")
+            else:
+                logger.warning("No gradient snapshots captured during training")
         
         training_metrics["final_loss"] = training_metrics["losses"][-1] if training_metrics["losses"] else float('inf')
         
