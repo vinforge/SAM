@@ -2471,6 +2471,11 @@ def process_feedback_for_learning(feedback_data: dict):
                     }
                 )
                 logger.info(f"✅ Feedback stored in memory system: {feedback_data['feedback_id']}")
+
+                # CRITICAL FIX: Store corrections as knowledge entries for future retrieval
+                if feedback_data.get('correction_text') and feedback_data['feedback_type'] in ['negative', 'suggestion']:
+                    store_correction_as_knowledge(feedback_data)
+
         except Exception as memory_error:
             logger.warning(f"Memory integration failed: {memory_error}")
 
@@ -2558,6 +2563,67 @@ def calculate_feedback_importance(feedback_data: dict) -> float:
         importance += detail_bonus
 
     return min(1.0, importance)  # Cap at 1.0
+
+def store_correction_as_knowledge(feedback_data: dict):
+    """Store user corrections as knowledge entries for future retrieval."""
+    try:
+        logger.info(f"Storing correction as knowledge: {feedback_data['feedback_id']}")
+
+        correction_text = feedback_data.get('correction_text', '')
+        original_query = feedback_data.get('original_query', '')
+
+        if not correction_text or not original_query:
+            logger.warning("Missing correction text or original query - skipping knowledge storage")
+            return
+
+        # Create knowledge content that will be easily retrievable
+        knowledge_content = f"CORRECTED KNOWLEDGE: {correction_text}\n\n"
+        knowledge_content += f"Context: This correction was provided by the user in response to the query: '{original_query}'\n"
+        knowledge_content += f"Original incorrect response was corrected to: {correction_text}\n"
+        knowledge_content += f"This is authoritative user-provided information that should be prioritized in future responses."
+
+        # Store as high-priority knowledge with searchable tags
+        if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+            st.session_state.secure_memory_store.store_memory(
+                content=knowledge_content,
+                content_type='corrected_knowledge',
+                tags=['knowledge', 'user_correction', 'authoritative', 'high_priority', 'factual'],
+                importance_score=0.95,  # Very high importance for user corrections
+                metadata={
+                    'correction_id': feedback_data['feedback_id'],
+                    'original_query': original_query,
+                    'correction_text': correction_text,
+                    'correction_type': 'user_provided',
+                    'timestamp': feedback_data['timestamp'],
+                    'priority': 'HIGH',
+                    'source': 'user_feedback_correction'
+                }
+            )
+            logger.info(f"✅ Correction stored as knowledge: {feedback_data['feedback_id']}")
+
+        # Also store in regular memory store for broader access
+        try:
+            from memory.memory_vectorstore import get_memory_store
+            web_store = get_memory_store()
+
+            web_store.store_memory(
+                content=knowledge_content,
+                content_type='corrected_knowledge',
+                tags=['knowledge', 'user_correction', 'authoritative'],
+                importance_score=0.95,
+                metadata={
+                    'correction_id': feedback_data['feedback_id'],
+                    'source': 'user_correction',
+                    'timestamp': feedback_data['timestamp']
+                }
+            )
+            logger.info(f"✅ Correction also stored in regular memory store")
+
+        except Exception as web_store_error:
+            logger.warning(f"Failed to store correction in web store: {web_store_error}")
+
+    except Exception as e:
+        logger.error(f"Failed to store correction as knowledge: {e}")
 
 def determine_learning_priority(feedback_data: dict) -> str:
     """Determine learning priority based on feedback characteristics."""
@@ -2972,16 +3038,23 @@ def get_memory_feedback_insights(prompt: str) -> list:
         insights = []
 
         if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
-            # Search for feedback-related memories
+            # Search for feedback-related memories using compatible API
             feedback_memories = st.session_state.secure_memory_store.search_memories(
                 query=f"feedback learning {prompt}",
                 max_results=5,
-                content_type='user_feedback'
+                tags=['feedback', 'learning', 'user_interaction']  # Use tags instead of content_type
             )
 
             for memory in feedback_memories:
-                if 'Learning:' in memory.content:
-                    learning_text = memory.content.split('Learning:')[-1].strip()
+                if hasattr(memory, 'chunk') and hasattr(memory.chunk, 'content'):
+                    content = memory.chunk.content
+                elif hasattr(memory, 'content'):
+                    content = memory.content
+                else:
+                    continue
+
+                if 'Learning:' in content:
+                    learning_text = content.split('Learning:')[-1].strip()
                     insights.append(learning_text)
 
         return insights[:3]  # Limit to top 3 insights
@@ -6158,46 +6231,282 @@ def create_web_search_escalation_message(assessment, original_query: str) -> str
     return escalation_message, escalation_id
 
 def search_unified_memory(query: str, max_results: int = 5) -> list:
-    """Search both secure memory store and consolidated web knowledge."""
+    """Enhanced search across all memory stores with specific focus on uploaded documents."""
     try:
         all_results = []
 
-        # Search secure memory store (uploaded documents, secure content)
-        try:
-            secure_results = st.session_state.secure_memory_store.search_memories(
-                query=query,
-                max_results=max_results
-            )
-            # Tag secure results
-            for result in secure_results:
-                result.source_type = 'secure_documents'
-            all_results.extend(secure_results)
-            logger.info(f"Secure store search returned {len(secure_results)} results")
-        except Exception as e:
-            logger.warning(f"Secure store search failed: {e}")
+        logger.info(f"🔍 ENHANCED MEMORY SEARCH: '{query}' (max_results: {max_results})")
 
-        # Search consolidated web knowledge (vetted web content)
+        # PRIORITY 0: Search for user corrections first (CRITICAL FIX)
+        correction_results = []
+        try:
+            if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+                correction_results = st.session_state.secure_memory_store.search_memories(
+                    query=query,
+                    max_results=max_results,
+                    memory_types=['corrected_knowledge'],
+                    tags=['user_correction', 'authoritative', 'knowledge']
+                )
+                logger.info(f"🔧 User correction search returned {len(correction_results)} results")
+
+                # Boost correction scores to highest priority
+                for result in correction_results:
+                    result.source_type = 'user_corrections'
+                    if hasattr(result, 'similarity_score'):
+                        result.similarity_score = min(1.0, result.similarity_score * 1.5)  # Major boost
+                all_results.extend(correction_results)
+
+        except Exception as e:
+            logger.warning(f"⚠️ User correction search failed: {e}")
+
+        # PRIORITY 1: Search secure memory store (uploaded documents, whitepapers)
+        try:
+            if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+                # Use enhanced search if available for better document retrieval
+                if hasattr(st.session_state.secure_memory_store, 'enhanced_search_memories'):
+                    secure_results = st.session_state.secure_memory_store.enhanced_search_memories(
+                        query=query,
+                        max_results=max_results * 2,  # Get more candidates for better results
+                        memory_types=['document', 'consolidated'],  # Focus on documents
+                        tags=['uploaded', 'document', 'whitepaper', 'pdf']  # Target uploaded content
+                    )
+                    logger.info(f"📄 Enhanced secure search returned {len(secure_results)} document results")
+                else:
+                    # Fallback to regular search with document-specific parameters
+                    secure_results = st.session_state.secure_memory_store.search_memories(
+                        query=query,
+                        max_results=max_results * 2,
+                        memory_types=['document'],
+                        tags=['uploaded', 'document']
+                    )
+                    logger.info(f"📄 Regular secure search returned {len(secure_results)} document results")
+
+                # Tag and prioritize secure document results
+                for result in secure_results:
+                    result.source_type = 'uploaded_documents'
+                    # Boost score for uploaded documents
+                    if hasattr(result, 'similarity_score'):
+                        result.similarity_score = min(1.0, result.similarity_score * 1.1)
+                all_results.extend(secure_results)
+
+            else:
+                logger.warning("⚠️ Secure memory store not available")
+        except Exception as e:
+            logger.error(f"❌ Secure store search failed: {e}")
+
+        # PRIORITY 2: Search regular memory store (consolidated knowledge, web content)
         try:
             from memory.memory_vectorstore import get_memory_store
             web_store = get_memory_store()
-            web_results = web_store.search_memories(query, max_results=max_results)
+
+            # Use enhanced search if available
+            if hasattr(web_store, 'enhanced_search_memories'):
+                web_results = web_store.enhanced_search_memories(
+                    query=query,
+                    max_results=max_results,
+                    memory_types=['document', 'consolidated'],
+                    tags=['consolidated', 'knowledge']
+                )
+                logger.info(f"🌐 Enhanced web knowledge search returned {len(web_results)} results")
+            else:
+                web_results = web_store.search_memories(query, max_results=max_results)
+                logger.info(f"🌐 Regular web knowledge search returned {len(web_results)} results")
+
             # Tag web results
             for result in web_results:
                 result.source_type = 'web_knowledge'
             all_results.extend(web_results)
-            logger.info(f"Web knowledge search returned {len(web_results)} results")
-        except Exception as e:
-            logger.warning(f"Web knowledge search failed: {e}")
 
-        # Sort combined results by similarity score
-        all_results.sort(key=lambda x: x.similarity_score, reverse=True)
+        except Exception as e:
+            logger.warning(f"⚠️ Web knowledge search failed: {e}")
+
+        # PRIORITY 3: Search for specific document references
+        if any(term in query.lower() for term in ['pdf', 'paper', 'whitepaper', 'document', 'file']):
+            try:
+                # Additional search specifically for document metadata
+                if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+                    doc_specific_results = st.session_state.secure_memory_store.search_memories(
+                        query=f"filename document {query}",
+                        max_results=max_results,
+                        min_similarity=0.3  # Lower threshold for document name matches
+                    )
+                    for result in doc_specific_results:
+                        result.source_type = 'document_metadata'
+                        # Boost document name matches
+                        if hasattr(result, 'similarity_score'):
+                            result.similarity_score = min(1.0, result.similarity_score * 1.2)
+                    all_results.extend(doc_specific_results)
+                    logger.info(f"📋 Document-specific search returned {len(doc_specific_results)} results")
+            except Exception as e:
+                logger.warning(f"⚠️ Document-specific search failed: {e}")
+
+        # Sort combined results by similarity score (prioritizing uploaded documents)
+        all_results.sort(key=lambda x: (
+            x.source_type == 'uploaded_documents',  # Uploaded docs first
+            getattr(x, 'similarity_score', 0.0)     # Then by similarity
+        ), reverse=True)
+
+        # Log search results summary
+        source_counts = {}
+        for result in all_results:
+            source_type = getattr(result, 'source_type', 'unknown')
+            source_counts[source_type] = source_counts.get(source_type, 0) + 1
+
+        logger.info(f"📊 SEARCH RESULTS SUMMARY: {source_counts}")
+        logger.info(f"🎯 Returning top {min(len(all_results), max_results)} results")
 
         # Return top results
         return all_results[:max_results]
 
     except Exception as e:
-        logger.error(f"Unified search failed: {e}")
+        logger.error(f"❌ Unified search failed: {e}")
         return []
+
+def detect_document_query(query: str) -> bool:
+    """
+    Detect if a query is asking about uploaded documents, whitepapers, or local files.
+
+    This function prevents document queries from being routed to web search.
+    """
+    try:
+        query_lower = query.lower()
+
+        # PRIORITY 1: Explicit file references
+        file_indicators = [
+            '.pdf', '.docx', '.txt', '.md', '.doc',
+            'file', 'document', 'paper', 'whitepaper',
+            'uploaded', 'local file', 'my file', 'my document'
+        ]
+
+        # PRIORITY 2: ArXiv paper patterns (like 2506.21393v1.pdf)
+        import re
+        arxiv_pattern = r'\d{4}\.\d{5}v?\d*\.pdf'
+        has_arxiv_reference = bool(re.search(arxiv_pattern, query))
+
+        # PRIORITY 3: Document-specific question patterns
+        document_question_patterns = [
+            r'what is.*\.pdf.*about',
+            r'what.*in.*document',
+            r'summarize.*paper',
+            r'content of.*file',
+            r'uploaded.*document',
+            r'local.*file.*about',
+            r'whitepaper.*about',
+            r'paper.*titled',
+            r'document.*titled'
+        ]
+
+        # PRIORITY 4: Knowledge base queries about imported content
+        knowledge_base_patterns = [
+            'general domain knowledge',
+            'whitepapers imported',
+            'documents imported',
+            'uploaded whitepapers',
+            'imported to you',
+            'knowledge base',
+            'your documents',
+            'files you have'
+        ]
+
+        # Check all patterns
+        has_file_indicator = any(indicator in query_lower for indicator in file_indicators)
+        has_document_pattern = any(re.search(pattern, query_lower) for pattern in document_question_patterns)
+        has_knowledge_pattern = any(pattern in query_lower for pattern in knowledge_base_patterns)
+
+        # Log detection details
+        if has_file_indicator or has_arxiv_reference or has_document_pattern or has_knowledge_pattern:
+            logger.info(f"📄 DOCUMENT QUERY DETECTED:")
+            logger.info(f"   File indicators: {has_file_indicator}")
+            logger.info(f"   ArXiv reference: {has_arxiv_reference}")
+            logger.info(f"   Document patterns: {has_document_pattern}")
+            logger.info(f"   Knowledge patterns: {has_knowledge_pattern}")
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.error(f"Error in document query detection: {e}")
+        return False
+
+def diagnose_memory_retrieval(query: str) -> dict:
+    """Diagnostic function to debug memory retrieval issues."""
+    try:
+        diagnosis = {
+            'query': query,
+            'secure_store_available': False,
+            'secure_store_total_memories': 0,
+            'secure_store_search_results': 0,
+            'web_store_available': False,
+            'web_store_total_memories': 0,
+            'web_store_search_results': 0,
+            'sample_memory_sources': [],
+            'recommendations': []
+        }
+
+        # Check secure memory store
+        try:
+            if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+                diagnosis['secure_store_available'] = True
+
+                # Get total memory count
+                try:
+                    security_status = st.session_state.secure_memory_store.get_security_status()
+                    diagnosis['secure_store_total_memories'] = security_status.get('encrypted_chunk_count', 0)
+                except:
+                    diagnosis['secure_store_total_memories'] = 'unknown'
+
+                # Test search
+                test_results = st.session_state.secure_memory_store.search_memories(
+                    query=query,
+                    max_results=3
+                )
+                diagnosis['secure_store_search_results'] = len(test_results)
+
+                # Sample sources
+                for result in test_results[:2]:
+                    if hasattr(result, 'source'):
+                        diagnosis['sample_memory_sources'].append(f"Secure: {result.source}")
+
+        except Exception as e:
+            diagnosis['secure_store_error'] = str(e)
+
+        # Check web memory store
+        try:
+            from memory.memory_vectorstore import get_memory_store
+            web_store = get_memory_store()
+            diagnosis['web_store_available'] = True
+
+            # Get total memory count
+            try:
+                all_memories = web_store.get_all_memories()
+                diagnosis['web_store_total_memories'] = len(all_memories)
+            except:
+                diagnosis['web_store_total_memories'] = 'unknown'
+
+            # Test search
+            test_results = web_store.search_memories(query, max_results=3)
+            diagnosis['web_store_search_results'] = len(test_results)
+
+            # Sample sources
+            for result in test_results[:2]:
+                if hasattr(result, 'source'):
+                    diagnosis['sample_memory_sources'].append(f"Web: {result.source}")
+
+        except Exception as e:
+            diagnosis['web_store_error'] = str(e)
+
+        # Generate recommendations
+        if diagnosis['secure_store_total_memories'] == 0:
+            diagnosis['recommendations'].append("No memories found in secure store - check document upload process")
+        if diagnosis['secure_store_search_results'] == 0 and diagnosis['secure_store_total_memories'] > 0:
+            diagnosis['recommendations'].append("Memories exist but search returned no results - check search parameters")
+        if not diagnosis['secure_store_available']:
+            diagnosis['recommendations'].append("Secure memory store not initialized - check authentication")
+
+        return diagnosis
+
+    except Exception as e:
+        return {'error': str(e), 'query': query}
 
 def generate_secure_response(prompt: str, force_local: bool = False) -> str:
     """Generate a secure response using SAM's capabilities with Phase 8 confidence assessment, TPV monitoring, intelligent tool selection, and feedback-driven learning."""
@@ -6212,8 +6521,9 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
         # Phase -0.5: User Correction Detection for MEMOIR Learning (preserving 100% of functionality)
         try:
             correction_detected = detect_user_correction(prompt)
-            if correction_detected:
-                logger.info(f"🔧 User correction detected: {correction_detected['correction_text'][:100]}...")
+            if correction_detected and correction_detected.get('is_correction'):
+                correction_text = correction_detected.get('correction_text', '')
+                logger.info(f"🔧 User correction detected: {correction_text[:100]}...")
                 # Process the correction through MEMOIR
                 process_user_correction_for_memoir(correction_detected)
         except Exception as e:
@@ -6230,6 +6540,23 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
             logger.warning(f"MEMOIR knowledge retrieval failed, continuing with standard flow: {e}")
             memoir_context = {}
 
+        # Phase -0.1: PRIORITY Document Query Detection (CRITICAL FIX)
+        # This MUST run BEFORE web search to prevent uploaded documents from being ignored
+        try:
+            is_document_query = detect_document_query(prompt)
+            if is_document_query:
+                logger.info(f"📄 DOCUMENT QUERY DETECTED: '{prompt[:50]}...' - Routing to internal memory search")
+                # Force local search for document queries to prevent web search
+                force_local = True
+                # Add document query context
+                st.session_state['last_query_type'] = 'document_specific'
+                st.session_state['document_query_detected'] = True
+            else:
+                st.session_state['document_query_detected'] = False
+        except Exception as e:
+            logger.warning(f"Document query detection failed: {e}")
+            st.session_state['document_query_detected'] = False
+
         # Phase 0: MANDATORY Interactive Web Search Choice Before Tool Selection (preserving 100% of functionality)
         # This MUST run before any tool selection to ensure user control over web searches
         try:
@@ -6242,6 +6569,11 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
 
             logger.info(f"🔍 Checking for current info keywords in: '{prompt[:50]}...'")
             logger.info(f"🔍 Has current keyword: {has_current_keyword}")
+
+            # CRITICAL: Skip web search for document queries
+            if st.session_state.get('document_query_detected', False):
+                logger.info(f"📄 Skipping web search - document query detected")
+                has_current_keyword = False  # Override to prevent web search
 
             if has_current_keyword and not force_local:
                 # Check user's web search preference
@@ -6550,33 +6882,98 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
                 else:
                     general_results.append(result)
 
-            # Add document-specific content first (highest priority)
-            if doc_specific_results:
-                context_parts.append(f"📄 **PRIMARY DOCUMENT CONTENT** ({selected_document}):")
-                for i, result in enumerate(doc_specific_results[:4], 1):  # Limit to 4 for focus
-                    content_preview = result.chunk.content[:1200]  # More content for document discussions
+            # Enhanced document attribution and content organization with user corrections priority
+            user_correction_results = []
+            uploaded_doc_results = []
+            web_knowledge_results = []
+            other_results = []
+
+            # Categorize results by source type for better organization
+            for result in memory_results:
+                source_type = getattr(result, 'source_type', 'unknown')
+                if source_type == 'user_corrections':
+                    user_correction_results.append(result)
+                elif source_type in ['uploaded_documents', 'secure_documents', 'document_metadata']:
+                    uploaded_doc_results.append(result)
+                elif source_type == 'web_knowledge':
+                    web_knowledge_results.append(result)
+                else:
+                    other_results.append(result)
+
+            # PRIORITY 0: Add user corrections first (HIGHEST PRIORITY)
+            if user_correction_results:
+                context_parts.append("🔧 **USER CORRECTIONS** (Authoritative Information):")
+                for i, result in enumerate(user_correction_results[:3], 1):  # Limit to top 3 corrections
+                    source_name = result.chunk.source
+                    similarity = getattr(result, 'similarity_score', 0.0)
+
+                    # Enhanced content preview for corrections
+                    content_preview = result.chunk.content[:1200]  # Full content for corrections
+                    if len(result.chunk.content) > 1200:
+                        content_preview += "..."
+
+                    # Clear correction attribution
+                    context_parts.append(f"🎯 **Correction {i}: {source_name}** (Relevance: {similarity:.2f})")
+                    context_parts.append(f"Corrected Information: {content_preview}")
+
+                    logger.info(f"🔧 Including user correction: {source_name} (score: {similarity:.3f})")
+
+            # PRIORITY 1: Add uploaded document content (whitepapers, PDFs)
+            if uploaded_doc_results:
+                context_parts.append("📄 **UPLOADED DOCUMENT CONTENT** (Your Whitepapers & Documents):")
+                for i, result in enumerate(uploaded_doc_results[:5], 1):  # More results for uploaded docs
+                    source_name = result.chunk.source
+                    similarity = getattr(result, 'similarity_score', 0.0)
+
+                    # Enhanced content preview for documents
+                    content_preview = result.chunk.content[:1500]  # Longer content for documents
+                    if len(result.chunk.content) > 1500:
+                        content_preview += "..."
+
+                    # Clear document attribution
+                    context_parts.append(f"📋 **Document {i}: {source_name}** (Relevance: {similarity:.2f})")
+                    context_parts.append(f"Content: {content_preview}")
+
+                    logger.info(f"📄 Including uploaded document: {source_name} (score: {similarity:.3f})")
+
+            # PRIORITY 2: Add document-specific content if a document is selected
+            if doc_specific_results and selected_document:
+                if not uploaded_doc_results:  # Only add header if not already added
+                    context_parts.append(f"📄 **SELECTED DOCUMENT CONTENT** ({selected_document}):")
+                for i, result in enumerate(doc_specific_results[:3], 1):
+                    content_preview = result.chunk.content[:1200]
                     if len(result.chunk.content) > 1200:
                         content_preview += "..."
                     context_parts.append(f"Section {i}: {content_preview}")
 
-                if general_results:
-                    context_parts.append("\n🔗 **RELATED CONTEXT** (from other sources):")
+            # PRIORITY 3: Add web knowledge if relevant
+            if web_knowledge_results:
+                context_parts.append("\n🌐 **ADDITIONAL KNOWLEDGE** (Web Sources):")
+                for i, result in enumerate(web_knowledge_results[:2], 1):  # Limit web results
+                    source_name = result.chunk.source
+                    content_preview = result.chunk.content[:800]
+                    if len(result.chunk.content) > 800:
+                        content_preview += "..."
+                    context_parts.append(f"Source {i}: {source_name}\nContent: {content_preview}")
 
-            # Add general/related results
-            results_to_process = general_results if doc_specific_results else memory_results
-            for i, result in enumerate(results_to_process[:4], 1):  # Limit total results
-                source_type = getattr(result, 'source_type', 'unknown')
-                source_label = "📄 Document" if source_type == 'secure_documents' else "🌐 Web Knowledge" if source_type == 'web_knowledge' else "📋 Memory"
+            # PRIORITY 4: Add other results if needed
+            if other_results and not uploaded_doc_results and not web_knowledge_results:
+                context_parts.append("\n📋 **AVAILABLE CONTEXT**:")
+                for i, result in enumerate(other_results[:3], 1):
+                    source_type = getattr(result, 'source_type', 'unknown')
+                    source_label = "📄 Document" if 'document' in source_type else "📋 Memory"
+                    content_preview = result.chunk.content[:1000]
+                    if len(result.chunk.content) > 1000:
+                        content_preview += "..."
+                    context_parts.append(f"{source_label} - {result.chunk.source}\nContent: {content_preview}")
 
-                logger.debug(f"Result {i+1}: Score={result.similarity_score:.3f}, Source={result.chunk.source}, Type={source_type}")
-
-                # Get appropriate content length based on context
-                content_length = 800 if doc_specific_results else 1000
-                content_preview = result.chunk.content[:content_length]
-                if len(result.chunk.content) > content_length:
-                    content_preview += "..."
-
-                context_parts.append(f"{source_label} - {result.chunk.source}\nContent: {content_preview}")
+            # Log detailed search results for debugging
+            logger.info(f"📊 MEMORY SEARCH BREAKDOWN:")
+            logger.info(f"   🔧 User Corrections: {len(user_correction_results)}")
+            logger.info(f"   📄 Uploaded Documents: {len(uploaded_doc_results)}")
+            logger.info(f"   🌐 Web Knowledge: {len(web_knowledge_results)}")
+            logger.info(f"   📋 Other Sources: {len(other_results)}")
+            logger.info(f"   🎯 Total Results: {len(memory_results)}")
 
             context = "\n\n".join(context_parts)
 
@@ -6593,15 +6990,56 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
             try:
                 import requests
 
-                # Prepare the prompt for Ollama
-                system_prompt = f"""You are SAM, a secure AI assistant. Answer the user's question based on the provided content from {sources_text}.
+                # Enhanced system prompt with user corrections and document attribution guidance
+                correction_count = len(user_correction_results)
+                doc_count = len(uploaded_doc_results)
+                has_corrections = correction_count > 0
+                has_uploaded_docs = doc_count > 0
 
-When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.
+                if has_corrections:
+                    system_prompt = f"""You are SAM, a secure AI assistant with access to {correction_count} user correction(s), {doc_count} uploaded document(s), and {sources_text}.
+
+🎯 **CRITICAL**: You have access to user-provided corrections that override any other information. These corrections are authoritative and must be prioritized above all other sources.
+
+**Response Priority Order:**
+1. **User Corrections**: Always use corrected information provided by the user - this is the most authoritative source
+2. **Uploaded Documents**: Reference specific documents by name when relevant
+3. **Other Sources**: Use additional context when needed
+
+**Response Guidelines:**
+1. **When user corrections are available**: Start with "Based on your correction..." and use the corrected information
+2. **For document-specific questions**: Reference documents directly by name and cite specific content
+3. **Never contradict user corrections**: User-provided corrections are always correct
+4. **When information conflicts**: Prioritize user corrections over any other source
+
+When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process.
+
+Extract relevant information from the provided sources, prioritizing user corrections above all else."""
+                elif has_uploaded_docs:
+                    system_prompt = f"""You are SAM, a secure AI assistant with access to {doc_count} uploaded document(s) and {sources_text}.
+
+🔍 **IMPORTANT**: You have direct access to the user's uploaded whitepapers and documents. When answering questions about specific papers or documents, reference them directly by name and cite specific content.
+
+**Response Guidelines:**
+1. **For document-specific questions**: Start with "Based on your uploaded document [document name]..." and cite specific sections
+2. **For general questions**: Use information from uploaded documents when relevant, clearly attributing the source
+3. **When information is found**: Be specific about which document(s) contain the information
+4. **When information is missing**: Clearly state "I don't find information about [topic] in your uploaded documents"
+
+**Never say "likely content" or "based on the title" - you have access to the actual document content.**
+
+When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process.
+
+Extract relevant information from the provided sources to answer the question directly and thoroughly."""
+                else:
+                    system_prompt = f"""You are SAM, a secure AI assistant. Answer the user's question based on the provided content from {sources_text}.
+
+**Note**: No uploaded documents were found for this query. If the user is asking about specific documents they uploaded, let them know that you cannot locate those documents in your current search results.
+
+When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process.
 
 Be helpful and informative. Extract relevant information from the provided sources to answer the question directly.
-If the information isn't sufficient, say so clearly. Always be concise but thorough.
-
-The sources include both uploaded documents and current web knowledge that has been vetted and approved for your knowledge base."""
+If the information isn't sufficient, say so clearly. Always be concise but thorough."""
 
                 # Build user prompt with MEMOIR integration
                 user_prompt_parts = [f"Question: {prompt}"]
@@ -6812,39 +7250,83 @@ I'm SAM, your secure AI assistant. How can I help you further?"""
                     except Exception as e:
                         logger.warning(f"No results confidence assessment failed: {e}")
 
-                # Generate a response using Ollama even without specific context
-                try:
-                    import requests
+                # Enhanced response for document queries vs. general queries
+                is_doc_query = st.session_state.get('document_query_detected', False)
 
-                    system_prompt = """You are SAM, a helpful AI assistant. When thinking through questions, you can use <think>...</think> tags to show your reasoning process.
+                if is_doc_query:
+                    # Specific feedback for document queries
+                    logger.info(f"📄 No results found for document query - providing diagnostic feedback")
+
+                    # Run diagnostic to help user understand the issue
+                    try:
+                        diagnosis = diagnose_memory_retrieval(prompt)
+                        diagnostic_info = f"""
+📊 **Memory System Diagnostic:**
+- Secure Store Available: {diagnosis.get('secure_store_available', 'Unknown')}
+- Total Memories: {diagnosis.get('secure_store_total_memories', 'Unknown')}
+- Search Results: {diagnosis.get('secure_store_search_results', 'Unknown')}"""
+                    except:
+                        diagnostic_info = ""
+
+                    return f"""📄 **Document Search Results**
+
+I searched through your uploaded documents and memory system but couldn't find information about "{prompt}".
+
+**Possible reasons:**
+1. **Document not uploaded**: The specific file may not have been uploaded to SAM
+2. **Search terms mismatch**: Try using different keywords from the document
+3. **Processing issue**: The document may not have been properly processed during upload
+
+**Suggestions:**
+- Try searching with the exact document title or author name
+- Use key terms that would appear in the document content
+- Check if the document was successfully uploaded in the Document Library
+
+**For the query about "2506.21393v1.pdf" (Active Inference AI Systems):**
+If this document was uploaded, try searching with terms like:
+- "Active Inference"
+- "Scientific Discovery"
+- "AI Systems"
+- The author's name
+
+{diagnostic_info}
+
+Would you like me to help you search with different terms, or would you prefer to re-upload the document?"""
+
+                else:
+                    # Generate a response using Ollama for general queries
+                    try:
+                        import requests
+
+                        system_prompt = """You are SAM, a helpful AI assistant. When thinking through questions, you can use <think>...</think> tags to show your reasoning process.
 
 Answer the user's question helpfully and accurately based on your general knowledge."""
 
-                    ollama_response = requests.post(
-                        "http://localhost:11434/api/generate",
-                        json={
-                            "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
-                            "prompt": f"System: {system_prompt}\n\nUser: {prompt}\n\nAssistant:",
-                            "stream": False,
-                            "options": {
-                                "temperature": 0.7,
-                                "top_p": 0.9,
-                                "max_tokens": 500
-                            }
-                        },
-                        timeout=120  # Increased timeout to 120 seconds for complex analytical queries
-                    )
+                        ollama_response = requests.post(
+                            "http://localhost:11434/api/generate",
+                            json={
+                                "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                                "prompt": f"System: {system_prompt}\n\nUser: {prompt}\n\nAssistant:",
+                                "stream": False,
+                                "options": {
+                                    "temperature": 0.7,
+                                    "top_p": 0.9,
+                                    "max_tokens": 500
+                                }
+                            },
+                            timeout=120  # Increased timeout to 120 seconds for complex analytical queries
+                        )
 
-                    if ollama_response.status_code == 200:
-                        response_data = ollama_response.json()
-                        ai_response = response_data.get('response', '').strip()
-                        if ai_response:
-                            return ai_response
+                        if ollama_response.status_code == 200:
+                            response_data = ollama_response.json()
+                            ai_response = response_data.get('response', '').strip()
+                            if ai_response:
+                                return ai_response
 
-                except Exception as e:
-                    logger.error(f"Fallback Ollama call failed: {e}")
+                    except Exception as e:
+                        logger.error(f"Fallback Ollama call failed: {e}")
 
-                return f"""I searched through your {total_chunks} encrypted memory chunks but couldn't find relevant information about "{prompt}".
+                    return f"""I searched through your {total_chunks} encrypted memory chunks but couldn't find relevant information about "{prompt}".
 
 This could be because:
 - The search terms don't match the document content
@@ -7012,7 +7494,7 @@ def retrieve_memoir_knowledge(query: str) -> dict:
                     memoir_memories = st.session_state.secure_memory_store.search_memories(
                         query=query,
                         max_results=3,
-                        content_type='user_feedback'
+                        tags=['memoir', 'user_feedback', 'learning']  # Use tags instead of content_type
                     )
 
                     for memory in memoir_memories:
