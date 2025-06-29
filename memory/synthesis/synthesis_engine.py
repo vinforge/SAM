@@ -5,6 +5,10 @@ This module orchestrates the complete cognitive synthesis process, from clusteri
 analysis through insight generation to output logging.
 """
 
+import os
+# Prevent torch conflicts with Streamlit
+os.environ['PYTORCH_DISABLE_PER_OP_PROFILING'] = '1'
+
 import logging
 import json
 import numpy as np

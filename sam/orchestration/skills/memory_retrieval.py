@@ -198,8 +198,8 @@ class MemoryRetrievalSkill(BaseSkillModule):
             if self._memory_store:
                 vector_results = self._memory_store.search(
                     query=query,
-                    top_k=max_results,
-                    threshold=similarity_threshold
+                    max_results=max_results,
+                    min_similarity=similarity_threshold
                 )
                 results["vector_store"] = vector_results
                 
@@ -238,7 +238,7 @@ class MemoryRetrievalSkill(BaseSkillModule):
             from memory.knowledge_capsules import get_capsule_manager
             
             capsule_manager = get_capsule_manager()
-            capsules = capsule_manager.search_capsules(query, max_results=max_results)
+            capsules = capsule_manager.search_capsules(query, limit=max_results)
             
             return [
                 {

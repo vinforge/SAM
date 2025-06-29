@@ -113,7 +113,30 @@ class SecureMemoryVectorStore(MemoryVectorStore):
                 return False
         
         return True
-    
+
+    def activate_encryption(self) -> bool:
+        """Activate encryption if security manager becomes unlocked."""
+        if not self.encryption_enabled or not self._encryption_available:
+            return False
+
+        if not self.security_manager or not self.security_manager.is_unlocked():
+            return False
+
+        if self.encrypted_store is None:
+            try:
+                from security import EncryptedChromaStore
+                self.encrypted_store = EncryptedChromaStore(
+                    collection_name="sam_secure_memory",
+                    crypto_manager=self.security_manager.crypto
+                )
+                logger.info("✅ Encryption activated - secure storage now available")
+                return True
+            except Exception as e:
+                logger.error(f"❌ Failed to activate encryption: {e}")
+                return False
+
+        return True
+
     def add_memory(self, content: str, memory_type: MemoryType, source: str,
                   tags: List[str] = None, importance_score: float = 0.5,
                   metadata: Dict[str, Any] = None) -> str:

@@ -140,10 +140,11 @@ class MemoryVectorStore:
         
         # Initialize vector store
         self._initialize_vector_store()
-        
-        # Load existing memories
-        self._load_memories()
-        
+
+        # Load existing memories (ChromaDB loading is handled in _initialize_chroma)
+        if self.store_type != VectorStoreType.CHROMA:
+            self._load_memories()
+
         logger.info(f"Memory vector store initialized: {store_type.value} with {len(self.memory_chunks)} memories")
     
     def add_memory(self, content: str, memory_type: MemoryType, source: str,
@@ -276,6 +277,20 @@ class MemoryVectorStore:
         except Exception as e:
             logger.error(f"Error searching memories: {e}")
             return []
+
+    def search(self, query: str, max_results: int = 5, **kwargs) -> List[MemorySearchResult]:
+        """
+        Alias for search_memories for compatibility.
+
+        Args:
+            query: Search query
+            max_results: Maximum number of results
+            **kwargs: Additional search parameters
+
+        Returns:
+            List of memory search results
+        """
+        return self.search_memories(query, max_results, **kwargs)
 
     def enhanced_search_memories(self, query: str, max_results: int = 5,
                                initial_candidates: Optional[int] = None,
@@ -1093,7 +1108,8 @@ class MemoryVectorStore:
                 logger.info("No existing memories found in ChromaDB")
                 return
 
-            logger.info(f"Loading {len(all_data['ids'])} memories from ChromaDB...")
+            logger.info(f"Loading {len(all_data['ids'])} existing memories from ChromaDB...")
+            loaded_count = 0
 
             for i, chunk_id in enumerate(all_data["ids"]):
                 try:
@@ -1133,14 +1149,15 @@ class MemoryVectorStore:
                         metadata=metadata  # Store all metadata
                     )
 
-                    # Add to memory store
+                    # Add to memory store (no need to add to vector index since it's already in ChromaDB)
                     self.memory_chunks[chunk_id] = chunk
+                    loaded_count += 1
 
                 except Exception as e:
                     logger.error(f"Error loading memory chunk {chunk_id}: {e}")
                     continue
 
-            logger.info(f"Successfully loaded {len(self.memory_chunks)} memories from ChromaDB")
+            logger.info(f"Loaded {loaded_count} existing memories")
 
         except Exception as e:
             logger.error(f"Error loading memories from ChromaDB: {e}")
@@ -1191,19 +1208,33 @@ class MemoryVectorStore:
             return embedding
     
     def _add_to_vector_index(self, chunk_id: str, embedding: List[float]):
-        """Add embedding to vector index."""
+        """Add embedding to vector index with duplicate prevention."""
         try:
             if self.store_type == VectorStoreType.FAISS and self.faiss_index:
+                # Check for duplicates
+                if chunk_id in self.chunk_ids:
+                    logger.debug(f"Skipping duplicate embedding for chunk: {chunk_id}")
+                    return
+
                 embedding_array = np.array([embedding], dtype=np.float32)
                 self.faiss_index.add(embedding_array)
                 self.chunk_ids.append(chunk_id)
-                
+
                 # Save index
                 index_file = self.storage_dir / "faiss_index.bin"
                 import faiss
                 faiss.write_index(self.faiss_index, str(index_file))
-                
+
             elif self.store_type == VectorStoreType.CHROMA and self.chroma_client:
+                # Check if chunk already exists in ChromaDB
+                try:
+                    existing = self.chroma_collection.get(ids=[chunk_id])
+                    if existing["ids"]:
+                        logger.debug(f"Skipping duplicate embedding for chunk: {chunk_id}")
+                        return
+                except Exception:
+                    pass  # Chunk doesn't exist, proceed with adding
+
                 # Prepare enhanced metadata for Chroma
                 memory_chunk = self.memory_chunks[chunk_id]
                 enhanced_metadata = self._prepare_chroma_metadata(memory_chunk)
@@ -1214,15 +1245,20 @@ class MemoryVectorStore:
                     metadatas=[enhanced_metadata],
                     ids=[chunk_id]
                 )
-                
+
             elif self.store_type == VectorStoreType.SIMPLE:
+                # Check for duplicates
+                if chunk_id in self.chunk_ids:
+                    logger.debug(f"Skipping duplicate embedding for chunk: {chunk_id}")
+                    return
+
                 if self.embeddings_matrix is None:
                     self.embeddings_matrix = np.array([embedding])
                     self.chunk_ids = [chunk_id]
                 else:
                     self.embeddings_matrix = np.vstack([self.embeddings_matrix, embedding])
                     self.chunk_ids.append(chunk_id)
-            
+
         except Exception as e:
             logger.error(f"Error adding to vector index: {e}")
     
