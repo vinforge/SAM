@@ -14,9 +14,49 @@ import sys
 import subprocess
 import argparse
 import time
+import socket
 
 # Suppress PyTorch/Streamlit compatibility warnings
 os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
+
+def check_port_available(port):
+    """Check if a port is available."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('localhost', port))
+            return True
+    except OSError:
+        return False
+
+def find_available_port(start_port, max_attempts=10):
+    """Find an available port starting from start_port."""
+    for i in range(max_attempts):
+        port = start_port + i
+        if check_port_available(port):
+            return port
+    return None
+
+def kill_process_on_port(port):
+    """Kill process running on specified port."""
+    try:
+        if sys.platform == "darwin":  # macOS
+            subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, check=True)
+            result = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True)
+            if result.stdout.strip():
+                pids = result.stdout.strip().split('\n')
+                for pid in pids:
+                    subprocess.run(["kill", "-9", pid], capture_output=True)
+                print(f"✅ Killed process on port {port}")
+                time.sleep(2)  # Give time for port to be released
+                return True
+        else:  # Linux/Windows
+            subprocess.run(["fuser", "-k", f"{port}/tcp"], capture_output=True)
+            print(f"✅ Killed process on port {port}")
+            time.sleep(2)
+            return True
+    except Exception as e:
+        print(f"⚠️ Could not kill process on port {port}: {e}")
+        return False
 
 def print_banner():
     """Print SAM Secure Enclave banner."""
@@ -43,7 +83,11 @@ def check_dependencies():
 
     for module_name, description in required_packages:
         try:
-            __import__(module_name)
+            # Special handling for argon2 which is installed as argon2-cffi
+            if module_name == 'argon2':
+                import argon2
+            else:
+                __import__(module_name)
             print(f"  ✅ {description}")
         except ImportError:
             print(f"  ❌ {description}")
@@ -106,17 +150,48 @@ def run_migration():
 def launch_secure_streamlit():
     """Launch secure Streamlit application."""
     print("\n🚀 Launching SAM Secure Streamlit Application...")
-    
+
+    port = 8502
+
+    # Check if port is available
+    if not check_port_available(port):
+        print(f"⚠️ Port {port} is already in use")
+
+        # Try to kill existing process
+        print(f"🔄 Attempting to free port {port}...")
+        if kill_process_on_port(port):
+            if check_port_available(port):
+                print(f"✅ Port {port} is now available")
+            else:
+                print(f"❌ Port {port} still in use, finding alternative...")
+                alt_port = find_available_port(8503)
+                if alt_port:
+                    port = alt_port
+                    print(f"🔄 Using alternative port {port}")
+                else:
+                    print("❌ No available ports found")
+                    return
+        else:
+            # Find alternative port
+            alt_port = find_available_port(8503)
+            if alt_port:
+                port = alt_port
+                print(f"🔄 Using alternative port {port}")
+            else:
+                print("❌ No available ports found")
+                return
+
     try:
+        print(f"🌐 Starting SAM at: http://localhost:{port}")
         # Launch secure Streamlit app
         subprocess.run([
-            sys.executable, "-m", "streamlit", "run", 
+            sys.executable, "-m", "streamlit", "run",
             "secure_streamlit_app.py",
-            "--server.port=8502",
+            f"--server.port={port}",
             "--server.address=0.0.0.0",
             "--browser.gatherUsageStats=false"
         ])
-        
+
     except KeyboardInterrupt:
         print("\n👋 SAM Secure Streamlit stopped by user")
     except Exception as e:
@@ -136,44 +211,43 @@ def launch_secure_web_ui():
         print(f"❌ Failed to launch Secure Web UI: {e}")
 
 def launch_memory_ui():
-    """Launch memory control center."""
-    print("\n🧠 Launching Memory Control Center...")
-    print("\n⚠️  **SECURITY NOTICE:**")
-    print("   The Memory Control Center requires authentication.")
-    print("   1. First unlock SAM at http://localhost:8502")
-    print("   2. Then navigate to http://localhost:8501")
-    print("   3. If not authenticated, you will be redirected to the secure interface.")
-    print("\n🔗 Server will start at: http://localhost:8501 (no auto-open)")
+    """Launch memory control center (now integrated into secure interface)."""
+    print("\n🧠 Memory Control Center Access...")
+    print("\n✅ **UPDATED ARCHITECTURE:**")
+    print("   The Memory Control Center is now integrated into the secure interface.")
+    print("   🔗 Access it at: http://localhost:8502")
+    print("   📱 Use the 'Memory Center' tab in the secure interface")
+    print("   🔐 Authentication is handled automatically")
+    print("\n🚀 Launching Secure Interface with Memory Center...")
 
     try:
-        # Launch memory UI (no auto-open since authentication is required)
+        # Launch secure streamlit app which includes memory center
         subprocess.run([
             sys.executable, "-m", "streamlit", "run",
-            "ui/memory_app.py",
-            "--server.port=8501",
+            "secure_streamlit_app.py",
+            "--server.port=8502",
             "--server.address=0.0.0.0",
-            "--browser.gatherUsageStats=false",
-            "--server.headless=true"
+            "--browser.gatherUsageStats=false"
         ])
 
     except KeyboardInterrupt:
-        print("\n👋 Memory Control Center stopped by user")
+        print("\n👋 SAM Secure Interface stopped by user")
     except Exception as e:
-        print(f"❌ Failed to launch Memory Control Center: {e}")
+        print(f"❌ Failed to launch SAM Secure Interface: {e}")
 
 def launch_full_suite():
     """Launch full SAM suite with security."""
     print("\n🚀 Launching Full SAM Secure Suite...")
     print("This will start:")
-    print("  📱 Secure Streamlit App (port 8502) - Primary authentication interface")
+    print("  📱 Secure Streamlit App (port 8502) - Primary interface with integrated Memory Center")
     print("  🌐 Secure Web UI (port 5001)")
-    print("  🧠 Memory Control Center (port 8501) - Requires authentication")
+    print("  ✅ Memory Control Center is now integrated into the secure interface")
 
     processes = []
 
     try:
-        # Launch Secure Streamlit FIRST (primary authentication interface)
-        print("\n📱 Starting Secure Streamlit App (Primary Interface)...")
+        # Launch Secure Streamlit FIRST (primary authentication interface with integrated memory center)
+        print("\n📱 Starting Secure Streamlit App (Primary Interface with Memory Center)...")
         streamlit_process = subprocess.Popen([
             sys.executable, "-m", "streamlit", "run",
             "secure_streamlit_app.py",
@@ -190,17 +264,8 @@ def launch_full_suite():
         processes.append(("Web UI", web_process))
         time.sleep(2)
 
-        # Launch Memory UI (requires authentication, no auto-open)
-        print("🧠 Starting Memory Control Center...")
-        memory_process = subprocess.Popen([
-            sys.executable, "-m", "streamlit", "run",
-            "ui/memory_app.py",
-            "--server.port=8501",
-            "--server.address=0.0.0.0",
-            "--browser.gatherUsageStats=false",
-            "--server.headless=true"
-        ])
-        processes.append(("Memory UI", memory_process))
+        print("✅ Memory Control Center integrated into Secure Streamlit App")
+        print("   Access via the 'Memory Center' tab at http://localhost:8502")
 
         print("\n✅ All services started successfully!")
         print("\n🔐 **IMPORTANT - Authentication Required:**")

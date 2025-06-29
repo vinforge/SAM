@@ -79,6 +79,16 @@ task_run_reports/
 curiosity.log
 enrichment.log
 
+# Temporary Test and Demo Files
+test_*.py
+demo_*.py
+debug_*.py
+diagnose_*.py
+check_*.py
+cleanup_*.py
+*_test_*.py
+*_demo_*.py
+
 # SAM Specific - Config (keep templates)
 config/sam_config.json
 config/collab_key.json
