@@ -2456,9 +2456,12 @@ def process_feedback_for_learning(feedback_data: dict):
                 memory_content = create_feedback_memory_content(feedback_data)
 
                 # Store feedback as a learning memory
-                st.session_state.secure_memory_store.store_memory(
+                from memory.memory_vectorstore import MemoryType
+
+                st.session_state.secure_memory_store.add_memory(
                     content=memory_content,
-                    content_type='user_feedback',
+                    memory_type=MemoryType.CONVERSATION,
+                    source=f"feedback_{feedback_data['feedback_id']}",
                     tags=['feedback', 'learning', 'user_interaction', feedback_data['feedback_type']],
                     importance_score=calculate_feedback_importance(feedback_data),
                     metadata={
@@ -2467,7 +2470,8 @@ def process_feedback_for_learning(feedback_data: dict):
                         'message_index': feedback_data['message_index'],
                         'timestamp': feedback_data['timestamp'],
                         'interface': feedback_data['interface'],
-                        'learning_priority': determine_learning_priority(feedback_data)
+                        'learning_priority': determine_learning_priority(feedback_data),
+                        'content_type': 'user_feedback'
                     }
                 )
                 logger.info(f"✅ Feedback stored in memory system: {feedback_data['feedback_id']}")
@@ -2584,9 +2588,12 @@ def store_correction_as_knowledge(feedback_data: dict):
 
         # Store as high-priority knowledge with searchable tags
         if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
-            st.session_state.secure_memory_store.store_memory(
+            from memory.memory_vectorstore import MemoryType
+
+            st.session_state.secure_memory_store.add_memory(
                 content=knowledge_content,
-                content_type='corrected_knowledge',
+                memory_type=MemoryType.CONVERSATION,  # Use proper MemoryType enum
+                source=f"user_correction_{feedback_data['feedback_id']}",
                 tags=['knowledge', 'user_correction', 'authoritative', 'high_priority', 'factual'],
                 importance_score=0.95,  # Very high importance for user corrections
                 metadata={
@@ -2596,25 +2603,28 @@ def store_correction_as_knowledge(feedback_data: dict):
                     'correction_type': 'user_provided',
                     'timestamp': feedback_data['timestamp'],
                     'priority': 'HIGH',
-                    'source': 'user_feedback_correction'
+                    'source': 'user_feedback_correction',
+                    'content_type': 'corrected_knowledge'  # Add as metadata instead
                 }
             )
             logger.info(f"✅ Correction stored as knowledge: {feedback_data['feedback_id']}")
 
         # Also store in regular memory store for broader access
         try:
-            from memory.memory_vectorstore import get_memory_store
+            from memory.memory_vectorstore import get_memory_store, MemoryType
             web_store = get_memory_store()
 
-            web_store.store_memory(
+            web_store.add_memory(
                 content=knowledge_content,
-                content_type='corrected_knowledge',
+                memory_type=MemoryType.CONVERSATION,
+                source=f"user_correction_{feedback_data['feedback_id']}",
                 tags=['knowledge', 'user_correction', 'authoritative'],
                 importance_score=0.95,
                 metadata={
                     'correction_id': feedback_data['feedback_id'],
                     'source': 'user_correction',
-                    'timestamp': feedback_data['timestamp']
+                    'timestamp': feedback_data['timestamp'],
+                    'content_type': 'corrected_knowledge'
                 }
             )
             logger.info(f"✅ Correction also stored in regular memory store")
@@ -6241,10 +6251,10 @@ def search_unified_memory(query: str, max_results: int = 5) -> list:
         correction_results = []
         try:
             if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+                # Search for user corrections using tags (since content_type is now in metadata)
                 correction_results = st.session_state.secure_memory_store.search_memories(
                     query=query,
                     max_results=max_results,
-                    memory_types=['corrected_knowledge'],
                     tags=['user_correction', 'authoritative', 'knowledge']
                 )
                 logger.info(f"🔧 User correction search returned {len(correction_results)} results")

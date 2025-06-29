@@ -171,13 +171,14 @@ class MEMOIR_EditSkill(BaseSkillModule):
             uif.intermediate_data["edit_mask"] = edit_result["edit_mask"]
             uif.intermediate_data["training_metrics"] = edit_result["training_metrics"]
             
-            # Set skill outputs
+            # Set skill outputs with safe access to training metrics
+            training_metrics = edit_result.get("training_metrics", {})
             uif.set_skill_output(self.skill_name, {
                 "edit_id": edit_id,
                 "success": edit_result["success"],
-                "training_steps": edit_result["training_metrics"]["steps"],
-                "final_loss": edit_result["training_metrics"]["final_loss"],
-                "convergence_achieved": edit_result["training_metrics"]["converged"]
+                "training_steps": training_metrics.get("steps", 0),
+                "final_loss": training_metrics.get("final_loss", 0.0),
+                "convergence_achieved": training_metrics.get("converged", False)
             })
             
             if edit_result["success"]:
