@@ -162,7 +162,7 @@ class LongTermMemoryManager:
             if memory:
                 # Update access statistics
                 memory.last_accessed = datetime.now().isoformat()
-                memory.access_count += 1
+                memory.access_count = int(memory.access_count) + 1 if isinstance(memory.access_count, (str, int)) else 1
                 
                 # Boost importance slightly on access
                 memory.importance_score = min(1.0, memory.importance_score * 1.05)
@@ -395,7 +395,7 @@ class LongTermMemoryManager:
                 
                 # Importance and access
                 stats['average_importance'] += memory.importance_score
-                stats['total_access_count'] += memory.access_count
+                stats['total_access_count'] += int(memory.access_count) if isinstance(memory.access_count, (str, int)) else 0
                 
                 # Expired count
                 if self._is_memory_expired(memory):
