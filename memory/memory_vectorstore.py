@@ -843,14 +843,19 @@ class MemoryVectorStore:
                 sorted_by_time = sorted(self.memory_chunks.values(), key=lambda c: c.timestamp)
                 stats['oldest_memory'] = sorted_by_time[0].timestamp
                 stats['newest_memory'] = sorted_by_time[-1].timestamp
-                
-                # Most accessed
-                most_accessed = max(self.memory_chunks.values(), key=lambda c: c.access_count)
-                stats['most_accessed'] = {
-                    'chunk_id': most_accessed.chunk_id,
-                    'access_count': most_accessed.access_count,
-                    'content_preview': most_accessed.content[:100]
-                }
+
+                # Most accessed (with safe integer conversion)
+                try:
+                    most_accessed = max(self.memory_chunks.values(),
+                                      key=lambda c: int(c.access_count) if isinstance(c.access_count, (str, int)) else 0)
+                    stats['most_accessed'] = {
+                        'chunk_id': most_accessed.chunk_id,
+                        'access_count': most_accessed.access_count,
+                        'content_preview': most_accessed.content[:100]
+                    }
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Error finding most accessed memory: {e}")
+                    stats['most_accessed'] = {'error': 'Unable to determine most accessed memory'}
             
             return stats
             
@@ -1333,6 +1338,15 @@ class MemoryVectorStore:
             chunk_dict = asdict(chunk)
             chunk_dict['memory_type'] = chunk.memory_type.value  # Convert enum to string
 
+            # Convert numpy array to list for JSON serialization
+            if chunk_dict.get('embedding') is not None:
+                if hasattr(chunk_dict['embedding'], 'tolist'):
+                    chunk_dict['embedding'] = chunk_dict['embedding'].tolist()
+                elif isinstance(chunk_dict['embedding'], list):
+                    chunk_dict['embedding'] = chunk_dict['embedding']  # Already a list
+                else:
+                    chunk_dict['embedding'] = list(chunk_dict['embedding'])  # Convert to list
+
             with open(chunk_file, 'w', encoding='utf-8') as f:
                 json.dump(chunk_dict, f, indent=2, ensure_ascii=False)
 
@@ -1358,10 +1372,10 @@ class MemoryVectorStore:
                         source=chunk_data['source'],
                         timestamp=chunk_data['timestamp'],
                         tags=chunk_data['tags'],
-                        importance_score=chunk_data['importance_score'],
-                        access_count=chunk_data['access_count'],
+                        importance_score=float(chunk_data.get('importance_score', 0.0)),
+                        access_count=int(chunk_data.get('access_count', 0)),  # Safe integer conversion
                         last_accessed=chunk_data['last_accessed'],
-                        metadata=chunk_data['metadata']
+                        metadata=chunk_data.get('metadata', {})
                     )
                     
                     self.memory_chunks[chunk.chunk_id] = chunk
