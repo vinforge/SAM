@@ -265,10 +265,9 @@ class MEMOIRTransformerBlock(nn.Module):
         self.norm2 = nn.LayerNorm(hidden_size)
         
         # Feed-forward network
-        activation_fn = getattr(F, activation) if hasattr(F, activation) else F.gelu
         self.ffn = nn.Sequential(
             nn.Linear(hidden_size, intermediate_size),
-            activation_fn,
+            nn.GELU() if activation == 'gelu' else nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(intermediate_size, hidden_size)
         )
@@ -314,9 +313,16 @@ class MEMOIRTransformerBlock(nn.Module):
             Tuple of (output_states, attention_weights)
         """
         # Self-attention with residual connection
+        # Convert attention mask format for PyTorch MultiheadAttention
+        # attention_mask should be [batch_size, seq_len] with 1 for valid tokens, 0 for padding
+        # key_padding_mask should be [batch_size, seq_len] with True for padding tokens
+        key_padding_mask = None
+        if attention_mask is not None:
+            key_padding_mask = (attention_mask == 0)  # True for padding tokens
+
         attn_output, attn_weights = self.attention(
             hidden_states, hidden_states, hidden_states,
-            attn_mask=attention_mask,
+            key_padding_mask=key_padding_mask,
             need_weights=return_attention_weights
         )
         hidden_states = self.norm1(hidden_states + attn_output)
