@@ -66,7 +66,7 @@
 ### 1. Install SAM
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/SAM.git
+git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
 # Run the setup launcher (recommended for new users)

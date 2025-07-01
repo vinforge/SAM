@@ -75,7 +75,7 @@
 #### Option 1: Automated Installation (Recommended)
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/SAM.git
+git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
 # Run the setup launcher (recommended for new users)
@@ -85,7 +85,7 @@ python setup.py
 #### Option 2: Quick Setup
 ```bash
 # Clone and setup
-git clone https://github.com/your-username/SAM.git
+git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
 # Install dependencies and initialize
@@ -95,7 +95,7 @@ python install_sam.py
 #### Option 3: Manual Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/SAM.git
+git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
 # Install dependencies
@@ -244,7 +244,7 @@ We welcome contributions to SAM's revolutionary AI capabilities! Please see our 
 ### Development Setup
 ```bash
 # Clone for development
-git clone https://github.com/your-username/SAM.git
+git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
 # Install in development mode
@@ -330,8 +330,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 - **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/your-username/SAM/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/SAM/discussions)
+- **Issues**: [GitHub Issues](https://github.com/forge-1825/SAM/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/forge-1825/SAM/discussions)
 - **Task 27 Guide**: [Task 27 Implementation](docs/TASK27_IMPLEMENTATION_COMPLETE.md)
 - **Security Guide**: [Enterprise Security](security/README.md)
 
@@ -346,7 +346,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you find SAM useful, please consider giving it a star! ⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=your-username/SAM&type=Date)](https://star-history.com/#your-username/SAM&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=forge-1825/SAM&type=Date)](https://star-history.com/#forge-1825/SAM&Date)
 
 ---
 
