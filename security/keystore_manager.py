@@ -1,307 +1,394 @@
 """
-SAM Secure Enclave - Keystore Management
+Keystore Manager for SAM Security Module
 
-Manages secure storage of cryptographic metadata including salts and verifier hashes.
-Implements secure file handling with proper permissions and audit trails.
-
-Security Features:
-- Secure file permissions (600 - owner read/write only)
-- JSON-based keystore format with versioning
-- Audit trail for security monitoring
-- Cross-platform compatibility
+Manages secure storage of cryptographic keys and security metadata.
+Provides enterprise-grade keystore functionality with audit trails.
 
 Author: SAM Development Team
-Version: 1.0.0
+Version: 2.0.0
 """
 
 import json
-import os
-import uuid
+import secrets
 import logging
 from pathlib import Path
-from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
+from datetime import datetime, timedelta
+from dataclasses import dataclass, asdict
 
-# Configure logging
+from .crypto_utils import CryptoManager
+
 logger = logging.getLogger(__name__)
 
-class KeystoreError(Exception):
-    """Base exception for keystore-related errors"""
-    pass
+@dataclass
+class KeystoreMetadata:
+    """Metadata for the keystore."""
+    version: str
+    created_at: str
+    last_accessed: str
+    installation_id: str
+    first_setup_completed: bool
+    access_count: int
+    last_backup: Optional[str] = None
 
-class KeystoreNotFoundError(KeystoreError):
-    """Raised when keystore file is not found"""
-    pass
-
-class KeystoreCorruptedError(KeystoreError):
-    """Raised when keystore file is corrupted or invalid"""
-    pass
+@dataclass
+class KDFConfig:
+    """Key derivation function configuration."""
+    algorithm: str
+    iterations: Optional[int] = None
+    memory_cost: Optional[int] = None
+    parallelism: Optional[int] = None
+    time_cost: Optional[int] = None
+    salt_length: int = 16
+    hash_length: int = 32
 
 class KeystoreManager:
     """
-    Manages the secure keystore file for SAM's cryptographic metadata.
+    Manages the SAM security keystore.
     
-    The keystore contains:
-    - Salt for key derivation
-    - Verifier hash for password verification
-    - Security configuration parameters
-    - Audit trail metadata
-    
-    The keystore file is stored with restricted permissions and never contains
-    the actual encryption key.
+    Features:
+    - Secure key storage with verification
+    - Audit trail and access logging
+    - Backup and recovery support
+    - Installation ID tracking
+    - Automatic keystore validation
     """
     
-    KEYSTORE_VERSION = "1.0"
-    DEFAULT_KEYSTORE_PATH = "security/keystore.json"
-    
-    def __init__(self, keystore_path: Optional[str] = None):
-        """
-        Initialize keystore manager.
-        
-        Args:
-            keystore_path: Path to keystore file (default: security/keystore.json)
-        """
-        self.keystore_path = Path(keystore_path or self.DEFAULT_KEYSTORE_PATH)
+    def __init__(self, keystore_path: Optional[Path] = None):
+        self.keystore_path = keystore_path or Path("security/keystore.json")
+        self.crypto = CryptoManager()
+        self.logger = logging.getLogger(f"{__name__}.KeystoreManager")
         
         # Ensure security directory exists
-        self.keystore_path.parent.mkdir(exist_ok=True, mode=0o700)
+        self.keystore_path.parent.mkdir(exist_ok=True)
         
-        logger.info(f"Keystore manager initialized: {self.keystore_path}")
+        self.logger.info(f"KeystoreManager initialized with path: {self.keystore_path}")
     
-    def is_first_run(self) -> bool:
+    def create_keystore(self, password: str) -> bool:
         """
-        Check if this is the first run (no keystore exists).
-        
-        Returns:
-            True if keystore doesn't exist, False otherwise
-        """
-        exists = self.keystore_path.exists()
-        logger.info(f"First run check: keystore exists = {exists}")
-        return not exists
-    
-    def create_keystore(self, salt: bytes, verifier_hash: str, 
-                       kdf_config: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Create a new keystore with the provided cryptographic metadata.
+        Create a new keystore with master password.
         
         Args:
-            salt: Random salt used for key derivation
-            verifier_hash: SHA-256 hash of the derived key
-            kdf_config: Key derivation function configuration
+            password: Master password for the keystore
             
-        Raises:
-            KeystoreError: If keystore creation fails
+        Returns:
+            True if keystore created successfully
         """
-        if self.keystore_path.exists():
-            raise KeystoreError("Keystore already exists - cannot overwrite")
-        
         try:
-            # Default KDF configuration
-            if kdf_config is None:
-                kdf_config = {
-                    "algorithm": "argon2id",
-                    "time_cost": 3,
-                    "memory_cost": 65536,
-                    "parallelism": 4,
-                    "salt_length": 16,
-                    "hash_length": 32
-                }
+            # Generate installation ID
+            installation_id = f"sam_{secrets.token_hex(8)}"
             
-            # Create keystore data structure
+            # Derive key and get salt
+            derived_key, salt = self.crypto.derive_key_from_password(password)
+            
+            # Create verifier hash for password verification
+            verifier_hash = self.crypto.generate_secure_token(32)
+            self.crypto.set_session_key(derived_key)
+            
+            # Encrypt the verifier with the derived key
+            verifier_result = self.crypto.encrypt(verifier_hash)
+            
+            # Determine KDF algorithm used
+            try:
+                import argon2
+                kdf_config = KDFConfig(
+                    algorithm="argon2id",
+                    time_cost=3,
+                    memory_cost=65536,
+                    parallelism=4,
+                    salt_length=16,
+                    hash_length=32
+                )
+            except ImportError:
+                kdf_config = KDFConfig(
+                    algorithm="pbkdf2_sha256",
+                    iterations=100000,
+                    salt_length=16,
+                    hash_length=32
+                )
+            
+            # Create metadata
+            now = datetime.now().isoformat()
+            metadata = KeystoreMetadata(
+                version="2.0.0",
+                created_at=now,
+                last_accessed=now,
+                installation_id=installation_id,
+                first_setup_completed=True,
+                access_count=1
+            )
+            
+            # Create keystore data
             keystore_data = {
-                "version": self.KEYSTORE_VERSION,
-                "created_at": datetime.utcnow().isoformat() + "Z",
-                "kdf_config": kdf_config,
+                "metadata": asdict(metadata),
+                "kdf_config": asdict(kdf_config),
                 "salt": salt.hex(),
-                "verifier_hash": f"sha256:{verifier_hash}",
-                "metadata": {
-                    "installation_id": str(uuid.uuid4()),
-                    "first_setup_completed": True,
-                    "last_unlock_attempt": None,
-                    "unlock_attempt_count": 0,
-                    "created_by": "SAM Secure Enclave v1.0"
-                }
+                "verifier": {
+                    "ciphertext": verifier_result.ciphertext.hex(),
+                    "nonce": verifier_result.nonce.hex(),
+                    "tag": verifier_result.tag.hex(),
+                    "metadata": verifier_result.metadata
+                },
+                "security_settings": {
+                    "session_timeout_minutes": 60,
+                    "max_failed_attempts": 5,
+                    "lockout_duration_minutes": 30,
+                    "require_password_on_startup": True,
+                    "auto_lock_on_idle": True,
+                    "audit_logging_enabled": True
+                },
+                "audit_log": [
+                    {
+                        "timestamp": now,
+                        "event": "keystore_created",
+                        "details": {
+                            "installation_id": installation_id,
+                            "kdf_algorithm": kdf_config.algorithm
+                        }
+                    }
+                ]
             }
             
-            # Write keystore with atomic operation
-            temp_path = self.keystore_path.with_suffix('.tmp')
-            
-            with open(temp_path, 'w') as f:
+            # Save keystore
+            with open(self.keystore_path, 'w') as f:
                 json.dump(keystore_data, f, indent=2)
             
-            # Atomic move to final location
-            temp_path.replace(self.keystore_path)
+            # Set secure file permissions (Unix-like systems)
+            try:
+                import stat
+                self.keystore_path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 600 permissions
+            except (ImportError, OSError):
+                pass  # Windows or permission error
             
-            # Set secure file permissions (Unix/Linux/macOS)
-            if os.name != 'nt':  # Not Windows
-                os.chmod(self.keystore_path, 0o600)
-            
-            logger.info("Keystore created successfully")
+            self.logger.info(f"Keystore created successfully: {installation_id}")
+            return True
             
         except Exception as e:
-            # Clean up temporary file if it exists
-            temp_path = self.keystore_path.with_suffix('.tmp')
-            if temp_path.exists():
-                temp_path.unlink()
-            
-            logger.error(f"Failed to create keystore: {e}")
-            raise KeystoreError(f"Keystore creation failed: {e}")
+            self.logger.error(f"Failed to create keystore: {e}")
+            return False
+        finally:
+            # Clear session key
+            self.crypto.clear_session_key()
     
-    def load_keystore(self) -> Dict[str, Any]:
+    def verify_password(self, password: str) -> Tuple[bool, Optional[bytes]]:
         """
-        Load and validate keystore data.
+        Verify master password and return session key if valid.
         
-        Returns:
-            Dictionary containing keystore data
+        Args:
+            password: Password to verify
             
-        Raises:
-            KeystoreNotFoundError: If keystore file doesn't exist
-            KeystoreCorruptedError: If keystore is invalid or corrupted
+        Returns:
+            Tuple of (is_valid, session_key)
         """
+        try:
+            if not self.keystore_path.exists():
+                self.logger.error("Keystore file not found")
+                return False, None
+            
+            # Load keystore
+            with open(self.keystore_path, 'r') as f:
+                keystore_data = json.load(f)
+            
+            # Extract salt and verifier
+            salt = bytes.fromhex(keystore_data['salt'])
+            verifier_data = keystore_data['verifier']
+            
+            # Derive key from password
+            derived_key, _ = self.crypto.derive_key_from_password(password, salt)
+            
+            # Set session key and try to decrypt verifier
+            self.crypto.set_session_key(derived_key)
+            
+            try:
+                ciphertext = bytes.fromhex(verifier_data['ciphertext'])
+                nonce = bytes.fromhex(verifier_data['nonce'])
+                tag = bytes.fromhex(verifier_data['tag'])
+                
+                # Attempt decryption
+                result = self.crypto.decrypt(ciphertext, nonce, tag)
+                
+                # If we get here, password is correct
+                self._update_access_log(keystore_data, "password_verified")
+                
+                self.logger.info("Password verified successfully")
+                return True, derived_key
+                
+            except ValueError:
+                # Decryption failed - wrong password
+                self._update_access_log(keystore_data, "password_verification_failed")
+                self.logger.warning("Password verification failed")
+                return False, None
+                
+        except Exception as e:
+            self.logger.error(f"Password verification error: {e}")
+            return False, None
+        finally:
+            # Don't clear session key here - caller needs it
+            pass
+    
+    def is_setup_required(self) -> bool:
+        """Check if keystore setup is required."""
         if not self.keystore_path.exists():
-            raise KeystoreNotFoundError("Keystore file not found")
+            return True
         
         try:
             with open(self.keystore_path, 'r') as f:
                 keystore_data = json.load(f)
             
-            # Validate keystore structure
-            self._validate_keystore(keystore_data)
-            
-            logger.info("Keystore loaded successfully")
-            return keystore_data
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Keystore JSON parsing failed: {e}")
-            raise KeystoreCorruptedError(f"Keystore file is corrupted: {e}")
-        except Exception as e:
-            logger.error(f"Failed to load keystore: {e}")
-            raise KeystoreError(f"Keystore loading failed: {e}")
-    
-    def _validate_keystore(self, keystore_data: Dict[str, Any]) -> None:
-        """
-        Validate keystore data structure and content.
-        
-        Args:
-            keystore_data: Keystore data to validate
-            
-        Raises:
-            KeystoreCorruptedError: If keystore is invalid
-        """
-        required_fields = ['version', 'salt', 'verifier_hash', 'kdf_config']
-        
-        for field in required_fields:
-            if field not in keystore_data:
-                raise KeystoreCorruptedError(f"Missing required field: {field}")
-        
-        # Validate version
-        if keystore_data['version'] != self.KEYSTORE_VERSION:
-            logger.warning(f"Keystore version mismatch: {keystore_data['version']} != {self.KEYSTORE_VERSION}")
-        
-        # Validate salt format
-        try:
-            salt_bytes = bytes.fromhex(keystore_data['salt'])
-            if len(salt_bytes) != 16:  # 128-bit salt
-                raise KeystoreCorruptedError("Invalid salt length")
-        except ValueError:
-            raise KeystoreCorruptedError("Invalid salt format")
-        
-        # Validate verifier hash format
-        verifier = keystore_data['verifier_hash']
-        if not verifier.startswith('sha256:') or len(verifier) != 71:  # 'sha256:' + 64 hex chars
-            raise KeystoreCorruptedError("Invalid verifier hash format")
-        
-        logger.info("Keystore validation passed")
-    
-    def update_unlock_attempt(self, success: bool) -> None:
-        """
-        Update unlock attempt metadata.
-        
-        Args:
-            success: Whether the unlock attempt was successful
-            
-        Raises:
-            KeystoreError: If update fails
-        """
-        try:
-            keystore_data = self.load_keystore()
-            
-            # Update metadata
-            keystore_data["metadata"]["last_unlock_attempt"] = datetime.utcnow().isoformat() + "Z"
-            keystore_data["metadata"]["unlock_attempt_count"] = keystore_data["metadata"].get("unlock_attempt_count", 0) + 1
-            
-            if success:
-                keystore_data["metadata"]["last_successful_unlock"] = datetime.utcnow().isoformat() + "Z"
-            
-            # Write updated keystore
-            temp_path = self.keystore_path.with_suffix('.tmp')
-            
-            with open(temp_path, 'w') as f:
-                json.dump(keystore_data, f, indent=2)
-            
-            temp_path.replace(self.keystore_path)
-            
-            # Restore file permissions
-            if os.name != 'nt':
-                os.chmod(self.keystore_path, 0o600)
-            
-            logger.info(f"Unlock attempt recorded: success={success}")
+            metadata = keystore_data.get('metadata', {})
+            return not metadata.get('first_setup_completed', False)
             
         except Exception as e:
-            logger.error(f"Failed to update unlock attempt: {e}")
-            raise KeystoreError(f"Unlock attempt update failed: {e}")
+            self.logger.error(f"Error checking setup status: {e}")
+            return True
     
-    def get_security_info(self) -> Dict[str, Any]:
-        """
-        Get security information from keystore.
-        
-        Returns:
-            Dictionary containing security information
-        """
-        try:
-            keystore_data = self.load_keystore()
-            
-            return {
-                'version': keystore_data['version'],
-                'created_at': keystore_data['created_at'],
-                'kdf_algorithm': keystore_data['kdf_config']['algorithm'],
-                'installation_id': keystore_data['metadata']['installation_id'],
-                'unlock_attempt_count': keystore_data['metadata'].get('unlock_attempt_count', 0),
-                'last_unlock_attempt': keystore_data['metadata'].get('last_unlock_attempt'),
-                'last_successful_unlock': keystore_data['metadata'].get('last_successful_unlock')
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to get security info: {e}")
-            return {'error': str(e)}
-    
-    def backup_keystore(self, backup_path: str) -> None:
-        """
-        Create a backup of the keystore.
-        
-        Args:
-            backup_path: Path for backup file
-            
-        Raises:
-            KeystoreError: If backup fails
-        """
+    def validate_keystore(self) -> bool:
+        """Validate keystore integrity and structure."""
         try:
             if not self.keystore_path.exists():
-                raise KeystoreNotFoundError("No keystore to backup")
+                self.logger.error("Keystore file does not exist")
+                return False
             
-            backup_path_obj = Path(backup_path)
-            backup_path_obj.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.keystore_path, 'r') as f:
+                keystore_data = json.load(f)
             
-            # Copy keystore to backup location
-            import shutil
-            shutil.copy2(self.keystore_path, backup_path_obj)
+            # Check required fields
+            required_fields = ['metadata', 'kdf_config', 'salt', 'verifier']
+            for field in required_fields:
+                if field not in keystore_data:
+                    self.logger.error(f"Missing required field: {field}")
+                    return False
             
-            # Set secure permissions on backup
-            if os.name != 'nt':
-                os.chmod(backup_path_obj, 0o600)
+            # Validate metadata
+            metadata = keystore_data['metadata']
+            required_metadata = ['version', 'created_at', 'installation_id', 'first_setup_completed']
+            for field in required_metadata:
+                if field not in metadata:
+                    self.logger.error(f"Missing metadata field: {field}")
+                    return False
             
-            logger.info(f"Keystore backed up to: {backup_path}")
+            # Validate verifier structure
+            verifier = keystore_data['verifier']
+            required_verifier = ['ciphertext', 'nonce', 'tag']
+            for field in required_verifier:
+                if field not in verifier:
+                    self.logger.error(f"Missing verifier field: {field}")
+                    return False
+            
+            # Validate hex encoding
+            try:
+                bytes.fromhex(keystore_data['salt'])
+                bytes.fromhex(verifier['ciphertext'])
+                bytes.fromhex(verifier['nonce'])
+                bytes.fromhex(verifier['tag'])
+            except ValueError as e:
+                self.logger.error(f"Invalid hex encoding: {e}")
+                return False
+            
+            self.logger.info("Keystore validation passed")
+            return True
+            
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Keystore JSON is corrupted: {e}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Keystore validation failed: {e}")
+            return False
+    
+    def get_metadata(self) -> Optional[KeystoreMetadata]:
+        """Get keystore metadata."""
+        try:
+            if not self.keystore_path.exists():
+                return None
+            
+            with open(self.keystore_path, 'r') as f:
+                keystore_data = json.load(f)
+            
+            metadata_dict = keystore_data.get('metadata', {})
+            return KeystoreMetadata(**metadata_dict)
             
         except Exception as e:
-            logger.error(f"Keystore backup failed: {e}")
-            raise KeystoreError(f"Backup failed: {e}")
+            self.logger.error(f"Failed to get metadata: {e}")
+            return None
+    
+    def get_security_settings(self) -> Dict[str, Any]:
+        """Get security settings from keystore."""
+        try:
+            if not self.keystore_path.exists():
+                return {}
+            
+            with open(self.keystore_path, 'r') as f:
+                keystore_data = json.load(f)
+            
+            return keystore_data.get('security_settings', {})
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get security settings: {e}")
+            return {}
+    
+    def _update_access_log(self, keystore_data: Dict[str, Any], event: str) -> None:
+        """Update access log in keystore."""
+        try:
+            # Update metadata
+            metadata = keystore_data['metadata']
+            metadata['last_accessed'] = datetime.now().isoformat()
+            metadata['access_count'] = metadata.get('access_count', 0) + 1
+            
+            # Add audit log entry
+            audit_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "event": event,
+                "details": {
+                    "access_count": metadata['access_count']
+                }
+            }
+            
+            audit_log = keystore_data.get('audit_log', [])
+            audit_log.append(audit_entry)
+            
+            # Keep only last 100 entries
+            if len(audit_log) > 100:
+                audit_log = audit_log[-100:]
+            
+            keystore_data['audit_log'] = audit_log
+            
+            # Save updated keystore
+            with open(self.keystore_path, 'w') as f:
+                json.dump(keystore_data, f, indent=2)
+                
+        except Exception as e:
+            self.logger.error(f"Failed to update access log: {e}")
+    
+    def backup_keystore(self, backup_path: Optional[Path] = None) -> bool:
+        """Create a backup of the keystore."""
+        try:
+            if not self.keystore_path.exists():
+                self.logger.error("Cannot backup: keystore does not exist")
+                return False
+            
+            if backup_path is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = self.keystore_path.parent / f"keystore_backup_{timestamp}.json"
+            
+            # Copy keystore
+            import shutil
+            shutil.copy2(self.keystore_path, backup_path)
+            
+            # Update backup timestamp in original
+            try:
+                with open(self.keystore_path, 'r') as f:
+                    keystore_data = json.load(f)
+                
+                keystore_data['metadata']['last_backup'] = datetime.now().isoformat()
+                
+                with open(self.keystore_path, 'w') as f:
+                    json.dump(keystore_data, f, indent=2)
+            except Exception:
+                pass  # Non-critical if this fails
+            
+            self.logger.info(f"Keystore backed up to: {backup_path}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Backup failed: {e}")
+            return False

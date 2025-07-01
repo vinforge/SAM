@@ -21,6 +21,9 @@ from .skills.calculator_tool import CalculatorTool
 from .skills.web_browser_tool import AgentZeroWebBrowserTool
 from .skills.content_vetting import ContentVettingSkill
 from .skills.reasoning.implicit_knowledge import ImplicitKnowledgeSkill
+from .skills.financial_data_tool import FinancialDataTool
+from .skills.news_api_tool import NewsApiTool
+from .skills.table_to_code_expert import TableToCodeExpert
 from .config import get_sof_config, is_sof_enabled
 
 logger = logging.getLogger(__name__)
@@ -37,18 +40,56 @@ class SOFIntegration:
     def __init__(self, fallback_generator: Optional[Callable[[str], str]] = None):
         """
         Initialize SOF integration.
-        
+
         Args:
             fallback_generator: Optional fallback function for generating responses
         """
         self.logger = logging.getLogger(f"{__name__}.SOFIntegration")
-        self._coordinator = CoordinatorEngine(fallback_generator)
+
+        # Initialize Goal & Motivation Engine
+        self._motivation_engine = self._initialize_motivation_engine()
+
+        # Create coordinator with motivation engine
+        self._coordinator = CoordinatorEngine(
+            fallback_generator=fallback_generator,
+            motivation_engine=self._motivation_engine
+        )
         self._initialized = False
         self._config = get_sof_config()
         
         # Initialize if SOF is enabled
         if is_sof_enabled():
             self.initialize()
+
+    def _initialize_motivation_engine(self):
+        """Initialize the Goal & Motivation Engine for autonomous goal generation."""
+        try:
+            from sam.autonomy import GoalStack, MotivationEngine, GoalSafetyValidator
+
+            # Create safety validator
+            safety_validator = GoalSafetyValidator()
+
+            # Create goal stack with persistent storage
+            goal_stack = GoalStack(
+                db_path="memory/autonomy_goals.db",
+                safety_validator=safety_validator
+            )
+
+            # Create motivation engine
+            motivation_engine = MotivationEngine(
+                goal_stack=goal_stack,
+                safety_validator=safety_validator
+            )
+
+            self.logger.info("Goal & Motivation Engine initialized successfully")
+            return motivation_engine
+
+        except ImportError as e:
+            self.logger.warning(f"Goal & Motivation Engine not available: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Goal & Motivation Engine: {e}")
+            return None
     
     def initialize(self) -> bool:
         """
@@ -133,6 +174,34 @@ class SOFIntegration:
             self.logger.debug("ImplicitKnowledgeSkill registered")
         except Exception as e:
             self.logger.warning(f"Failed to register ImplicitKnowledgeSkill: {e}")
+
+        # Financial Data Tool
+        try:
+            # Get Serper API key from config if available
+            serper_api_key = getattr(self._config, 'serper_api_key', None)
+            financial_tool = FinancialDataTool(serper_api_key=serper_api_key)
+            core_skills.append(financial_tool)
+            self.logger.debug("FinancialDataTool registered")
+        except Exception as e:
+            self.logger.warning(f"Failed to register FinancialDataTool: {e}")
+
+        # News API Tool
+        try:
+            # Get NewsAPI key from config if available
+            newsapi_key = getattr(self._config, 'newsapi_api_key', None)
+            news_tool = NewsApiTool(newsapi_key=newsapi_key)
+            core_skills.append(news_tool)
+            self.logger.debug("NewsApiTool registered")
+        except Exception as e:
+            self.logger.warning(f"Failed to register NewsApiTool: {e}")
+
+        # Table-to-Code Expert Tool (Phase 2)
+        try:
+            table_expert = TableToCodeExpert()
+            core_skills.append(table_expert)
+            self.logger.debug("TableToCodeExpert registered")
+        except Exception as e:
+            self.logger.warning(f"Failed to register TableToCodeExpert: {e}")
 
         # Register all successfully created skills
         if core_skills:

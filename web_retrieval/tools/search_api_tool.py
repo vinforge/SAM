@@ -143,6 +143,38 @@ class SearchAPITool:
                     'source': 'duckduckgo'
                 }
             else:
+                # Handle different status codes more gracefully
+                if response.status_code == 202:
+                    logger.warning(f"DuckDuckGo API returned 202 (Accepted) - request is being processed")
+                    # For 202, try to parse any partial results
+                    try:
+                        data = response.json()
+                        if data and (data.get('RelatedTopics') or data.get('AbstractURL')):
+                            # Process partial results
+                            results = []
+                            for topic in data.get('RelatedTopics', []):
+                                if isinstance(topic, dict) and topic.get('FirstURL'):
+                                    result = {
+                                        'title': topic.get('Text', '').split(' - ')[0] if ' - ' in topic.get('Text', '') else topic.get('Text', ''),
+                                        'url': topic.get('FirstURL', ''),
+                                        'snippet': topic.get('Text', ''),
+                                        'source': 'duckduckgo_search_partial',
+                                        'timestamp': datetime.now().isoformat()
+                                    }
+                                    results.append(result)
+
+                            if results:
+                                logger.info(f"DuckDuckGo returned partial results despite 202 status")
+                                return {
+                                    'success': True,
+                                    'results': results,
+                                    'total_results': len(results),
+                                    'query': query,
+                                    'source': 'duckduckgo_partial'
+                                }
+                    except:
+                        pass
+
                 logger.error(f"DuckDuckGo API error: {response.status_code}")
                 return {
                     'success': False,

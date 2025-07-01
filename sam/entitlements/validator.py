@@ -155,14 +155,28 @@ class EntitlementValidator:
                     "rate_limited": True
                 }
             
-            # Validate key format (basic UUID check)
+            # Validate key format (enhanced UUID check)
             user_key = user_key.strip()
+
+            # Check basic length and format
             if not user_key or len(user_key) != 36:
                 self._record_attempt(state, False)
                 self._save_state(state)
                 return {
                     "success": False,
                     "message": "❌ Invalid key format. Please check your activation key.",
+                    "invalid_format": True
+                }
+
+            # Check UUID format pattern (8-4-4-4-12)
+            import re
+            uuid_pattern = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+            if not re.match(uuid_pattern, user_key):
+                self._record_attempt(state, False)
+                self._save_state(state)
+                return {
+                    "success": False,
+                    "message": "❌ Invalid key format. Keys must be in UUID format (e.g., 12345678-1234-1234-1234-123456789abc).",
                     "invalid_format": True
                 }
             

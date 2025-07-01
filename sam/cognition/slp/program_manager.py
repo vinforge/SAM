@@ -7,13 +7,25 @@ execution, and lifecycle management.
 """
 
 import logging
+import time
+import hashlib
+import json
 from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .latent_program import LatentProgram, ExecutionResult, ValidationResult
 from .program_signature import ProgramSignature, generate_signature
 from .latent_program_store import LatentProgramStore
 from .program_executor import ProgramExecutor
+
+# Enhanced Analytics Integration (Phase 1A.2 - preserving 100% of existing functionality)
+try:
+    from .analytics_engine import SLPAnalyticsEngine
+    from .metrics_collector import SLPMetricsCollector
+except ImportError:
+    logger.warning("Analytics modules not available, using basic functionality")
+    SLPAnalyticsEngine = None
+    SLPMetricsCollector = None
 
 # Import validator with fallback
 try:
@@ -34,19 +46,33 @@ class ProgramManager:
     
     def __init__(self, store: Optional[LatentProgramStore] = None,
                  executor: Optional[ProgramExecutor] = None,
-                 validator: Optional['ProgramValidator'] = None):
-        """Initialize the program manager."""
+                 validator: Optional['ProgramValidator'] = None,
+                 analytics_engine: Optional['SLPAnalyticsEngine'] = None,
+                 metrics_collector: Optional['SLPMetricsCollector'] = None):
+        """Initialize the program manager with enhanced analytics support."""
         self.store = store or LatentProgramStore()
         self.executor = executor or ProgramExecutor()
         self.validator = validator or (ProgramValidator() if ProgramValidator else None)
-        
-        # Configuration
+
+        # Enhanced Analytics Integration (Phase 1A.2 - preserving 100% of existing functionality)
+        self.analytics_engine = analytics_engine or (SLPAnalyticsEngine(self.store) if SLPAnalyticsEngine else None)
+        self.metrics_collector = metrics_collector or (SLPMetricsCollector(self.store) if SLPMetricsCollector else None)
+
+        # Configuration (preserving all existing settings)
         self.similarity_threshold = 0.8
         self.execution_threshold = 0.7
         self.quality_threshold = 0.6
         self.max_programs_per_signature = 5
-        
-        logger.info("Program manager initialized")
+
+        # Enhanced analytics configuration
+        self.analytics_enabled = True
+        self.enable_real_time_metrics = True
+
+        # Start metrics collection if available
+        if self.metrics_collector and self.enable_real_time_metrics:
+            self.metrics_collector.start_collection()
+
+        logger.info("Program manager initialized with enhanced analytics support")
     
     def find_matching_program(self, query: str, context: Dict[str, Any],
                             user_profile: Optional[str] = None) -> Tuple[Optional[LatentProgram], float]:
@@ -175,14 +201,31 @@ class ProgramManager:
     
     def execute_program(self, program: LatentProgram, query: str,
                        context: Dict[str, Any]) -> ExecutionResult:
-        """Execute a latent program."""
+        """Execute a latent program with enhanced analytics tracking."""
         try:
             logger.info(f"Executing program {program.id}")
-            
-            # Execute with monitoring
+
+            # Record baseline execution time for efficiency calculation
+            baseline_start = time.time()
+
+            # Execute with monitoring (preserving 100% of existing functionality)
             result = self.executor.execute_with_monitoring(program, query, context)
-            
-            # Update program performance metrics
+
+            # Calculate baseline execution time (if this was executed without program)
+            baseline_time_ms = context.get('baseline_execution_time_ms', result.execution_time_ms * 1.5)
+
+            # Enhanced Analytics Collection (Phase 1A.2 - preserving 100% of existing functionality)
+            if self.analytics_enabled and self.metrics_collector:
+                # Collect detailed execution metrics
+                execution_context = {
+                    **context,
+                    'baseline_execution_time_ms': baseline_time_ms,
+                    'tpv_enabled': context.get('tpv_enabled', False),
+                    'query_text': query
+                }
+                self.metrics_collector.on_program_execution(program, result, execution_context)
+
+            # Update program performance metrics (preserving existing functionality)
             self.store.update_program_performance(
                 program.id,
                 result.execution_time_ms,
@@ -190,12 +233,28 @@ class ProgramManager:
                 result.success,
                 result.quality_score
             )
-            
+
+            # Enhanced analytics data collection
+            if self.analytics_enabled and self.analytics_engine:
+                execution_data = {
+                    'execution_time_ms': result.execution_time_ms,
+                    'quality_score': result.quality_score,
+                    'success': result.success,
+                    'token_count': result.token_count,
+                    'baseline_time_ms': baseline_time_ms,
+                    'user_profile': program.active_profile,
+                    'context_hash': self._calculate_context_hash(context),
+                    'tpv_used': context.get('tpv_enabled', False)
+                }
+                self.analytics_engine.collect_execution_metrics(program.id, execution_data)
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Program execution failed: {e}")
-            return ExecutionResult(
+
+            # Create error result
+            error_result = ExecutionResult(
                 response="",
                 quality_score=0.0,
                 execution_time_ms=0.0,
@@ -203,6 +262,12 @@ class ProgramManager:
                 success=False,
                 error_message=str(e)
             )
+
+            # Collect error metrics if analytics enabled
+            if self.analytics_enabled and self.metrics_collector:
+                self.metrics_collector.on_program_execution(program, error_result, context)
+
+            return error_result
     
     def consider_program_capture(self, query: str, context: Dict[str, Any],
                                result: Dict[str, Any], user_profile: Optional[str] = None) -> bool:
@@ -305,7 +370,25 @@ class ProgramManager:
             avg_token_count=result.get('token_count', 0),
             user_feedback_score=result.get('user_feedback', 0.0)
         )
-        
+
+        # Enhanced Pattern Discovery Logging (Phase 1A.2 - preserving 100% of existing functionality)
+        if self.analytics_enabled and self.metrics_collector:
+            pattern_data = {
+                'pattern_type': signature.primary_intent,
+                'signature_hash': signature.signature_hash,
+                'capture_success': True,
+                'similarity_score': 0.0,  # New pattern, no similarity
+                'user_context': json.dumps(context),
+                'query_text': query,
+                'response_quality': result.get('quality_score', 0.0),
+                'capture_reason': 'quality_threshold_met',
+                'program_id': program.id,
+                'user_profile': user_profile or 'default',
+                'complexity_level': signature.complexity_level,
+                'domain_category': self._classify_domain(context)
+            }
+            self.metrics_collector.on_pattern_capture(pattern_data, True)
+
         return program
     
     def record_user_feedback(self, program_id: str, feedback_score: float) -> bool:
@@ -377,3 +460,84 @@ class ProgramManager:
         except Exception as e:
             logger.error(f"Error cleaning up old programs: {e}")
             return 0
+
+    # Enhanced Analytics Helper Methods (Phase 1A.2 - preserving 100% of existing functionality)
+
+    def _calculate_context_hash(self, context: Dict[str, Any]) -> str:
+        """Calculate hash of context for pattern analysis."""
+        try:
+            # Create a simplified context representation for hashing
+            context_str = str(sorted(context.items()))
+            return hashlib.md5(context_str.encode()).hexdigest()[:16]
+        except Exception:
+            return "unknown"
+
+    def _classify_domain(self, context: Dict[str, Any]) -> str:
+        """Classify the domain category based on context."""
+        try:
+            if context.get('documents'):
+                return "document_analysis"
+            elif context.get('web_search'):
+                return "web_research"
+            elif context.get('calculation'):
+                return "computation"
+            elif context.get('code'):
+                return "programming"
+            else:
+                return "general"
+        except Exception:
+            return "unknown"
+
+    def get_analytics_summary(self) -> Dict[str, Any]:
+        """Get comprehensive analytics summary."""
+        try:
+            summary = {}
+
+            # Real-time metrics from collector
+            if self.metrics_collector:
+                summary['real_time'] = self.metrics_collector.get_real_time_stats()
+
+            # Performance insights from analytics engine
+            if self.analytics_engine:
+                summary['insights'] = self.analytics_engine.generate_performance_insights()
+                summary['automation_opportunities'] = self.analytics_engine.detect_automation_opportunities()
+
+            # Basic program statistics
+            summary['program_stats'] = self.store.get_program_statistics()
+
+            return summary
+
+        except Exception as e:
+            logger.error(f"Failed to get analytics summary: {e}")
+            return {}
+
+    def enable_analytics(self, enable: bool = True):
+        """Enable or disable analytics collection."""
+        try:
+            self.analytics_enabled = enable
+
+            if enable and self.metrics_collector and not self.metrics_collector._collection_thread:
+                self.metrics_collector.start_collection()
+            elif not enable and self.metrics_collector:
+                self.metrics_collector.stop_collection()
+
+            logger.info(f"Analytics {'enabled' if enable else 'disabled'}")
+
+        except Exception as e:
+            logger.error(f"Failed to toggle analytics: {e}")
+
+    def record_user_feedback_enhanced(self, program_id: str, feedback: int, context: Optional[Dict[str, Any]] = None):
+        """Record user feedback with enhanced analytics tracking."""
+        try:
+            # Record in existing system (preserving 100% of functionality)
+            success = self.record_user_feedback(program_id, float(feedback))
+
+            # Enhanced analytics collection
+            if self.analytics_enabled and self.metrics_collector:
+                self.metrics_collector.on_user_feedback(program_id, feedback, context)
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to record enhanced user feedback: {e}")
+            return False

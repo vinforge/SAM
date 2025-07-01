@@ -23,6 +23,26 @@ from .program_manager import ProgramManager
 from .program_executor import ProgramExecutor
 from .sam_slp_integration import SAMSLPIntegration, get_slp_integration, initialize_slp_integration
 
+# Enhanced Analytics Modules (Phase 1A - preserving 100% of existing functionality)
+try:
+    from .analytics_engine import SLPAnalyticsEngine
+    from .metrics_collector import SLPMetricsCollector
+    ENHANCED_ANALYTICS_AVAILABLE = True
+except ImportError:
+    SLPAnalyticsEngine = None
+    SLPMetricsCollector = None
+    ENHANCED_ANALYTICS_AVAILABLE = False
+
+# Advanced Analysis Modules (Phase 1B - preserving 100% of existing functionality)
+try:
+    from .program_analyzer import ProgramAnalyzer
+    from .cognitive_insights import CognitiveInsightsGenerator
+    ADVANCED_ANALYSIS_AVAILABLE = True
+except ImportError:
+    ProgramAnalyzer = None
+    CognitiveInsightsGenerator = None
+    ADVANCED_ANALYSIS_AVAILABLE = False
+
 __version__ = "1.0.0"
 __author__ = "SAM Development Team"
 
@@ -57,7 +77,7 @@ def initialize_slp_system():
         print(f"Warning: Failed to initialize SLP system: {e}")
         return None
 
-# Export main classes for easy import
+# Export main classes for easy import (preserving 100% of existing functionality)
 __all__ = [
     'LatentProgram',
     'ExecutionResult',
@@ -72,5 +92,13 @@ __all__ = [
     'initialize_slp_integration',
     'get_slp_config',
     'update_slp_config',
-    'initialize_slp_system'
+    'initialize_slp_system',
+    # Enhanced Analytics (Phase 1A)
+    'SLPAnalyticsEngine',
+    'SLPMetricsCollector',
+    'ENHANCED_ANALYTICS_AVAILABLE',
+    # Advanced Analysis (Phase 1B)
+    'ProgramAnalyzer',
+    'CognitiveInsightsGenerator',
+    'ADVANCED_ANALYSIS_AVAILABLE'
 ]

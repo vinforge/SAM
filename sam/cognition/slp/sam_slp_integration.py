@@ -8,7 +8,7 @@ with SAM's existing reasoning pipeline for seamless program capture and executio
 
 import logging
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from .program_manager import ProgramManager
@@ -27,18 +27,39 @@ class SAMSLPIntegration:
     """
     
     def __init__(self, tpv_integration=None):
-        """Initialize the SAM-SLP integration."""
-        self.program_manager = ProgramManager()
+        """Initialize the SAM-SLP integration with enhanced analytics."""
+        # Enhanced Analytics Integration (Phase 1A.6 - preserving 100% of existing functionality)
+        try:
+            from .analytics_engine import SLPAnalyticsEngine
+            from .metrics_collector import SLPMetricsCollector
+
+            # Initialize with enhanced analytics
+            analytics_engine = SLPAnalyticsEngine()
+            metrics_collector = SLPMetricsCollector()
+
+            self.program_manager = ProgramManager(
+                analytics_engine=analytics_engine,
+                metrics_collector=metrics_collector
+            )
+
+        except ImportError:
+            logger.warning("Enhanced analytics not available, using basic functionality")
+            self.program_manager = ProgramManager()
+
         self.tpv_integration = tpv_integration
         self.enabled = True
-        
-        # Performance tracking
+
+        # Performance tracking (preserving 100% of existing functionality)
         self.total_queries = 0
         self.program_hits = 0
         self.program_captures = 0
         self.total_time_saved_ms = 0.0
-        
-        logger.info("SAM-SLP integration initialized")
+
+        # Enhanced tracking
+        self.detailed_logging = True
+        self.session_analytics = {}
+
+        logger.info("SAM-SLP integration initialized with enhanced analytics")
     
     def generate_response_with_slp(self, query: str, context: Dict[str, Any],
                                   user_profile: Optional[str] = None,
@@ -60,29 +81,59 @@ class SAMSLPIntegration:
         """
         start_time = time.time()
         self.total_queries += 1
-        
+
+        # Enhanced Logging (Phase 1A.6 - preserving 100% of existing functionality)
+        if self.detailed_logging:
+            logger.info(f"🧠 SLP Processing Query: {query[:100]}...")
+            logger.debug(f"Context keys: {list(context.keys())}")
+            logger.debug(f"User profile: {user_profile}")
+
         try:
             if not self.enabled:
+                if self.detailed_logging:
+                    logger.info("🔄 SLP disabled, using standard response generation")
                 return self._generate_standard_response(query, context, fallback_generator, start_time)
             
-            # Phase 1: Try to find matching program
+            # Phase 1: Try to find matching program (preserving 100% of existing functionality)
             matching_program, confidence = self.program_manager.find_matching_program(
                 query, context, user_profile
             )
 
+            # Enhanced Logging for Program Matching
+            if self.detailed_logging:
+                if matching_program:
+                    logger.info(f"🎯 Found matching program: {matching_program.id} (confidence: {confidence:.3f})")
+                    logger.debug(f"Program usage count: {matching_program.usage_count}")
+                    logger.debug(f"Program success rate: {matching_program.success_rate}")
+                else:
+                    logger.info(f"🔍 No matching program found (best confidence: {confidence:.3f})")
+
             if matching_program and confidence >= self.program_manager.execution_threshold:
                 # Execute using latent program
+                if self.detailed_logging:
+                    logger.info(f"🚀 Executing with latent program (threshold: {self.program_manager.execution_threshold})")
+
                 return self._execute_with_program(
                     matching_program, query, context, fallback_generator, start_time, confidence
                 )
             else:
                 # Generate standard response and consider program capture
+                if self.detailed_logging:
+                    logger.info(f"📝 Generating standard response and considering capture")
+
                 return self._generate_and_capture(
                     query, context, user_profile, fallback_generator, start_time, confidence
                 )
                 
         except Exception as e:
             logger.error(f"Error in SLP-enabled response generation: {e}")
+
+            # Enhanced Error Logging
+            if self.detailed_logging:
+                logger.error(f"🚨 SLP Error Details: {str(e)}")
+                logger.debug(f"Query: {query}")
+                logger.debug(f"Context: {context}")
+
             return self._generate_fallback_response(query, context, fallback_generator, str(e), start_time)
     
     def _execute_with_program(self, program: LatentProgram, query: str,
@@ -184,8 +235,8 @@ class SAMSLPIntegration:
                 else:
                     response = str(fallback_generator)
             else:
-                # Basic fallback response
-                response = f"I understand you're asking about: {query[:100]}..."
+                # Generate proper response using Ollama when no fallback provided
+                response = self._generate_ollama_response(query, context)
             
             response_time = (time.time() - start_time) * 1000
             
@@ -210,6 +261,65 @@ class SAMSLPIntegration:
         except Exception as e:
             logger.error(f"Error in standard response generation: {e}")
             return self._generate_fallback_response(query, context, fallback_generator, str(e), start_time)
+
+    def _generate_ollama_response(self, query: str, context: Dict[str, Any]) -> str:
+        """Generate response using Ollama API directly."""
+        try:
+            import requests
+            import json
+
+            # Build context-aware prompt
+            prompt_parts = [f"User question: {query}"]
+
+            # Add context if available
+            if context.get('sources'):
+                prompt_parts.append("\nRelevant context:")
+                for i, source in enumerate(context['sources'][:3]):  # Limit to top 3 sources
+                    content = source.get('content', '')[:500]  # Limit content length
+                    prompt_parts.append(f"{i+1}. {content}")
+
+            # Add knowledge context if available
+            if context.get('knowledge_context'):
+                prompt_parts.append(f"\nAdditional context: {context['knowledge_context'][:300]}")
+
+            prompt_parts.append("\nPlease provide a comprehensive, helpful response based on the available information.")
+
+            full_prompt = "\n".join(prompt_parts)
+
+            # Call Ollama API
+            ollama_payload = {
+                "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                "prompt": full_prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "max_tokens": 1000
+                }
+            }
+
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=ollama_payload,
+                timeout=60  # Increased timeout to 60 seconds for better reliability
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                ollama_response = result.get('response', '').strip()
+                if ollama_response:
+                    return ollama_response
+                else:
+                    logger.warning("Empty response from Ollama")
+                    return f"I understand you're asking about: {query}"
+            else:
+                logger.warning(f"Ollama API returned status {response.status_code}")
+                return f"I understand you're asking about: {query}"
+
+        except Exception as e:
+            logger.error(f"Error calling Ollama API: {e}")
+            # When Ollama fails, return a more helpful message instead of placeholder
+            return f"I apologize, but I'm experiencing technical difficulties processing your question about '{query}'. Please try again in a moment."
     
     def _generate_fallback_response(self, query: str, context: Dict[str, Any],
                                   fallback_generator, error_msg: str, start_time: float) -> Dict[str, Any]:
@@ -350,6 +460,78 @@ class SAMSLPIntegration:
         except Exception as e:
             logger.error(f"Error cleaning up programs: {e}")
             return 0
+
+    # Enhanced Analytics Methods (Phase 1A.6 - preserving 100% of existing functionality)
+
+    def get_enhanced_performance_metrics(self) -> Dict[str, Any]:
+        """Get comprehensive performance metrics with enhanced analytics."""
+        try:
+            # Basic metrics (preserving existing functionality)
+            basic_stats = self.get_slp_statistics()
+
+            # Enhanced analytics if available
+            enhanced_metrics = {}
+            if hasattr(self.program_manager, 'get_analytics_summary'):
+                enhanced_metrics = self.program_manager.get_analytics_summary()
+
+            return {
+                'basic_stats': basic_stats,
+                'enhanced_analytics': enhanced_metrics,
+                'detailed_logging_enabled': self.detailed_logging,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get enhanced performance metrics: {e}")
+            return {}
+
+    def get_real_time_dashboard_data(self) -> Dict[str, Any]:
+        """Get real-time data for SLP dashboard display."""
+        try:
+            dashboard_data = {
+                'system_status': {
+                    'enabled': self.enabled,
+                    'health': 'healthy',
+                    'detailed_logging': self.detailed_logging
+                },
+                'current_session': {
+                    'total_queries': self.total_queries,
+                    'program_hits': self.program_hits,
+                    'program_captures': self.program_captures,
+                    'hit_rate_percent': (self.program_hits / max(self.total_queries, 1)) * 100,
+                    'time_saved_ms': self.total_time_saved_ms
+                },
+                'program_library': {
+                    'total_programs': len(self.program_manager.store.get_all_programs()),
+                    'active_programs': len([p for p in self.program_manager.store.get_all_programs() if p.is_active])
+                }
+            }
+
+            # Add real-time metrics if available
+            if (hasattr(self.program_manager, 'metrics_collector') and
+                self.program_manager.metrics_collector):
+                real_time_stats = self.program_manager.metrics_collector.get_real_time_stats()
+                dashboard_data['real_time_metrics'] = real_time_stats
+
+            return dashboard_data
+
+        except Exception as e:
+            logger.error(f"Failed to get dashboard data: {e}")
+            return {}
+
+    def enable_enhanced_analytics(self, enable: bool = True):
+        """Enable or disable enhanced analytics collection."""
+        try:
+            self.detailed_logging = enable
+
+            # Enable analytics in program manager if available
+            if hasattr(self.program_manager, 'enable_analytics'):
+                self.program_manager.enable_analytics(enable)
+
+            logger.info(f"Enhanced analytics {'enabled' if enable else 'disabled'}")
+
+        except Exception as e:
+            logger.error(f"Failed to toggle enhanced analytics: {e}")
 
 
 # Global SLP integration instance

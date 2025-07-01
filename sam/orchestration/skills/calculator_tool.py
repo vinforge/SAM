@@ -8,6 +8,7 @@ Supports arithmetic, algebraic, and basic statistical operations.
 
 import re
 import math
+import time
 import logging
 from typing import Dict, Any, Optional, List, Union
 from ..uif import SAM_UIF
@@ -35,8 +36,8 @@ class CalculatorTool(BaseSkillModule):
     skill_category = "tools"
     
     # Dependency declarations
-    required_inputs = ["calculation_expression"]
-    optional_inputs = ["calculation_context", "precision"]
+    required_inputs = []  # Can extract from input_query if calculation_expression not provided
+    optional_inputs = ["calculation_expression", "calculation_context", "precision"]
     output_keys = ["calculation_result", "calculation_steps", "calculation_confidence"]
     
     # Skill characteristics
@@ -116,33 +117,90 @@ class CalculatorTool(BaseSkillModule):
     def execute(self, uif: SAM_UIF) -> SAM_UIF:
         """
         Execute mathematical calculation with security controls.
-        
+
         Args:
             uif: Universal Interface Format with calculation request
-            
+
         Returns:
             Updated UIF with calculation results
         """
+        # Initialize tracing
+        trace_id = uif.intermediate_data.get('trace_id')
+        start_time = time.time()
+
+        if trace_id:
+            self._log_trace_event(
+                trace_id=trace_id,
+                event_type="start",
+                severity="info",
+                message="Starting mathematical calculation",
+                payload={
+                    "tool": self.skill_name,
+                    "input_query": uif.input_query,
+                    "has_calculation_expression": "calculation_expression" in uif.intermediate_data
+                }
+            )
+
         try:
             # Extract calculation expression
             expression = self._extract_calculation_expression(uif)
             if not expression:
+                if trace_id:
+                    self._log_trace_event(
+                        trace_id=trace_id,
+                        event_type="error",
+                        severity="error",
+                        message="No calculation expression found",
+                        payload={"input_query": uif.input_query}
+                    )
                 raise SkillExecutionError("No calculation expression found")
-            
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="data_in",
+                    severity="info",
+                    message=f"Extracted calculation expression: {expression}",
+                    payload={
+                        "expression": expression,
+                        "expression_length": len(expression),
+                        "contains_functions": any(func in expression for func in ['sin', 'cos', 'log', 'sqrt'])
+                    }
+                )
+
             self.logger.info(f"Performing calculation: {expression}")
-            
+
             # Get calculation context
             context = uif.intermediate_data.get("calculation_context", {})
             precision = uif.intermediate_data.get("precision", 10)
-            
+
             # Perform secure calculation
+            calc_start_time = time.time()
             result = self._perform_secure_calculation(expression, context, precision)
-            
+            calc_duration = (time.time() - calc_start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="tool_call",
+                    severity="info",
+                    message=f"Calculation completed: {expression} = {result['value']}",
+                    duration_ms=calc_duration,
+                    payload={
+                        "expression": expression,
+                        "result": result["value"],
+                        "steps_count": len(result["steps"]),
+                        "confidence": result["confidence"],
+                        "precision": precision,
+                        "context_variables": len(context)
+                    }
+                )
+
             # Store results in UIF
             uif.intermediate_data["calculation_result"] = result["value"]
             uif.intermediate_data["calculation_steps"] = result["steps"]
             uif.intermediate_data["calculation_confidence"] = result["confidence"]
-            
+
             # Set skill outputs
             uif.set_skill_output(self.skill_name, {
                 "expression": expression,
@@ -151,12 +209,46 @@ class CalculatorTool(BaseSkillModule):
                 "confidence": result["confidence"],
                 "precision": precision
             })
-            
+
+            total_duration = (time.time() - start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="data_out",
+                    severity="info",
+                    message=f"Calculator tool execution completed successfully",
+                    duration_ms=total_duration,
+                    payload={
+                        "result": result["value"],
+                        "result_type": type(result["value"]).__name__,
+                        "execution_time_ms": total_duration,
+                        "calculation_time_ms": calc_duration,
+                        "overhead_ms": total_duration - calc_duration
+                    }
+                )
+
             self.logger.info(f"Calculation completed: {expression} = {result['value']}")
-            
+
             return uif
-            
+
         except Exception as e:
+            total_duration = (time.time() - start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="error",
+                    severity="error",
+                    message=f"Calculator execution failed: {str(e)}",
+                    duration_ms=total_duration,
+                    payload={
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "execution_time_ms": total_duration
+                    }
+                )
+
             self.logger.exception("Error during calculation")
             raise SkillExecutionError(f"Calculation failed: {str(e)}")
     
@@ -321,7 +413,7 @@ class CalculatorTool(BaseSkillModule):
                     result = f"{result.real:.{precision}f} + {result.imag:.{precision}f}i"
                     confidence = 0.8
             elif isinstance(result, float):
-                if result.is_infinite():
+                if math.isinf(result):
                     result = "∞" if result > 0 else "-∞"
                     confidence = 0.7
                 elif math.isnan(result):
@@ -415,3 +507,30 @@ class CalculatorTool(BaseSkillModule):
             return True
         
         return False
+
+    def _log_trace_event(self, trace_id: str, event_type: str, severity: str,
+                        message: str, duration_ms: Optional[float] = None,
+                        payload: Optional[Dict[str, Any]] = None) -> None:
+        """Log a trace event for the calculator tool."""
+        try:
+            from sam.cognition.trace_logger import log_event
+            log_event(
+                trace_id=trace_id,
+                source_module=self.skill_name,
+                event_type=event_type,
+                severity=severity,
+                message=message,
+                duration_ms=duration_ms,
+                payload=payload or {},
+                metadata={
+                    "tool_version": self.skill_version,
+                    "tool_category": self.skill_category,
+                    "requires_external_access": self.requires_external_access
+                }
+            )
+        except ImportError:
+            # Tracing not available, continue without logging
+            pass
+        except Exception as e:
+            # Don't let tracing errors break the tool
+            self.logger.debug(f"Trace logging failed: {e}")

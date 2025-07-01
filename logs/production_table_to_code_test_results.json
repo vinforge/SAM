@@ -1,0 +1,40 @@
+{
+  "test_1_registration": {
+    "status": "PASSED",
+    "skill_name": "table_to_code_expert",
+    "skill_version": "2.0.0"
+  },
+  "test_2_parsing": {
+    "status": "PASSED",
+    "success_rate": 1.0,
+    "queries_tested": 4
+  },
+  "test_3_table_handling": {
+    "status": "FAILED",
+    "tables_found": 0,
+    "table_ids": []
+  },
+  "test_4_code_generation": {
+    "status": "FAILED",
+    "success_rate": 0.0,
+    "successful_generations": 0
+  },
+  "test_5_uif": {
+    "status": "PASSED",
+    "can_execute": true,
+    "dependencies_valid": true
+  },
+  "test_6_end_to_end": {
+    "status": "PASSED",
+    "execution_completed": true,
+    "has_response": true,
+    "final_status": "failure"
+  },
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 4,
+    "failed_tests": 2,
+    "success_rate": 66.66666666666666,
+    "production_ready": false
+  }
+}

@@ -139,8 +139,10 @@ class CocoIndexTool:
             
             logger.info(f"Executing cocoindex search with config: {config}")
             
-            # Perform the search
-            search_result = cocoindex.search(query, **config)
+            # TEMPORARY FIX: CocoIndex API has changed, disable for now
+            # TODO: Implement proper cocoindex flow-based search
+            logger.warning("CocoIndex search temporarily disabled due to API compatibility issues")
+            raise Exception("CocoIndex tool temporarily disabled - API interface changed")
             
             # Process and format results
             if search_result and hasattr(search_result, 'chunks'):

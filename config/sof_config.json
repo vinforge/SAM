@@ -1,6 +1,7 @@
 {
   "use_sof_framework": true,
   "sof_version": "2.0.0",
+  "table_to_code_expert_enabled": true,
   "max_execution_time": 60.0,
   "skill_timeout": 30.0,
   "enable_parallel_execution": false,

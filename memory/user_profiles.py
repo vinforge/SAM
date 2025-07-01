@@ -87,7 +87,7 @@ class UserProfileManager:
             verbosity=VerbosityLevel.BALANCED,
             explanation_level=ExplanationLevel.INTERMEDIATE,
             conversation_style=ConversationStyle.EXPLORATORY,
-            tools_enabled=["python_interpreter", "table_generator", "multimodal_query"],
+            tools_enabled=["python_interpreter", "table_generator", "multimodal_query", "table_to_code_expert"],
             tools_disabled=[],
             formatting_preferences={
                 "use_markdown": True,
@@ -304,7 +304,7 @@ class UserProfileManager:
             return True
         
         # Default behavior based on tool type
-        default_enabled_tools = ["python_interpreter", "table_generator", "multimodal_query"]
+        default_enabled_tools = ["python_interpreter", "table_generator", "multimodal_query", "table_to_code_expert"]
         return tool_name in default_enabled_tools
     
     def add_custom_command(self, user_id: str, command: str, response: str) -> bool:

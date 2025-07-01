@@ -1,0 +1,43 @@
+{
+  "diagnosis_timestamp": "2025-06-29T22:54:37.201758",
+  "summary": {
+    "total_failure_points": 2,
+    "critical_issues": [
+      "Table data retrieval failures"
+    ],
+    "recommended_fixes": [
+      "Fix table reconstruction and data conversion logic"
+    ]
+  },
+  "detailed_findings": {
+    "code_generation_diagnosis": {
+      "test_name": "Code Generation Types",
+      "failure_points": [],
+      "root_causes": [
+        "Table data retrieval failures - possible memory integration issues"
+      ],
+      "data_issues": [
+        "Visualization Generation: Failed to retrieve table data",
+        "Calculation Generation: Failed to retrieve table data",
+        "Analysis Generation: Failed to retrieve table data"
+      ],
+      "code_issues": [],
+      "execution_issues": []
+    },
+    "end_to_end_diagnosis": {
+      "test_name": "End-to-End Workflow",
+      "failure_points": [
+        "Execution failed with status: failure",
+        "Error details: Analysis failed: Table data not available"
+      ],
+      "root_causes": [],
+      "uif_issues": [],
+      "integration_issues": [],
+      "execution_flow": [
+        "UIF created successfully",
+        "Request parsed - Intent: analyze",
+        "Found 3 relevant tables"
+      ]
+    }
+  }
+}

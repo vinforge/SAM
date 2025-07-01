@@ -18,6 +18,7 @@ from .enrichment_scorer import get_enrichment_scorer, EnrichmentScore
 from utils.vector_manager import VectorManager
 from utils.embedding_utils import get_embedding_manager
 from memory.memory_vectorstore import get_memory_store, MemoryType
+from sam.cognition.table_processing.sam_integration import get_table_aware_chunker, TableProcessingResult
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,9 @@ class MultimodalProcessingPipeline:
 
         # Memory store for Q&A retrieval
         self.memory_store = get_memory_store()
+
+        # Table processing system
+        self.table_aware_chunker = get_table_aware_chunker()
 
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -85,7 +89,10 @@ class MultimodalProcessingPipeline:
             
             logger.info(f"Parsed document: {len(parsed_doc.content_blocks)} content blocks")
             self.processing_stats['total_content_blocks'] += len(parsed_doc.content_blocks)
-            
+
+            # Step 1.5: Process tables with semantic role classification
+            table_processing_result = self._process_tables_in_document(parsed_doc, file_path)
+
             # Step 2: Consolidate knowledge
             consolidated = self.knowledge_consolidator.consolidate_document(parsed_doc)
             if not consolidated:
@@ -114,7 +121,15 @@ class MultimodalProcessingPipeline:
             # Add memory storage information to processing result
             if memory_storage_result:
                 processing_result['memory_storage'] = memory_storage_result
-            
+
+            # Add table processing information to processing result
+            if table_processing_result:
+                processing_result['table_processing'] = {
+                    'tables_found': len(table_processing_result.tables),
+                    'enhanced_chunks': len(table_processing_result.enhanced_chunks),
+                    'processing_metrics': table_processing_result.processing_metrics
+                }
+
             # Update statistics
             self.processing_stats['documents_processed'] += 1
             
@@ -498,6 +513,83 @@ Content Type: {content_block.content_type}
         except Exception as e:
             logger.error(f"Error storing document in memory: {e}")
             return None
+
+    def _process_tables_in_document(self, parsed_doc: ParsedDocument, file_path: Path) -> Optional[TableProcessingResult]:
+        """
+        Process tables in the document using the table processing system.
+
+        Args:
+            parsed_doc: Parsed document with content blocks
+            file_path: Path to the original document file
+
+        Returns:
+            TableProcessingResult or None if no tables found or processing failed
+        """
+        try:
+            # Extract document content for table processing
+            doc_content = ""
+            doc_type = file_path.suffix.lower().lstrip('.')
+
+            # Combine all text content for table detection
+            for content_block in parsed_doc.content_blocks:
+                if content_block.content_type == 'text':
+                    doc_content += content_block.content + "\n"
+                elif content_block.content_type == 'table':
+                    # Convert table data back to text format for processing
+                    if isinstance(content_block.content, list):
+                        table_text = "\n".join(["\t".join(row) for row in content_block.content])
+                        doc_content += table_text + "\n"
+
+            if not doc_content.strip():
+                logger.info("No text content found for table processing")
+                return None
+
+            # Process document with table intelligence
+            document_context = f"Document: {file_path.name}"
+            table_result = self.table_aware_chunker.process_document_with_tables(
+                doc_content, doc_type, document_context
+            )
+
+            if table_result and table_result.tables:
+                logger.info(f"Table processing completed: {len(table_result.tables)} tables, "
+                          f"{len(table_result.enhanced_chunks)} enhanced chunks")
+
+                # Store table chunks in memory with enhanced metadata
+                self._store_table_chunks_in_memory(table_result, file_path)
+
+                return table_result
+            else:
+                logger.info("No tables detected in document")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error processing tables in document: {e}")
+            return None
+
+    def _store_table_chunks_in_memory(self, table_result: TableProcessingResult, file_path: Path):
+        """
+        Store table chunks in memory with enhanced metadata.
+
+        Args:
+            table_result: Result from table processing
+            file_path: Path to the original document file
+        """
+        try:
+            for chunk_metadata in table_result.enhanced_chunks:
+                # Create memory chunk with table metadata
+                chunk_id = self.memory_store.add_memory(
+                    content=chunk_metadata.get('content', ''),
+                    memory_type=MemoryType.DOCUMENT,
+                    source=str(file_path),
+                    tags=['table', 'structured_data'] + chunk_metadata.get('tags', []),
+                    importance_score=chunk_metadata.get('confidence_score', 0.5),
+                    metadata=chunk_metadata
+                )
+
+                logger.debug(f"Stored table chunk: {chunk_id}")
+
+        except Exception as e:
+            logger.error(f"Error storing table chunks in memory: {e}")
 
 # Global pipeline instance
 _multimodal_pipeline = None

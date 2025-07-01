@@ -29,13 +29,26 @@ class KnowledgeIntegrator:
             # Try to initialize secure memory store first (for SAM compatibility)
             try:
                 from memory.secure_memory_vectorstore import get_secure_memory_store, VectorStoreType
+
+                # Try to get the security manager from Streamlit session state if available
+                security_manager = None
+                try:
+                    import streamlit as st
+                    if hasattr(st, 'session_state') and 'security_manager' in st.session_state:
+                        security_manager = st.session_state.security_manager
+                        logger.info("Using security manager from Streamlit session")
+                except:
+                    logger.info("Streamlit session not available, creating new security manager")
+
+                # Initialize with same settings as SAM's interface
                 self.vector_store = get_secure_memory_store(
                     store_type=VectorStoreType.CHROMA,
                     storage_directory="memory_store",
                     embedding_dimension=384,
-                    enable_encryption=False  # Disable encryption for knowledge consolidation
+                    enable_encryption=True,  # Enable encryption to match SAM's interface
+                    security_manager=security_manager  # Use same security manager if available
                 )
-                logger.info("Secure vector store initialized for knowledge integration (encryption disabled)")
+                logger.info("Secure vector store initialized for knowledge integration (encryption enabled)")
             except ImportError:
                 # Fallback to regular memory store
                 from memory.memory_vectorstore import MemoryVectorStore

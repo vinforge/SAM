@@ -32,6 +32,9 @@ from .skills.calculator_tool import CalculatorTool
 from .skills.web_browser_tool import AgentZeroWebBrowserTool
 from .skills.content_vetting import ContentVettingSkill
 from .skills.reasoning.implicit_knowledge import ImplicitKnowledgeSkill
+from .skills.financial_data_tool import FinancialDataTool
+from .skills.news_api_tool import NewsApiTool
+from .skills.table_to_code_expert import TableToCodeExpert
 from .validator import PlanValidationEngine, PlanValidationReport, ValidationResult
 from .coordinator import CoordinatorEngine, ExecutionReport, ExecutionResult
 from .planner import DynamicPlanner, PlanGenerationResult, PlanCacheEntry
@@ -45,6 +48,10 @@ from .sof_integration import (
 from .config import (
     SOFConfig, SOFConfigManager, get_sof_config, is_sof_enabled,
     enable_sof_framework, disable_sof_framework
+)
+from .discovery_cycle import (
+    DiscoveryCycleOrchestrator, DiscoveryStage, DiscoveryProgress, DiscoveryResult,
+    get_discovery_orchestrator
 )
 
 __all__ = [
@@ -64,6 +71,8 @@ __all__ = [
     'CalculatorTool',
     'AgentZeroWebBrowserTool',
     'ContentVettingSkill',
+    'FinancialDataTool',
+    'NewsApiTool',
 
     # Reasoning skills
     'ImplicitKnowledgeSkill',
@@ -97,5 +106,12 @@ __all__ = [
     'get_sof_config',
     'is_sof_enabled',
     'enable_sof_framework',
-    'disable_sof_framework'
+    'disable_sof_framework',
+
+    # Task 27: Discovery Cycle Orchestration
+    'DiscoveryCycleOrchestrator',
+    'DiscoveryStage',
+    'DiscoveryProgress',
+    'DiscoveryResult',
+    'get_discovery_orchestrator',
 ]

@@ -1,0 +1,50 @@
+{
+  "test_1_initialization": {
+    "status": "PASSED",
+    "components_initialized": 4,
+    "token_roles_count": 9
+  },
+  "test_2_parser": {
+    "status": "PASSED",
+    "html_tables_detected": 1,
+    "markdown_tables_detected": 1,
+    "csv_tables_detected": 1,
+    "total_tables_detected": 3
+  },
+  "test_3_classifier": {
+    "status": "PASSED",
+    "tables_classified": 1,
+    "has_header_roles": true,
+    "has_data_roles": true,
+    "classification_rows": 4
+  },
+  "test_4_chunker": {
+    "status": "PASSED",
+    "tables_processed": 1,
+    "enhanced_chunks_created": 16,
+    "table_chunks_created": 16
+  },
+  "test_5_memory": {
+    "status": "PASSED",
+    "chunk_stored": true,
+    "chunk_retrieved": true,
+    "metadata_preserved": true
+  },
+  "test_6_pipeline": {
+    "status": "PASSED",
+    "table_chunker_integrated": true
+  },
+  "test_7_end_to_end": {
+    "status": "PASSED",
+    "document_processed": true,
+    "tables_detected": 1,
+    "enhanced_chunks": 8
+  },
+  "summary": {
+    "total_tests": 7,
+    "passed_tests": 7,
+    "failed_tests": 0,
+    "success_rate": 100.0,
+    "phase_1_complete": true
+  }
+}

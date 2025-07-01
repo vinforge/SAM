@@ -7,6 +7,7 @@ Integrates with SAM's security framework for safe external content access.
 """
 
 import re
+import time
 import logging
 import requests
 from typing import Dict, Any, Optional, List
@@ -85,39 +86,97 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
     def execute(self, uif: SAM_UIF) -> SAM_UIF:
         """
         Execute web browsing with security controls and content vetting.
-        
+
         Args:
             uif: Universal Interface Format with search request
-            
+
         Returns:
             Updated UIF with search results (marked for vetting)
         """
+        # Initialize tracing
+        trace_id = uif.intermediate_data.get('trace_id')
+        start_time = time.time()
+
+        if trace_id:
+            self._log_trace_event(
+                trace_id=trace_id,
+                event_type="start",
+                severity="info",
+                message="Starting web search and content extraction",
+                payload={
+                    "tool": self.skill_name,
+                    "input_query": uif.input_query,
+                    "requires_external_access": self.requires_external_access,
+                    "requires_vetting": self.requires_vetting
+                }
+            )
+
         try:
             # Extract search query
             search_query = self._extract_search_query(uif)
             if not search_query:
+                if trace_id:
+                    self._log_trace_event(
+                        trace_id=trace_id,
+                        event_type="error",
+                        severity="error",
+                        message="No web search query found",
+                        payload={"input_query": uif.input_query}
+                    )
                 raise SkillExecutionError("No web search query found")
-            
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="data_in",
+                    severity="info",
+                    message=f"Extracted web search query: {search_query}",
+                    payload={
+                        "search_query": search_query,
+                        "query_length": len(search_query),
+                        "is_question": any(q in search_query.lower() for q in ['what', 'how', 'why', 'when', 'where', 'who'])
+                    }
+                )
+
             self.logger.info(f"Performing web search: {search_query}")
-            
+
             # Get search parameters
             search_context = uif.intermediate_data.get("search_context", {})
             max_results = uif.intermediate_data.get("max_results", 5)
             content_filter = uif.intermediate_data.get("content_filter", "safe")
-            
+
             # Perform secure web search
+            search_start_time = time.time()
             search_results = self._perform_secure_search(
                 search_query, search_context, max_results, content_filter
             )
-            
+            search_duration = (time.time() - search_start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="tool_call",
+                    severity="info",
+                    message=f"Web search completed: {len(search_results['results'])} results found",
+                    duration_ms=search_duration,
+                    payload={
+                        "search_query": search_query,
+                        "results_count": len(search_results["results"]),
+                        "content_count": len(search_results["content"]),
+                        "confidence": search_results["confidence"],
+                        "search_duration_ms": search_duration,
+                        "max_results_requested": max_results
+                    }
+                )
+
             # Mark content for vetting
             uif.requires_vetting = True
-            
+
             # Store results in UIF (will be vetted before use)
             uif.intermediate_data["web_search_results"] = search_results["results"]
             uif.intermediate_data["extracted_content"] = search_results["content"]
             uif.intermediate_data["search_confidence"] = search_results["confidence"]
-            
+
             # Add to security context for vetting
             uif.security_context["external_content"] = {
                 "source": "web_search",
@@ -125,7 +184,7 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
                 "results_count": len(search_results["results"]),
                 "requires_vetting": True
             }
-            
+
             # Set skill outputs
             uif.set_skill_output(self.skill_name, {
                 "search_query": search_query,
@@ -133,12 +192,48 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
                 "confidence": search_results["confidence"],
                 "vetting_required": True
             })
-            
+
+            total_duration = (time.time() - start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="data_out",
+                    severity="info",
+                    message=f"Web browser tool execution completed - content marked for vetting",
+                    duration_ms=total_duration,
+                    payload={
+                        "results_count": len(search_results["results"]),
+                        "content_extracted": len(search_results["content"]),
+                        "confidence": search_results["confidence"],
+                        "requires_vetting": True,
+                        "execution_time_ms": total_duration,
+                        "search_time_ms": search_duration,
+                        "overhead_ms": total_duration - search_duration
+                    }
+                )
+
             self.logger.info(f"Web search completed: {len(search_results['results'])} results found")
-            
+
             return uif
-            
+
         except Exception as e:
+            total_duration = (time.time() - start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="error",
+                    severity="error",
+                    message=f"Web browser tool execution failed: {str(e)}",
+                    duration_ms=total_duration,
+                    payload={
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "execution_time_ms": total_duration
+                    }
+                )
+
             self.logger.exception("Error during web search")
             raise SkillExecutionError(f"Web search failed: {str(e)}")
     
@@ -156,14 +251,27 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
         # Try to extract from user query
         query = uif.input_query
         
-        # Look for search-related patterns
+        # Look for search-related patterns (enhanced for better detection)
         search_patterns = [
-            r'search\s+(?:for\s+)?(.+)',
+            r'search\s+(?:for\s+|up\s+|about\s+)?(.+)',
             r'find\s+(?:information\s+(?:about\s+)?)?(.+)',
             r'look\s+up\s+(.+)',
             r'browse\s+(?:for\s+)?(.+)',
             r'what\s+(?:is|are)\s+(.+)',
             r'tell\s+me\s+about\s+(.+)',
+            # Enhanced patterns to catch queries like "search up, information about, why do clouds form?"
+            r'search\s+up,?\s*(?:information\s+about,?\s*)?(.+)',
+            r'information\s+about,?\s*(.+)',
+            r'learn\s+about\s+(.+)',
+            r'research\s+(.+)',
+            r'investigate\s+(.+)',
+            r'discover\s+(.+)',
+            r'explore\s+(.+)',
+            r'understand\s+(.+)',
+            r'explain\s+(.+)',
+            r'clarify\s+(.+)',
+            r'describe\s+(.+)',
+            r'details\s+about\s+(.+)',
         ]
         
         query_lower = query.lower()
@@ -209,7 +317,11 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
         """
         search_indicators = [
             'search', 'find', 'look up', 'browse', 'what is', 'what are',
-            'tell me about', 'information about', 'details about'
+            'tell me about', 'information about', 'details about',
+            # Enhanced search detection (preserving 100% of functionality)
+            'search up', 'search for', 'search about', 'look for',
+            'find out', 'find information', 'learn about', 'research',
+            'investigate', 'discover', 'explore', 'understand', 'clarify'
         ]
         
         query_lower = query.lower()
@@ -444,3 +556,31 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
             return True
         
         return False
+
+    def _log_trace_event(self, trace_id: str, event_type: str, severity: str,
+                        message: str, duration_ms: Optional[float] = None,
+                        payload: Optional[Dict[str, Any]] = None) -> None:
+        """Log a trace event for the web browser tool."""
+        try:
+            from sam.cognition.trace_logger import log_event
+            log_event(
+                trace_id=trace_id,
+                source_module=self.skill_name,
+                event_type=event_type,
+                severity=severity,
+                message=message,
+                duration_ms=duration_ms,
+                payload=payload or {},
+                metadata={
+                    "tool_version": self.skill_version,
+                    "tool_category": self.skill_category,
+                    "requires_external_access": self.requires_external_access,
+                    "requires_vetting": self.requires_vetting
+                }
+            )
+        except ImportError:
+            # Tracing not available, continue without logging
+            pass
+        except Exception as e:
+            # Don't let tracing errors break the tool
+            self.logger.debug(f"Trace logging failed: {e}")

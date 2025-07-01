@@ -58,13 +58,14 @@ class DynamicPlanner:
     - Integration with Cognitive Memory Core (Phase B)
     """
     
-    def __init__(self, enable_curriculum: bool = True):
+    def __init__(self, enable_curriculum: bool = True, goal_stack=None):
         self.logger = logging.getLogger(f"{__name__}.DynamicPlanner")
         self._config = get_sof_config()
         self._registered_skills: Dict[str, BaseSkillModule] = {}
         self._plan_cache: Dict[str, PlanCacheEntry] = {}
         self._llm_model = None
         self._graph_database = None
+        self._goal_stack = goal_stack  # Phase B: Goal-informed planning
 
         # PINN-inspired reasoning curriculum
         self._curriculum = ReasoningCurriculum() if enable_curriculum else None
@@ -72,7 +73,7 @@ class DynamicPlanner:
         self._initialize_llm()
         self._initialize_graph_awareness()
 
-        self.logger.info(f"DynamicPlanner initialized (curriculum: {enable_curriculum})")
+        self.logger.info(f"DynamicPlanner initialized (curriculum: {enable_curriculum}, goal_aware: {goal_stack is not None})")
     
     def _initialize_llm(self) -> None:
         """Initialize the language model for plan generation."""
@@ -124,20 +125,34 @@ class DynamicPlanner:
         for skill in skills:
             self.register_skill(skill)
     
-    def create_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
+    def create_plan(self, uif: SAM_UIF, mode: str = "user_focused") -> PlanGenerationResult:
         """
         Create a custom execution plan for the given query.
-        
+
         Args:
             uif: Universal Interface Format with query and context
-            
+            mode: Planning mode - "user_focused", "goal_informed", or "goal_focused"
+
         Returns:
             Plan generation result with plan and metadata
         """
         start_time = time.time()
-        
-        self.logger.info(f"Creating plan for query: {uif.input_query[:100]}...")
-        
+
+        # Phase B: Handle goal-informed planning modes
+        background_goal = None
+        if mode in ["goal_informed", "goal_focused"] and self._goal_stack:
+            background_goal = self._get_background_goal()
+            if background_goal:
+                self.logger.info(f"Planning with background goal: {background_goal.description[:50]}...")
+                uif.add_log_entry(f"Background goal: {background_goal.goal_id}")
+
+        # For goal_focused mode with empty query, focus entirely on the goal
+        if mode == "goal_focused" and not uif.input_query.strip() and background_goal:
+            uif.input_query = f"Address autonomous goal: {background_goal.description}"
+            uif.add_log_entry(f"Planning focused on autonomous goal: {background_goal.goal_id}")
+
+        self.logger.info(f"Creating plan for query: {uif.input_query[:100]}... (mode: {mode})")
+
         try:
             # Check cache first
             if self._config.enable_plan_caching:
@@ -153,13 +168,13 @@ class DynamicPlanner:
                         fallback_used=False
                     )
             
-            # Generate new plan using curriculum if available
-            if self._curriculum:
-                result = self._generate_curriculum_plan(uif)
-            elif self._llm_model:
-                result = self._generate_llm_plan(uif)
+            # Generate new plan - prioritize LLM for enhanced tool selection
+            if self._llm_model:
+                result = self._generate_llm_plan(uif, background_goal)
+            elif self._curriculum:
+                result = self._generate_curriculum_plan(uif, background_goal)
             else:
-                result = self._generate_fallback_plan(uif)
+                result = self._generate_fallback_plan(uif, background_goal)
             
             # Cache the result if successful
             if self._config.enable_plan_caching and result.plan and result.confidence > 0.5:
@@ -211,7 +226,24 @@ class DynamicPlanner:
         
         return None
 
-    def _generate_curriculum_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
+    def _get_background_goal(self):
+        """
+        Get the top priority background goal for goal-informed planning.
+
+        Returns:
+            Top priority goal or None if no goals available
+        """
+        if not self._goal_stack:
+            return None
+
+        try:
+            top_goals = self._goal_stack.get_top_priority_goals(limit=1, status="pending")
+            return top_goals[0] if top_goals else None
+        except Exception as e:
+            self.logger.warning(f"Failed to retrieve background goal: {e}")
+            return None
+
+    def _generate_curriculum_plan(self, uif: SAM_UIF, background_goal=None) -> PlanGenerationResult:
         """
         Generate plan using PINN-inspired curriculum learning.
 
@@ -227,10 +259,11 @@ class DynamicPlanner:
             )
 
             # Store curriculum information in UIF for coordinator
-            uif.curriculum_level = reasoning_plan.curriculum_level.value
-            uif.complexity_score = reasoning_plan.complexity_score
-            uif.reasoning_strategy = reasoning_plan.reasoning_strategy
-            uif.estimated_effort = reasoning_plan.estimated_effort
+            # Note: These are dynamic attributes, not part of the UIF model
+            setattr(uif, 'curriculum_level', reasoning_plan.curriculum_level.value)
+            setattr(uif, 'complexity_score', reasoning_plan.complexity_score)
+            setattr(uif, 'reasoning_strategy', reasoning_plan.reasoning_strategy)
+            setattr(uif, 'estimated_effort', reasoning_plan.estimated_effort)
 
             return PlanGenerationResult(
                 plan=reasoning_plan.skills,
@@ -245,11 +278,11 @@ class DynamicPlanner:
             self.logger.error(f"Curriculum plan generation failed: {e}")
             # Fall back to standard plan generation
             if self._llm_model:
-                return self._generate_llm_plan(uif)
+                return self._generate_llm_plan(uif, background_goal)
             else:
-                return self._generate_fallback_plan(uif)
+                return self._generate_fallback_plan(uif, background_goal)
 
-    def _generate_llm_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
+    def _generate_llm_plan(self, uif: SAM_UIF, background_goal=None) -> PlanGenerationResult:
         """
         Generate plan using LLM-as-a-Planner approach.
         
@@ -258,8 +291,8 @@ class DynamicPlanner:
         """
         try:
             # Create planning prompt
-            prompt = self._create_planning_prompt(uif)
-            
+            prompt = self._create_planning_prompt(uif, background_goal)
+
             # Generate plan using LLM
             response = self._llm_model.generate(
                 prompt=prompt,
@@ -281,16 +314,20 @@ class DynamicPlanner:
                 )
             else:
                 # LLM response was invalid, use fallback
-                return self._generate_fallback_plan(uif)
-                
+                return self._generate_fallback_plan(uif, background_goal)
+
         except Exception as e:
             self.logger.error(f"LLM plan generation failed: {e}")
-            return self._generate_fallback_plan(uif)
-    
-    def _create_planning_prompt(self, uif: SAM_UIF) -> str:
+            return self._generate_fallback_plan(uif, background_goal)
+
+    def _create_planning_prompt(self, uif: SAM_UIF, background_goal=None) -> str:
         """
         Create a specialized prompt for plan generation.
-        
+
+        Args:
+            uif: Universal Interface Format
+            background_goal: Optional background goal for goal-informed planning
+
         Returns:
             Formatted planning prompt
         """
@@ -309,9 +346,21 @@ class DynamicPlanner:
             "You are the planning engine for the SAM AI system. Your task is to analyze the user's query and generate a JSON plan specifying the precise skills needed to answer the query, in the correct execution order.",
             "",
             f"User Query: {uif.input_query}",
-            "",
-            "Available Skills:",
+            ""
         ]
+
+        # Phase B: Add background goal context for goal-informed planning
+        if background_goal:
+            prompt_parts.extend([
+                f"High-Priority Background Goal: {background_goal.description}",
+                f"Goal Source: {background_goal.source_skill}",
+                f"Goal Priority: {background_goal.priority:.2f}",
+                "",
+                "Instructions: You must intelligently decide if you can safely and efficiently integrate steps to address the background goal within the same plan. If the user query is empty, you must generate a plan to address the background goal directly. Prioritize the user's query unless the background goal is directly related or critically urgent.",
+                ""
+            ])
+
+        prompt_parts.append("Available Skills:")
         
         for skill_name, info in skill_descriptions.items():
             prompt_parts.append(f"- {skill_name}: {info['description']}")
@@ -329,9 +378,35 @@ class DynamicPlanner:
             ])
         
         prompt_parts.extend([
+            "TOOL SELECTION GUIDE:",
+            "Choose the RIGHT tool for the specific type of query:",
+            "",
+            "📊 FinancialDataTool - Use for SPECIFIC factual data lookups:",
+            "  • Market capitalization, stock prices, company valuations",
+            "  • Financial metrics, revenue, earnings, financial data",
+            "  • Specific numerical facts about companies or markets",
+            "  • Example: 'What is NVIDIA's market capitalization?' → FinancialDataTool",
+            "",
+            "📰 NewsApiTool - Use for CURRENT news and recent events:",
+            "  • Breaking news, latest developments, recent headlines",
+            "  • Current events, news updates, what's happening now",
+            "  • Recent articles about topics or companies",
+            "  • Example: 'Latest news about NVIDIA' → NewsApiTool",
+            "",
+            "🌐 AgentZeroWebBrowserTool - Use for GENERAL web searches:",
+            "  • Broad information gathering, research topics",
+            "  • When you need comprehensive web content",
+            "  • General 'search the web' requests without specific data needs",
+            "  • Example: 'Search the web for information about AI' → AgentZeroWebBrowserTool",
+            "",
+            "🧮 CalculatorTool - Use for MATHEMATICAL computations:",
+            "  • Arithmetic operations, calculations, mathematical expressions",
+            "  • When you need to compute values from other tool outputs",
+            "  • Example: 'Calculate 1000 + 45 - 56' → CalculatorTool",
+            "",
             "Instructions:",
             "1. Analyze the query to understand what information and processing is needed",
-            "2. Select the minimum necessary skills to fulfill the request",
+            "2. Select the minimum necessary skills to fulfill the request using the Tool Selection Guide above",
             "3. Order skills so that dependencies are satisfied (outputs of earlier skills feed inputs of later skills)",
             "4. Always include ResponseGenerationSkill as the final step to create the user response",
             "5. Consider including MemoryRetrievalSkill if the query might benefit from stored knowledge",
@@ -407,9 +482,13 @@ class DynamicPlanner:
         
         return True
     
-    def _generate_fallback_plan(self, uif: SAM_UIF) -> PlanGenerationResult:
+    def _generate_fallback_plan(self, uif: SAM_UIF, background_goal=None) -> PlanGenerationResult:
         """
         Generate an enhanced graph-aware fallback plan using rule-based logic.
+
+        Args:
+            uif: Universal Interface Format
+            background_goal: Optional background goal for goal-informed planning
 
         Returns:
             Fallback plan generation result
@@ -419,6 +498,47 @@ class DynamicPlanner:
 
         # Analyze query for plan generation
         query_lower = uif.input_query.lower()
+
+        # Phase B: Consider background goal in fallback planning
+        if background_goal:
+            goal_lower = background_goal.description.lower()
+            # Merge goal keywords with query for better skill selection
+            query_lower = f"{query_lower} {goal_lower}"
+            reasoning_parts.append(f"Integrated background goal: {background_goal.description[:30]}...")
+
+        # Enhanced tool selection logic (matching the Tool Selection Guide)
+
+        # Financial data queries - use FinancialDataTool
+        if any(term in query_lower for term in [
+            "market cap", "market capitalization", "stock price", "share price",
+            "financial data", "revenue", "earnings", "valuation", "worth",
+            "cost", "price", "value", "trading", "current price", "today",
+            "stock", "shares", "equity", "investment", "finance", "financial"
+        ]):
+            if "FinancialDataTool" in self._registered_skills:
+                plan.append("FinancialDataTool")
+                reasoning_parts.append("Added FinancialDataTool for financial data lookup")
+
+        # News queries - use NewsApiTool
+        elif any(term in query_lower for term in [
+            "news", "breaking", "latest", "recent", "current events",
+            "headlines", "updates", "developments", "happening"
+        ]):
+            if "NewsApiTool" in self._registered_skills:
+                plan.append("NewsApiTool")
+                reasoning_parts.append("Added NewsApiTool for current news")
+
+        # General web search - use AgentZeroWebBrowserTool
+        elif ("search" in query_lower or "find" in query_lower or "look up" in query_lower):
+            if "AgentZeroWebBrowserTool" in self._registered_skills:
+                plan.append("AgentZeroWebBrowserTool")
+                reasoning_parts.append("Added web search for general information")
+
+        # Calculator for mathematical operations
+        if any(op in query_lower for op in ["+", "-", "*", "/", "calculate", "compute", "math"]):
+            if "CalculatorTool" in self._registered_skills:
+                plan.append("CalculatorTool")
+                reasoning_parts.append("Added calculator for mathematical operations")
 
         # Determine optimal retrieval mode and configure memory retrieval
         if "MemoryRetrievalSkill" in self._registered_skills:

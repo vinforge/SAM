@@ -334,11 +334,12 @@ class BulkIngestionUI:
         st.markdown("Manage document sources and bulk ingestion operations")
         
         # Create tabs for different sections
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "📂 Source Management",
             "🚀 Manual Scan",
             "📊 Statistics",
-            "⚙️ Settings"
+            "⚙️ Settings",
+            "🔬 Discovery Cycle"
         ])
         
         with tab1:
@@ -352,6 +353,9 @@ class BulkIngestionUI:
         
         with tab4:
             self._render_settings()
+
+        with tab5:
+            self._render_discovery_cycle()
     
     def _render_source_management(self):
         """Render the source management interface."""
@@ -555,7 +559,7 @@ Error details: {path_validation.get('error_details', 'None')}
                         st.warning("⚠️ No enabled sources to process")
 
             with col2:
-                if st.button("🔍 Preview All Sources", type="secondary", key="preview_all_sources_button"):
+                if st.button("🔍 Preview All Sources", type="secondary", key="preview_all_sources_button_main"):
                     enabled_sources = [s for s in sources if s["enabled"]]
                     if enabled_sources:
                         st.session_state.trigger_bulk_preview = True
@@ -901,8 +905,58 @@ Error details: {path_validation.get('error_details', 'None')}
         st.markdown("### 🚀 Manual Scan Operations")
         st.markdown("Trigger bulk ingestion scans manually")
 
-        # Add incremental processing information
+        # Enhanced incremental processing information with detailed benefits
         st.info("💡 **Smart Incremental Processing:** SAM only processes new or modified files, automatically skipping files that have already been processed. This makes subsequent scans much faster!")
+
+        # Add detailed incremental processing benefits
+        with st.expander("🔍 How Incremental Processing Works", expanded=False):
+            st.markdown("""
+            **🧠 Intelligent File Tracking:**
+            - **SHA256 Hash Verification**: Each file's content is hashed to detect any changes
+            - **Modification Time Checking**: File timestamps are compared to detect updates
+            - **SQLite State Database**: Persistent tracking of all processed files
+            - **Cross-Session Memory**: Remembers processed files between SAM restarts
+
+            **⚡ Performance Benefits:**
+            - **Skip Unchanged Files**: Dramatically reduces processing time on subsequent scans
+            - **Process Only New Content**: Focus computational resources on new information
+            - **Efficient Resource Usage**: Avoid redundant processing of existing knowledge
+            - **Faster Iteration**: Quick re-scans when adding new documents to existing folders
+
+            **🔄 What Triggers Re-Processing:**
+            - ✅ **New files** added to watched folders
+            - ✅ **Modified files** (content or metadata changes)
+            - ✅ **Renamed files** (treated as new files)
+            - ⏭️ **Unchanged files** are automatically skipped
+
+            **📊 Efficiency Metrics:**
+            - View real-time statistics showing files processed vs. skipped
+            - Track processing efficiency over time
+            - Monitor storage and computational savings
+            """)
+
+        # Add incremental processing status overview
+        try:
+            # Get overall statistics from the state database
+            if self.manager.state_db.exists():
+                with sqlite3.connect(self.manager.state_db) as conn:
+                    cursor = conn.execute("SELECT COUNT(*) as total, SUM(chunks_created) as total_chunks, AVG(enrichment_score) as avg_score FROM processed_files WHERE status = 'success'")
+                    stats = cursor.fetchone()
+
+                    if stats and stats[0] > 0:
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("📄 Total Processed Files", f"{stats[0]:,}")
+                        with col2:
+                            st.metric("🧩 Total Memory Chunks", f"{stats[1] or 0:,}")
+                        with col3:
+                            avg_score = stats[2] or 0
+                            st.metric("⭐ Avg Enrichment Score", f"{avg_score:.2f}")
+
+                        st.success(f"✅ **Incremental Processing Active**: {stats[0]:,} files already in knowledge base - only new/modified files will be processed!")
+        except Exception as e:
+            # Graceful fallback if database access fails
+            st.info("📊 Incremental processing database initializing...")
 
         config = self.manager.load_config()
         sources = config.get("sources", [])
@@ -922,7 +976,7 @@ Error details: {path_validation.get('error_details', 'None')}
             col1a, col1b = st.columns(2)
 
             with col1a:
-                if st.button("👁️ Preview All", key="preview_all_sources_button", help="See what files would be processed across all sources"):
+                if st.button("👁️ Preview All", key="preview_all_sources_button_manual", help="See what files would be processed across all sources"):
                     self._preview_all_sources(enabled_sources)
 
             with col1b:
@@ -1035,9 +1089,32 @@ Error details: {path_validation.get('error_details', 'None')}
                 else:
                     st.metric("⚡ Efficiency", "0%")
 
-            # Show efficiency message
+            # Enhanced efficiency message with detailed benefits
             if preview["already_processed"] > 0:
-                st.info(f"⚡ **Incremental Processing Benefit:** {preview['already_processed']} files already processed and will be skipped, saving significant time!")
+                time_saved_estimate = preview["already_processed"] * 2  # Estimate 2 minutes per file
+                st.info(f"⚡ **Incremental Processing Benefit:** {preview['already_processed']} files already processed and will be skipped, saving approximately {time_saved_estimate} minutes of processing time!")
+
+                # Add detailed breakdown
+                with st.expander("📊 Incremental Processing Details", expanded=False):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Files to Process:**")
+                        st.markdown(f"- 🆕 New files: {preview['new_files']}")
+                        st.markdown(f"- ⏭️ Already processed: {preview['already_processed']}")
+                        st.markdown(f"- 📊 Total discovered: {preview['total_found']}")
+
+                    with col2:
+                        st.markdown("**Efficiency Metrics:**")
+                        if preview['total_found'] > 0:
+                            efficiency_pct = (preview['already_processed'] / preview['total_found']) * 100
+                            st.markdown(f"- ⚡ Skip efficiency: {efficiency_pct:.1f}%")
+                            st.markdown(f"- 🕒 Est. time saved: ~{time_saved_estimate} min")
+                            st.markdown(f"- 💾 Storage saved: Significant")
+                        else:
+                            st.markdown("- ⚡ Skip efficiency: 0%")
+            else:
+                if preview["new_files"] > 0:
+                    st.info("🆕 **First-time processing**: All files are new and will be processed for the first time!")
 
             # Show action buttons based on results
             if preview["new_files"] > 0:
@@ -1053,10 +1130,74 @@ Error details: {path_validation.get('error_details', 'None')}
                         self._run_individual_scan(source, dry_run=False)
             else:
                 st.info("✅ All files in this source have already been processed!")
-                st.markdown("**Options:**")
-                st.markdown("- Add new files to the source folder")
-                st.markdown("- Modify existing files (they will be re-processed)")
-                st.markdown("- Check other sources for new content")
+
+                # Enhanced options with recently processed files view
+                with st.expander("📋 Recently Processed Files & Options", expanded=False):
+                    # Show recently processed files from this source
+                    try:
+                        if self.manager.state_db.exists():
+                            with sqlite3.connect(self.manager.state_db) as conn:
+                                cursor = conn.execute("""
+                                    SELECT filepath, processed_at, chunks_created, enrichment_score, status
+                                    FROM processed_files
+                                    WHERE filepath LIKE ?
+                                    ORDER BY processed_at DESC
+                                    LIMIT 10
+                                """, (f"{source['path']}%",))
+                                recent_files = cursor.fetchall()
+
+                                if recent_files:
+                                    st.markdown("**🕒 Recently Processed Files:**")
+                                    for filepath, processed_at, chunks, score, status in recent_files:
+                                        filename = Path(filepath).name
+                                        status_icon = "✅" if status == "success" else "❌"
+                                        try:
+                                            # Parse timestamp
+                                            dt = datetime.fromisoformat(processed_at)
+                                            time_str = dt.strftime("%Y-%m-%d %H:%M")
+                                        except:
+                                            time_str = processed_at[:16] if processed_at else "Unknown"
+
+                                        st.markdown(f"  {status_icon} `{filename}` - {time_str} ({chunks} chunks, score: {score:.2f})")
+                                else:
+                                    st.markdown("**📄 No files found in processing history for this source.**")
+                    except Exception as e:
+                        st.markdown("**📊 Processing history unavailable.**")
+
+                    st.markdown("---")
+                    st.markdown("**🔄 Available Options:**")
+                    st.markdown("- **Add new files** to the source folder")
+                    st.markdown("- **Modify existing files** (they will be automatically re-processed)")
+                    st.markdown("- **Check other sources** for new content")
+                    st.markdown("- **Force re-processing** using the advanced options below")
+
+                    # Advanced re-processing options
+                    st.markdown("**⚙️ Advanced Options:**")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        if st.button("🔄 Force Re-scan", key=f"force_rescan_{source['id']}",
+                                   help="Clear processing history and re-scan all files"):
+                            if st.session_state.get(f"confirm_rescan_{source['id']}", False):
+                                # Clear processing history for this source
+                                try:
+                                    if self.manager.state_db.exists():
+                                        with sqlite3.connect(self.manager.state_db) as conn:
+                                            conn.execute("DELETE FROM processed_files WHERE filepath LIKE ?", (f"{source['path']}%",))
+                                            conn.commit()
+                                        st.success(f"✅ Processing history cleared for {source['name']}. All files will be re-processed on next scan.")
+                                        st.session_state[f"confirm_rescan_{source['id']}"] = False
+                                        st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Failed to clear processing history: {e}")
+                            else:
+                                st.session_state[f"confirm_rescan_{source['id']}"] = True
+                                st.warning("⚠️ Click again to confirm clearing processing history")
+
+                    with col2:
+                        if st.button("📊 View Source Stats", key=f"view_stats_{source['id']}",
+                                   help="View detailed statistics for this source"):
+                            self._show_source_statistics(source)
         else:
             st.error(f"❌ Failed to analyze {source['name']}")
             if preview["stderr"]:
@@ -1425,22 +1566,385 @@ Error details: {path_validation.get('error_details', 'None')}
             self.manager.save_config(config)
             st.success("✅ Settings saved successfully!")
     
+    def _show_source_statistics(self, source):
+        """Show detailed statistics for a specific source."""
+        st.markdown(f"### 📊 Statistics for {source['name']}")
+
+        try:
+            if self.manager.state_db.exists():
+                with sqlite3.connect(self.manager.state_db) as conn:
+                    # Get overall stats for this source
+                    cursor = conn.execute("""
+                        SELECT
+                            COUNT(*) as total_files,
+                            SUM(chunks_created) as total_chunks,
+                            AVG(enrichment_score) as avg_score,
+                            MIN(processed_at) as first_processed,
+                            MAX(processed_at) as last_processed,
+                            SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
+                            SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as failed
+                        FROM processed_files
+                        WHERE filepath LIKE ?
+                    """, (f"{source['path']}%",))
+
+                    stats = cursor.fetchone()
+
+                    if stats and stats[0] > 0:
+                        col1, col2, col3, col4 = st.columns(4)
+
+                        with col1:
+                            st.metric("📄 Total Files", f"{stats[0]:,}")
+                            st.metric("✅ Successful", f"{stats[5]:,}")
+
+                        with col2:
+                            st.metric("🧩 Total Chunks", f"{stats[1] or 0:,}")
+                            st.metric("❌ Failed", f"{stats[6]:,}")
+
+                        with col3:
+                            avg_score = stats[2] or 0
+                            st.metric("⭐ Avg Score", f"{avg_score:.2f}")
+                            success_rate = (stats[5] / stats[0]) * 100 if stats[0] > 0 else 0
+                            st.metric("📈 Success Rate", f"{success_rate:.1f}%")
+
+                        with col4:
+                            try:
+                                first_dt = datetime.fromisoformat(stats[3]) if stats[3] else None
+                                last_dt = datetime.fromisoformat(stats[4]) if stats[4] else None
+
+                                if first_dt:
+                                    st.metric("🕒 First Processed", first_dt.strftime("%Y-%m-%d"))
+                                if last_dt:
+                                    st.metric("🕒 Last Processed", last_dt.strftime("%Y-%m-%d"))
+                            except:
+                                st.metric("🕒 Processing Period", "Available")
+
+                        # Show file type breakdown
+                        cursor = conn.execute("""
+                            SELECT
+                                CASE
+                                    WHEN filepath LIKE '%.pdf' THEN 'PDF'
+                                    WHEN filepath LIKE '%.docx' OR filepath LIKE '%.doc' THEN 'Word'
+                                    WHEN filepath LIKE '%.txt' OR filepath LIKE '%.md' THEN 'Text'
+                                    WHEN filepath LIKE '%.pptx' OR filepath LIKE '%.ppt' THEN 'PowerPoint'
+                                    ELSE 'Other'
+                                END as file_type,
+                                COUNT(*) as count,
+                                SUM(chunks_created) as chunks
+                            FROM processed_files
+                            WHERE filepath LIKE ? AND status = 'success'
+                            GROUP BY file_type
+                            ORDER BY count DESC
+                        """, (f"{source['path']}%",))
+
+                        file_types = cursor.fetchall()
+
+                        if file_types:
+                            st.markdown("**📁 File Type Breakdown:**")
+                            for file_type, count, chunks in file_types:
+                                st.markdown(f"- **{file_type}**: {count} files ({chunks or 0} chunks)")
+                    else:
+                        st.info("No processing statistics available for this source.")
+            else:
+                st.info("Processing database not found.")
+        except Exception as e:
+            st.error(f"Failed to load statistics: {e}")
+
     def _show_logs(self):
         """Display recent logs."""
         try:
             if self.manager.log_file.exists():
                 with open(self.manager.log_file, 'r') as f:
                     logs = f.read()
-                
+
                 # Show last 50 lines
                 log_lines = logs.split('\n')[-50:]
                 recent_logs = '\n'.join(log_lines)
-                
+
                 st.code(recent_logs, language="text")
             else:
                 st.info("📝 No log file found yet.")
         except Exception as e:
             st.error(f"Error reading logs: {e}")
+
+    def _render_discovery_cycle(self):
+        """Render the automated discovery cycle interface."""
+        st.subheader("🔬 Automated Discovery Cycle")
+        st.markdown("*Automated research discovery and insight synthesis pipeline*")
+
+        # Import discovery cycle components
+        try:
+            from sam.orchestration.discovery_cycle import get_discovery_orchestrator, DiscoveryStage
+            from sam.state.state_manager import get_state_manager
+
+            orchestrator = get_discovery_orchestrator()
+            state_manager = get_state_manager()
+
+            # Check current cycle status
+            is_running = orchestrator.is_cycle_running()
+            current_progress = orchestrator.get_current_progress()
+            insights_status = orchestrator.get_new_insights_status()
+
+            # Status display
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                if is_running:
+                    st.error("🔄 **Discovery Cycle Running**")
+                    if current_progress:
+                        st.progress(current_progress.progress_percentage / 100.0)
+                        st.caption(f"Stage: {current_progress.stage.value}")
+                        st.caption(f"Step: {current_progress.current_step}")
+                else:
+                    st.success("✅ **Discovery Cycle Ready**")
+
+            with col2:
+                if insights_status.get('new_insights_available'):
+                    st.warning("💡 **New Insights Available**")
+                    timestamp = insights_status.get('last_insights_timestamp')
+                    if timestamp:
+                        try:
+                            from datetime import datetime
+                            dt = datetime.fromisoformat(timestamp)
+                            st.caption(f"Generated: {dt.strftime('%Y-%m-%d %H:%M')}")
+                        except:
+                            st.caption("Recently generated")
+                else:
+                    st.info("🔍 **No New Insights**")
+
+            with col3:
+                # Quick stats
+                try:
+                    from pathlib import Path
+                    results_dir = Path("logs/discovery_cycles")
+                    if results_dir.exists():
+                        cycle_files = list(results_dir.glob("*.json"))
+                        st.metric("🔄 Total Cycles", len(cycle_files))
+                    else:
+                        st.metric("🔄 Total Cycles", 0)
+                except:
+                    st.metric("🔄 Total Cycles", "N/A")
+
+            st.markdown("---")
+
+            # Discovery cycle explanation
+            with st.expander("ℹ️ What is the Discovery Cycle?", expanded=False):
+                st.markdown("""
+                **The Automated Discovery Cycle is SAM's research automation engine:**
+
+                🔄 **Complete Pipeline:**
+                1. **Bulk Ingestion**: Process all configured document sources
+                2. **Dream Canvas Clustering**: Analyze memory patterns and find concept clusters
+                3. **Insight Synthesis**: Generate new insights from discovered patterns
+                4. **Research Initiation**: Automatically trigger research for promising insights
+
+                🎯 **Benefits:**
+                - **Automated Knowledge Discovery**: Find hidden patterns in your data
+                - **Research Automation**: Automatically discover relevant papers
+                - **Insight Generation**: Synthesize new understanding from existing knowledge
+                - **Continuous Learning**: Keep SAM's knowledge current and expanding
+
+                🛡️ **Security:**
+                - All downloads go to quarantine for vetting
+                - Multi-dimensional analysis (security, relevance, credibility)
+                - Manual review options for sensitive content
+                - Full audit trail and logging
+                """)
+
+            # Main action button
+            st.markdown("### 🚀 Discovery Cycle Control")
+
+            if not is_running:
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    if st.button("🚀 **Start Discovery Cycle**", type="primary", use_container_width=True,
+                               help="Begin automated discovery: bulk ingestion → clustering → synthesis → research"):
+                        # Trigger discovery cycle
+                        st.session_state.trigger_discovery_cycle = True
+                        st.rerun()
+
+                with col2:
+                    if st.button("🔍 Preview Sources", use_container_width=True,
+                               help="Preview what sources will be processed"):
+                        st.session_state.show_discovery_preview = True
+
+                # Handle discovery cycle trigger
+                if st.session_state.get("trigger_discovery_cycle", False):
+                    st.session_state.trigger_discovery_cycle = False
+                    self._run_discovery_cycle(orchestrator)
+
+                # Handle preview trigger
+                if st.session_state.get("show_discovery_preview", False):
+                    st.session_state.show_discovery_preview = False
+                    self._show_discovery_preview(orchestrator)
+
+            else:
+                # Show progress details
+                st.warning("🔄 **Discovery cycle is currently running...**")
+
+                if current_progress:
+                    progress_col1, progress_col2 = st.columns(2)
+
+                    with progress_col1:
+                        st.metric("Current Stage", current_progress.stage.value.replace('_', ' ').title())
+                        st.metric("Progress", f"{current_progress.progress_percentage:.1f}%")
+
+                    with progress_col2:
+                        st.metric("Steps Completed", len(current_progress.steps_completed))
+                        if current_progress.errors:
+                            st.metric("Errors", len(current_progress.errors))
+
+                    # Progress bar with details
+                    st.progress(current_progress.progress_percentage / 100.0)
+                    st.caption(f"**Current Step:** {current_progress.current_step}")
+
+                    # Show completed steps
+                    if current_progress.steps_completed:
+                        with st.expander("✅ Completed Steps", expanded=False):
+                            for step in current_progress.steps_completed:
+                                st.success(f"✅ {step}")
+
+                    # Show errors if any
+                    if current_progress.errors:
+                        with st.expander("⚠️ Errors", expanded=True):
+                            for error in current_progress.errors:
+                                st.error(f"❌ {error}")
+
+                # Refresh button
+                if st.button("🔄 Refresh Status", use_container_width=True):
+                    st.rerun()
+
+            # Recent cycles history
+            st.markdown("---")
+            st.markdown("### 📊 Recent Discovery Cycles")
+            self._show_recent_cycles()
+
+        except ImportError as e:
+            st.error(f"❌ Discovery cycle components not available: {e}")
+            st.info("💡 Make sure all Task 27 components are properly installed.")
+        except Exception as e:
+            st.error(f"❌ Error loading discovery cycle interface: {e}")
+
+    def _run_discovery_cycle(self, orchestrator):
+        """Run the discovery cycle asynchronously."""
+        import asyncio
+        import threading
+
+        def run_cycle():
+            """Run the discovery cycle in a separate thread."""
+            try:
+                # Create new event loop for this thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+                # Run the discovery cycle
+                result = loop.run_until_complete(orchestrator.run_full_cycle())
+
+                # Store result in session state
+                st.session_state.discovery_cycle_result = result
+
+            except Exception as e:
+                st.session_state.discovery_cycle_error = str(e)
+            finally:
+                loop.close()
+
+        # Start the cycle in a background thread
+        thread = threading.Thread(target=run_cycle, daemon=True)
+        thread.start()
+
+        st.success("🚀 **Discovery cycle started!** The process is running in the background.")
+        st.info("🔄 **Refresh this page** to see progress updates.")
+        st.markdown("**The discovery cycle includes:**")
+        st.markdown("1. 📁 **Bulk Ingestion** - Process all configured sources")
+        st.markdown("2. 🧠 **Dream Canvas Clustering** - Analyze memory patterns")
+        st.markdown("3. 💡 **Insight Synthesis** - Generate new insights")
+        st.markdown("4. 🔬 **Research Initiation** - Trigger automated research")
+
+    def _show_discovery_preview(self, orchestrator):
+        """Show preview of what the discovery cycle will process."""
+        st.info("🔍 **Discovery Cycle Preview**")
+
+        try:
+            # Get configured sources
+            sources = orchestrator._get_configured_sources()
+
+            if sources:
+                st.markdown("**📁 Sources that will be processed:**")
+                for i, source in enumerate(sources, 1):
+                    from pathlib import Path
+                    source_path = Path(source)
+                    if source_path.exists():
+                        file_count = len(list(source_path.rglob("*.*")))
+                        st.markdown(f"{i}. **{source}** ({file_count} files)")
+                    else:
+                        st.markdown(f"{i}. **{source}** (⚠️ path not found)")
+            else:
+                st.warning("⚠️ No sources configured for bulk ingestion.")
+                st.info("💡 Add sources in the 'Source Management' tab first.")
+
+        except Exception as e:
+            st.error(f"❌ Error previewing sources: {e}")
+
+    def _show_recent_cycles(self):
+        """Show recent discovery cycle results."""
+        try:
+            from pathlib import Path
+            import json
+
+            results_dir = Path("logs/discovery_cycles")
+            if not results_dir.exists():
+                st.info("📝 No discovery cycles have been run yet.")
+                return
+
+            # Get recent cycle files
+            cycle_files = sorted(
+                results_dir.glob("*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True
+            )[:5]  # Show last 5 cycles
+
+            if not cycle_files:
+                st.info("📝 No discovery cycle results found.")
+                return
+
+            for cycle_file in cycle_files:
+                try:
+                    with open(cycle_file, 'r') as f:
+                        result = json.load(f)
+
+                    # Create expandable section for each cycle
+                    cycle_id = result.get('cycle_id', 'Unknown')
+                    status = result.get('status', 'Unknown')
+                    insights = result.get('insights_generated', 0)
+
+                    status_emoji = "✅" if status == "completed" else "❌" if status == "failed" else "🔄"
+
+                    with st.expander(f"{status_emoji} **{cycle_id}** - {status} ({insights} insights)", expanded=False):
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.markdown(f"**Status:** {status}")
+                            st.markdown(f"**Insights Generated:** {insights}")
+                            st.markdown(f"**Started:** {result.get('started_at', 'Unknown')}")
+                            st.markdown(f"**Completed:** {result.get('completed_at', 'Unknown')}")
+
+                        with col2:
+                            stages = result.get('stages_completed', [])
+                            st.markdown(f"**Stages Completed:** {len(stages)}")
+                            for stage in stages:
+                                st.markdown(f"✅ {stage}")
+
+                            errors = result.get('errors', [])
+                            if errors:
+                                st.markdown(f"**Errors:** {len(errors)}")
+                                for error in errors:
+                                    st.markdown(f"❌ {error}")
+
+                except Exception as e:
+                    st.error(f"Error reading cycle file {cycle_file}: {e}")
+
+        except Exception as e:
+            st.error(f"Error loading recent cycles: {e}")
 
 def render_bulk_ingestion():
     """Main function to render the bulk ingestion UI."""

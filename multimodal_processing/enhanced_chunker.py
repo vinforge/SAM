@@ -78,6 +78,17 @@ class EnhancedChunk:
     moral_weight_score: float = 0.0
     classification_level: float = 0.0
     itar_sensitivity: float = 0.0
+
+    # NEW: Table processing metadata fields (Task 23 - Phase 1)
+    is_table_part: bool = False
+    table_id: Optional[str] = None
+    table_title: Optional[str] = None          # Table caption/title
+    cell_role: Optional[str] = None            # HEADER, DATA, FORMULA, etc.
+    cell_coordinates: Optional[Tuple[int, int]] = None  # (row, col)
+    cell_data_type: Optional[str] = None       # number, text, date, currency
+    table_structure: Optional[Dict] = None     # Overall table metadata
+    confidence_score: Optional[float] = None   # Classification confidence
+    table_context: Optional[str] = None        # Surrounding document context
     operational_impact: float = 0.0
     innovation_potential: float = 0.0
     technical_readiness: float = 0.0

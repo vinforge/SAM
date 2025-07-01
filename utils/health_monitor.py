@@ -256,11 +256,14 @@ class HealthMonitor:
                 status = "healthy"
                 error_message = ""
                 
-                # Check for warnings
-                if stats['total_memories'] > 10000:
+                # Check for warnings with fallback values
+                total_memories = stats.get('total_memories', 0)
+                total_size_mb = stats.get('total_size_mb', 0.0)
+
+                if total_memories > 10000:
                     status = "warning"
                     error_message = "High memory count"
-                elif stats['total_size_mb'] > 500:
+                elif total_size_mb > 500:
                     status = "warning"
                     error_message = "High memory usage"
             else:

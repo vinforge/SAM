@@ -7,6 +7,7 @@ credibility assessment, bias detection, and content purity validation.
 """
 
 import re
+import time
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
@@ -54,41 +55,97 @@ class ContentVettingSkill(BaseSkillModule):
     def execute(self, uif: SAM_UIF) -> SAM_UIF:
         """
         Execute comprehensive content vetting and security analysis.
-        
+
         Args:
             uif: Universal Interface Format with external content
-            
+
         Returns:
             Updated UIF with vetting results
         """
+        # Initialize tracing
+        trace_id = uif.intermediate_data.get('trace_id')
+        start_time = time.time()
+
+        if trace_id:
+            self._log_trace_event(
+                trace_id=trace_id,
+                event_type="start",
+                severity="info",
+                message="Starting comprehensive content vetting and security analysis",
+                payload={
+                    "tool": self.skill_name,
+                    "requires_vetting": self.requires_vetting,
+                    "skill_category": self.skill_category
+                }
+            )
+
         try:
             # Extract content for vetting
             external_content = self._extract_external_content(uif)
             if not external_content:
+                if trace_id:
+                    self._log_trace_event(
+                        trace_id=trace_id,
+                        event_type="error",
+                        severity="error",
+                        message="No external content found for vetting",
+                        payload={"uif_keys": list(uif.intermediate_data.keys())}
+                    )
                 raise SkillExecutionError("No external content found for vetting")
-            
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="data_in",
+                    severity="info",
+                    message=f"Extracted {len(external_content)} content items for vetting",
+                    payload={
+                        "content_count": len(external_content),
+                        "content_types": [item.get("type", "unknown") for item in external_content],
+                        "content_sources": [item.get("source", "unknown") for item in external_content]
+                    }
+                )
+
             self.logger.info(f"Vetting {len(external_content)} content items")
-            
+
             # Get vetting parameters
             vetting_context = uif.intermediate_data.get("vetting_context", {})
             security_level = uif.intermediate_data.get("security_level", "standard")
-            
+
             # Perform comprehensive vetting
+            vetting_start_time = time.time()
             vetting_report = self._perform_comprehensive_vetting(
                 external_content, vetting_context, security_level
             )
-            
+            vetting_duration = (time.time() - vetting_start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="tool_call",
+                    severity="info",
+                    message=f"Content vetting analysis completed: {len(vetting_report['items'])} items analyzed",
+                    duration_ms=vetting_duration,
+                    payload={
+                        "items_analyzed": len(vetting_report["items"]),
+                        "security_level": security_level,
+                        "risk_summary": vetting_report["risk_summary"],
+                        "aggregate_metrics": vetting_report["aggregate_metrics"],
+                        "vetting_duration_ms": vetting_duration
+                    }
+                )
+
             # Calculate overall security score
             security_score = self._calculate_security_score(vetting_report)
-            
+
             # Determine approved content
             approved_content = self._filter_approved_content(external_content, vetting_report)
-            
+
             # Store results in UIF
             uif.intermediate_data["vetting_report"] = vetting_report
             uif.intermediate_data["security_score"] = security_score
             uif.intermediate_data["approved_content"] = approved_content
-            
+
             # Update security context
             uif.security_context.update({
                 "vetting_completed": True,
@@ -96,7 +153,7 @@ class ContentVettingSkill(BaseSkillModule):
                 "content_approved": len(approved_content),
                 "content_rejected": len(external_content) - len(approved_content)
             })
-            
+
             # Set skill outputs
             uif.set_skill_output(self.skill_name, {
                 "items_vetted": len(external_content),
@@ -104,12 +161,49 @@ class ContentVettingSkill(BaseSkillModule):
                 "security_score": security_score,
                 "high_risk_items": len([item for item in vetting_report["items"] if item["risk_level"] == "high"])
             })
-            
+
+            total_duration = (time.time() - start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="data_out",
+                    severity="info",
+                    message=f"Content vetting completed: {len(approved_content)}/{len(external_content)} items approved",
+                    duration_ms=total_duration,
+                    payload={
+                        "items_vetted": len(external_content),
+                        "items_approved": len(approved_content),
+                        "items_rejected": len(external_content) - len(approved_content),
+                        "security_score": security_score,
+                        "high_risk_items": len([item for item in vetting_report["items"] if item["risk_level"] == "high"]),
+                        "execution_time_ms": total_duration,
+                        "vetting_time_ms": vetting_duration,
+                        "overhead_ms": total_duration - vetting_duration
+                    }
+                )
+
             self.logger.info(f"Vetting completed: {len(approved_content)}/{len(external_content)} items approved")
-            
+
             return uif
-            
+
         except Exception as e:
+            total_duration = (time.time() - start_time) * 1000
+
+            if trace_id:
+                self._log_trace_event(
+                    trace_id=trace_id,
+                    event_type="error",
+                    severity="error",
+                    message=f"Content vetting failed: {str(e)}",
+                    duration_ms=total_duration,
+                    payload={
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "execution_time_ms": total_duration
+                    }
+                )
+
             self.logger.exception("Error during content vetting")
             raise SkillExecutionError(f"Content vetting failed: {str(e)}")
     
@@ -453,3 +547,31 @@ class ContentVettingSkill(BaseSkillModule):
         ]
         
         return any(domain in source.lower() for domain in questionable_domains)
+
+    def _log_trace_event(self, trace_id: str, event_type: str, severity: str,
+                        message: str, duration_ms: Optional[float] = None,
+                        payload: Optional[Dict[str, Any]] = None) -> None:
+        """Log a trace event for the content vetting tool."""
+        try:
+            from sam.cognition.trace_logger import log_event
+            log_event(
+                trace_id=trace_id,
+                source_module=self.skill_name,
+                event_type=event_type,
+                severity=severity,
+                message=message,
+                duration_ms=duration_ms,
+                payload=payload or {},
+                metadata={
+                    "tool_version": self.skill_version,
+                    "tool_category": self.skill_category,
+                    "requires_external_access": self.requires_external_access,
+                    "requires_vetting": self.requires_vetting
+                }
+            )
+        except ImportError:
+            # Tracing not available, continue without logging
+            pass
+        except Exception as e:
+            # Don't let tracing errors break the tool
+            self.logger.debug(f"Trace logging failed: {e}")

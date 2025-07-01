@@ -14,6 +14,7 @@ from .tools.search_api_tool import SearchAPITool
 from .tools.news_api_tool import NewsAPITool
 from .tools.rss_reader_tool import RSSReaderTool
 from .tools.url_content_extractor import URLContentExtractor
+from .tools.firecrawl_tool import FirecrawlTool
 from .query_router import QueryRouter
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,10 @@ class IntelligentWebSystem:
         self.news_tool = NewsAPITool(api_key=self.api_keys.get('newsapi'))
         self.rss_tool = RSSReaderTool()
         self.url_extractor = URLContentExtractor()
+        self.firecrawl_tool = FirecrawlTool(
+            api_key=self.api_keys.get('firecrawl'),
+            timeout=self.config.get('firecrawl_timeout', 30)
+        )
 
         # Initialize router
         self.router = QueryRouter()
@@ -46,7 +51,8 @@ class IntelligentWebSystem:
             'search_api_tool': self.search_tool,
             'news_api_tool': self.news_tool,
             'rss_reader_tool': self.rss_tool,
-            'url_content_extractor': self.url_extractor
+            'url_content_extractor': self.url_extractor,
+            'firecrawl_tool': self.firecrawl_tool
         }
 
         logger.info("Intelligent Web System initialized with all tools including CocoIndex")
@@ -123,6 +129,8 @@ class IntelligentWebSystem:
                 return self._execute_rss_tool(tool, query, parameters)
             elif tool_name == 'url_content_extractor':
                 return self._execute_url_tool(tool, query, parameters)
+            elif tool_name == 'firecrawl_tool':
+                return self._execute_firecrawl_tool(tool, query, parameters)
             else:
                 return {'success': False, 'error': f'Unknown tool: {tool_name}'}
                 
@@ -276,7 +284,79 @@ class IntelligentWebSystem:
             }
         
         return result
-    
+
+    def _execute_firecrawl_tool(self, tool: FirecrawlTool, query: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute Firecrawl tool for advanced web crawling and extraction."""
+        try:
+            import asyncio
+
+            # Determine operation mode based on parameters
+            operation_mode = parameters.get('operation_mode', 'crawl')
+
+            # Run the appropriate Firecrawl operation
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                if operation_mode == 'crawl':
+                    # Full website crawling
+                    url = parameters.get('url', query)
+                    max_pages = parameters.get('max_pages', 10)
+                    include_subdomains = parameters.get('include_subdomains', False)
+                    result = loop.run_until_complete(
+                        tool.intelligent_crawl(url, max_pages, include_subdomains)
+                    )
+                elif operation_mode == 'interactive':
+                    # Interactive extraction with actions
+                    url = parameters.get('url', query)
+                    actions = parameters.get('actions', [])
+                    result = loop.run_until_complete(
+                        tool.extract_with_actions(url, actions)
+                    )
+                elif operation_mode == 'batch':
+                    # Batch processing multiple URLs
+                    urls = parameters.get('urls', [query])
+                    max_concurrent = parameters.get('max_concurrent', 5)
+                    result = loop.run_until_complete(
+                        tool.batch_scrape(urls, max_concurrent)
+                    )
+                else:
+                    # Default to single URL scraping
+                    url = parameters.get('url', query)
+                    result = loop.run_until_complete(
+                        tool.intelligent_crawl(url, 1, False)  # Single page crawl
+                    )
+            finally:
+                loop.close()
+
+            if result['success']:
+                # Format result for SAM's vetting pipeline
+                formatted_result = {
+                    'success': True,
+                    'tool_used': 'firecrawl_tool',
+                    'extraction_method': result.get('extraction_method', operation_mode),
+                    'chunks': result['chunks'],
+                    'total_chunks': result['total_chunks'],
+                    'metadata': result.get('metadata', {}),
+                    'timestamp': datetime.now().isoformat(),
+                    'vetting_ready': True  # Mark as ready for SAM's vetting pipeline
+                }
+
+                logger.info(f"Firecrawl tool completed successfully: {formatted_result['total_chunks']} chunks extracted")
+                return formatted_result
+            else:
+                # Firecrawl failed, return the error for potential fallback
+                logger.warning(f"Firecrawl tool failed: {result.get('error', 'Unknown error')}")
+                return result
+
+        except Exception as e:
+            logger.error(f"Firecrawl tool execution failed: {e}")
+            return {
+                'success': False,
+                'error': f'Firecrawl execution error: {str(e)}',
+                'tool_used': 'firecrawl_tool',
+                'fallback_recommended': True
+            }
+
     def _get_rss_feeds_for_query(self, query: str, parameters: Dict[str, Any]) -> List[str]:
         """Get relevant RSS feeds based on query and parameters."""
         query_lower = query.lower()
@@ -377,8 +457,44 @@ class IntelligentWebSystem:
                 'Multi-tool fallback chains',
                 'Content quality assessment',
                 'CocoIndex intelligent search (Phase 8.5)',
+                'Firecrawl advanced web crawling (NEW)',
+                'Interactive content extraction (NEW)',
+                'Batch URL processing (NEW)',
+                'Anti-bot mechanisms (NEW)',
                 'API integration',
                 'RSS feed processing',
                 'URL content extraction'
             ]
         }
+
+
+# Global instance
+_intelligent_web_system = None
+
+
+def get_intelligent_web_system(api_keys: Optional[Dict[str, str]] = None,
+                              config: Optional[Dict[str, Any]] = None) -> IntelligentWebSystem:
+    """
+    Get or create global intelligent web system instance.
+
+    Args:
+        api_keys: Optional API keys dictionary
+        config: Optional configuration dictionary
+
+    Returns:
+        IntelligentWebSystem instance
+    """
+    global _intelligent_web_system
+
+    if _intelligent_web_system is None:
+        # Try to load API keys from config if not provided
+        if api_keys is None:
+            try:
+                from config.api_keys import get_api_keys
+                api_keys = get_api_keys()
+            except ImportError:
+                api_keys = {}
+
+        _intelligent_web_system = IntelligentWebSystem(api_keys, config)
+
+    return _intelligent_web_system

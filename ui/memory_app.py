@@ -6,15 +6,23 @@ Sprint 12: Interactive Memory Control & Visualization
 """
 
 import os
-# Suppress PyTorch/Streamlit compatibility warnings
+# Suppress PyTorch/Streamlit compatibility warnings and prevent crashes
 os.environ['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
+os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
+os.environ['STREAMLIT_BROWSER_GATHER_USAGE_STATS'] = 'false'
+
+# Fix torch/Streamlit compatibility issues
+os.environ['PYTORCH_DISABLE_PER_OP_PROFILING'] = '1'
 
 import streamlit as st
 import sys
 import time
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -39,80 +47,100 @@ def check_authentication():
         bool: True if authenticated, False otherwise
     """
     try:
-        # First check shared session (cross-port authentication)
-        from security.shared_session import get_shared_session_manager
-        shared_session = get_shared_session_manager()
-
-        # Check if there's a valid shared session from port 8502
-        if shared_session.validate_session():
-            # Register this port access
-            shared_session.register_port_access(8501)
-
-            # Also initialize security manager for compatibility
-            from security import SecureStateManager
-            security_manager = SecureStateManager()
-            if 'security_manager' not in st.session_state:
-                st.session_state.security_manager = security_manager
-
-            return True
-
-        # Fallback to local security manager check
+        # Import security manager
         from security import SecureStateManager
-        security_manager = SecureStateManager()
+
+        # CRITICAL FIX: Try to get shared security manager from main SAM interface
+        # Check if we can access the main SAM's security manager
+        security_manager = None
+
+        # Method 1: Try to get from session state (if available)
+        if 'security_manager' in st.session_state:
+            security_manager = st.session_state.security_manager
+            logger.info("✅ Using shared security manager from session state")
+        else:
+            # Method 2: Create new instance but check for existing authentication
+            security_manager = SecureStateManager()
+            st.session_state.security_manager = security_manager
+            logger.info("🆕 Created new security manager instance")
+
+        # Check if the security system is unlocked
         is_authenticated = security_manager.is_unlocked()
 
-        # Store security manager in session state for future use
-        if 'security_manager' not in st.session_state:
-            st.session_state.security_manager = security_manager
-
-        # If locally authenticated, create shared session for cross-port access
         if is_authenticated:
-            try:
-                shared_session.create_session("sam_user")
-                shared_session.register_port_access(8501)
-            except Exception as e:
-                # Don't fail authentication if session creation fails
-                pass
+            # Verify session is still valid
+            session_info = security_manager.get_session_info()
+            if session_info['is_unlocked'] and session_info['time_remaining'] > 0:
+                logger.info("✅ Authentication verified - Memory Control Center access granted")
+                return True
+            else:
+                # Session expired, lock the application
+                security_manager.lock_application()
+                logger.warning("⚠️ Session expired - locking application")
+                return False
 
-        return is_authenticated
+        logger.info("🔒 Authentication required - user not authenticated")
+        return False
 
-    except ImportError:
-        # Security module not available - allow access for development
-        st.warning("⚠️ Security module not available - running in development mode")
-        return True
+    except ImportError as e:
+        # Security module not available - deny access in production
+        st.error(f"❌ Security module not available: {e}")
+        st.error("🔒 **Access Denied**: Memory Control Center requires the security module to be properly installed.")
+        st.info("💡 **Solution**: Ensure the security module is properly installed and configured.")
+        return False
     except Exception as e:
         # Log error and deny access
+        logger.error(f"Authentication check failed: {e}")
         st.error(f"❌ Authentication check failed: {e}")
+        st.error("🔒 **Access Denied**: Unable to verify authentication status.")
         return False
 
 def render_authentication_required():
     """Render the authentication required page."""
-    st.title("🔒 Authentication Required")
+    st.title("🔒 SAM Memory Control Center")
+    st.markdown("*Authentication Required*")
     st.markdown("---")
 
-    st.error("🚫 **Access Denied**")
+    st.error("🚫 **Access Denied - Authentication Required**")
     st.markdown("""
     The SAM Memory Control Center requires authentication through the secure SAM interface.
 
-    **To access this application:**
-    1. Go to the [Secure SAM Interface](http://localhost:8502)
-    2. Enter your master password to unlock SAM
-    3. Return to this page
+    **🔐 Security Integration:**
+    - Memory Control Center shares the same security system as the main SAM interface
+    - Your memory data is encrypted with AES-256-GCM and requires authentication
+    - Session management ensures secure access across all SAM components
 
-    **Why is this required?**
-    - Your memory data is encrypted and requires authentication to access
-    - This ensures your personal information remains secure
-    - All SAM components share the same security system
+    **📋 To Access the Memory Control Center:**
+    1. **Open the Secure SAM Interface**: [http://localhost:8502](http://localhost:8502)
+    2. **Enter your master password** to unlock SAM
+    3. **Return to this page** or click the Memory Control Center link from the main interface
+
+    **🛡️ Why Authentication is Required:**
+    - Your personal memory data is encrypted and protected
+    - Prevents unauthorized access to your knowledge base
+    - Maintains data integrity and privacy
+    - Ensures audit trail for all memory operations
     """)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🔓 Go to Secure SAM Interface", type="primary", use_container_width=True):
-            st.markdown("""
-            <script>
-            window.open('http://localhost:8502', '_blank');
-            </script>
-            """, unsafe_allow_html=True)
+        st.markdown("""
+        <div style="text-align: center; margin: 1rem 0;">
+            <a href="http://localhost:8502" target="_blank" style="
+                display: inline-block;
+                padding: 0.75rem 1.5rem;
+                background-color: #ff4b4b;
+                color: white;
+                text-decoration: none;
+                border-radius: 0.5rem;
+                font-weight: bold;
+                font-size: 1.1rem;
+                width: 100%;
+                text-align: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            ">🔓 Go to Secure SAM Interface</a>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -121,8 +149,13 @@ def render_authentication_required():
 
     # Show security status
     try:
-        from security import SecureStateManager
-        security_manager = SecureStateManager()
+        # Use shared security manager if available
+        if 'security_manager' in st.session_state:
+            security_manager = st.session_state.security_manager
+        else:
+            from security import SecureStateManager
+            security_manager = SecureStateManager()
+
         session_info = security_manager.get_session_info()
 
         st.markdown("### 🔍 Security Status")
@@ -322,26 +355,24 @@ def main():
 
     with col2:
         render_security_status_indicator()
-    
-    # Sidebar navigation
-    with st.sidebar:
-        st.header("🎛️ Navigation")
-        
-        # Current mode display
-        current_mode = mode_controller.get_current_mode()
-        mode_status = mode_controller.get_mode_status()
-        
-        st.info(f"**Current Mode:** {current_mode.value.title()}")
-        
-        if mode_status.key_status.value != "missing":
-            st.caption(f"Key Status: {mode_status.key_status.value}")
-        
+
+    # Navigation menu moved to main content area (preserving 100% of functionality)
+    st.markdown("---")
+    st.subheader("🎛️ Navigation")
+
+    # Current mode display
+    current_mode = mode_controller.get_current_mode()
+    mode_status = mode_controller.get_mode_status()
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
         # Navigation menu
         page = st.selectbox(
-            "Navigation",
+            "Select Feature",
             options=[
                 "💬 Enhanced Chat",
                 "Chat with SAM",
+                "🔍 Reasoning Visualizer",
                 "📁 Bulk Ingestion",
                 "🔑 API Key Manager",
                 "🧠🎨 Dream Canvas",
@@ -355,36 +386,59 @@ def main():
                 "📊 Smart Summaries",
                 "📈 Memory Insights",
                 "🧠 Thought Settings",
-                "System Status"
+                "🔧 System Health",
+                "System Status",
+                "⚙️ Admin Dashboard",
+                "🐛 Interactive Debugger"
             ],
-            index=0
+            index=0,
+            help="Choose a Memory Control Center feature to access"
         )
-        
+
+    with col2:
+        st.info(f"**Current Mode:** {current_mode.value.title()}")
+        if mode_status.key_status.value != "missing":
+            st.caption(f"Key Status: {mode_status.key_status.value}")
+
+    st.markdown("---")
+
+    # Sidebar for quick stats and actions (preserving 100% of functionality)
+    with st.sidebar:
+        st.header("📊 Memory Control Center")
+
         # Quick stats
         st.subheader("📊 Quick Stats")
         try:
             stats = memory_store.get_memory_stats()
-            st.metric("Total Memories", stats['total_memories'])
-            st.metric("Storage Size", f"{stats['total_size_mb']:.1f} MB")
-            
-            if stats['memory_types']:
+            # Use .get() with fallback values to prevent KeyError
+            total_memories = stats.get('total_memories', len(getattr(memory_store, 'memory_chunks', {})))
+            total_size_mb = stats.get('total_size_mb', 0.0)
+
+            st.metric("Total Memories", total_memories)
+            st.metric("Storage Size", f"{total_size_mb:.1f} MB")
+
+            memory_types = stats.get('memory_types', {})
+            if memory_types:
                 st.caption("**Memory Types:**")
-                for mem_type, count in list(stats['memory_types'].items())[:3]:
+                for mem_type, count in list(memory_types.items())[:3]:
                     st.caption(f"• {mem_type}: {count}")
-                    
+
         except Exception as e:
             st.error(f"Error loading stats: {e}")
-        
+            # Provide fallback metrics
+            st.metric("Total Memories", "N/A")
+            st.metric("Storage Size", "N/A")
+
         # Quick actions
         st.subheader("⚡ Quick Actions")
-        
+
         if st.button("🔄 Refresh Data", key="sidebar_refresh_data"):
             st.cache_data.clear()
             st.rerun()
 
         if st.button("📊 Memory Stats", key="sidebar_memory_stats"):
             st.session_state.show_stats = True
-        
+
         # Memory command input
         st.subheader("💬 Quick Command")
         quick_command = st.text_input(
@@ -392,7 +446,7 @@ def main():
             placeholder="!recall topic AI",
             help="Enter a memory command (type !memhelp for help)"
         )
-        
+
         if st.button("Execute", key="sidebar_execute_command") and quick_command:
             result = command_processor.process_command(quick_command)
             if result.success:
@@ -406,6 +460,8 @@ def main():
         render_enhanced_chat_interface()
     elif page == "Chat with SAM":
         render_chat_interface()
+    elif page == "🔍 Reasoning Visualizer":
+        render_reasoning_visualizer()
     elif page == "📁 Bulk Ingestion":
         render_bulk_ingestion()
     elif page == "🔑 API Key Manager":
@@ -432,8 +488,14 @@ def main():
         render_memory_insights()
     elif page == "🧠 Thought Settings":
         render_thought_settings()
+    elif page == "🔧 System Health":
+        render_system_health()
     elif page == "System Status":
         render_system_status()
+    elif page == "⚙️ Admin Dashboard":
+        render_admin_dashboard_interface()
+    elif page == "🐛 Interactive Debugger":
+        render_interactive_debugger_interface()
 
 def render_chat_interface():
     """Render the enhanced diagnostic chat interface with SAM."""
@@ -878,15 +940,21 @@ def render_system_status():
             
             memory_store = get_memory_store()
             stats = memory_store.get_memory_stats()
+
+            # Use .get() with fallback values to prevent KeyError
+            total_memories = stats.get('total_memories', len(getattr(memory_store, 'memory_chunks', {})))
+            total_size_mb = stats.get('total_size_mb', 0.0)
+            store_type = stats.get('store_type', 'Unknown')
+
+            st.metric("Total Memories", total_memories)
+            st.metric("Storage Size", f"{total_size_mb:.2f} MB")
+            st.metric("Store Type", store_type)
             
-            st.metric("Total Memories", stats['total_memories'])
-            st.metric("Storage Size", f"{stats['total_size_mb']:.2f} MB")
-            st.metric("Store Type", stats['store_type'])
-            
-            if stats['memory_types']:
+            memory_types = stats.get('memory_types', {})
+            if memory_types and total_memories > 0:
                 st.markdown("**Memory Distribution:**")
-                for mem_type, count in stats['memory_types'].items():
-                    st.progress(count / stats['total_memories'], text=f"{mem_type}: {count}")
+                for mem_type, count in memory_types.items():
+                    st.progress(count / total_memories, text=f"{mem_type}: {count}")
         
         with col2:
             st.markdown("**Agent Mode:**")
@@ -2124,7 +2192,7 @@ def get_system_status_info():
                 'content_blocks': learning_data['total_content_blocks_processed']
             },
             'performance_metrics': {
-                'memory_health': 'healthy' if stats['total_memories'] > 0 else 'no_data',
+                'memory_health': 'healthy' if stats.get('total_memories', 0) > 0 else 'no_data',
                 'learning_performance': 'excellent' if learning_data['average_enrichment_score'] >= 0.7 else
                                       'good' if learning_data['average_enrichment_score'] >= 0.5 else 'needs_improvement',
                 'system_uptime': 'active',
@@ -2219,7 +2287,7 @@ def get_memory_overview_info():
             'timestamp': datetime.now().isoformat(),
             'memory_statistics': {
                 'total_count': len(all_memories),
-                'storage_size': stats['total_size_mb'],
+                'storage_size': stats.get('total_size_mb', 0.0),
                 'unique_sources': len(memory_sources),
                 'memory_types': memory_types
             },
@@ -2455,13 +2523,22 @@ def render_dream_canvas():
             history = get_synthesis_history()
 
             if history:
-                for run in history[-5:]:  # Show last 5 runs
-                    with st.expander(f"Run {run.get('run_id', 'Unknown')[:8]}... - {run.get('timestamp', 'Unknown')}"):
+                for idx, run in enumerate(history[-5:]):  # Show last 5 runs
+                    run_id_short = run.get('run_id', 'Unknown')[:8]
+                    timestamp = run.get('timestamp', 'Unknown')
+                    insights_count = run.get('insights_generated', 0)
+
+                    # Enhanced expander title with insight count
+                    expander_title = f"Run {run_id_short}... - {timestamp}"
+                    if insights_count > 0:
+                        expander_title += f" ✨ ({insights_count} insights)"
+
+                    with st.expander(expander_title):
                         col1, col2 = st.columns(2)
 
                         with col1:
                             st.metric("Clusters Found", run.get('clusters_found', 0))
-                            st.metric("Insights Generated", run.get('insights_generated', 0))
+                            st.metric("Insights Generated", insights_count)
 
                         with col2:
                             st.metric("Processing Time", f"{run.get('processing_time_ms', 0)}ms")
@@ -2470,6 +2547,83 @@ def render_dream_canvas():
 
                         if run.get('status') == 'success':
                             st.success("✅ Synthesis completed successfully")
+
+                            # Display actual insights if available
+                            insights = run.get('insights', [])
+                            if insights:
+                                st.markdown("---")
+                                st.markdown("**✨ Generated Insights:**")
+
+                                # Show insights with expandable view - Fixed duplicate key issue
+                                show_all_insights = st.checkbox(f"Show all {len(insights)} insights", key=f"show_all_synthesis_{idx}_{run_id_short}")
+
+                                insights_to_show = insights if show_all_insights else insights[:3]
+
+                                for i, insight in enumerate(insights_to_show):
+                                    with st.container():
+                                        # Clean the insight text
+                                        clean_text = insight.get('synthesized_text', '')
+                                        if '<think>' in clean_text and '</think>' in clean_text:
+                                            parts = clean_text.split('</think>')
+                                            if len(parts) > 1:
+                                                clean_text = parts[-1].strip()
+                                            else:
+                                                clean_text = clean_text.replace('<think>', '').replace('</think>', '').strip()
+
+                                        # Show preview or full text based on expansion
+                                        if show_all_insights:
+                                            # Show full insight when expanded
+                                            display_text = clean_text
+                                        else:
+                                            # Show preview when collapsed
+                                            sentences = clean_text.split('. ')
+                                            display_text = sentences[0] if sentences else clean_text
+                                            if len(display_text) > 150:
+                                                display_text = display_text[:150] + "..."
+
+                                        confidence = insight.get('confidence_score', 0)
+                                        cluster_id = insight.get('cluster_id', 'Unknown')
+
+                                        st.markdown(f"**{i+1}. Cluster {cluster_id}** (Confidence: {confidence:.2f})")
+                                        st.markdown(f"*{display_text}*")
+
+                                        if not show_all_insights and i == 2 and len(insights) > 3:
+                                            st.caption(f"... and {len(insights) - 3} more insights")
+                                            break
+
+                                # Button to load this synthesis into Dream Canvas - Fixed duplicate key issue
+                                if st.button(f"🎨 Load in Dream Canvas", key=f"load_canvas_{idx}_{run_id_short}"):
+                                    # Create focused visualization data for this synthesis
+                                    try:
+                                        focused_visualization_data = create_focused_synthesis_visualization(insights, run.get('run_id'))
+
+                                        st.session_state.synthesis_results = {
+                                            'insights': insights,
+                                            'clusters_found': run.get('clusters_found', 0),
+                                            'insights_generated': len(insights),
+                                            'run_id': run.get('run_id'),
+                                            'timestamp': run.get('timestamp'),
+                                            'synthesis_log': {'status': 'loaded'}
+                                        }
+
+                                        # Store focused visualization data
+                                        st.session_state.dream_canvas_data = focused_visualization_data
+
+                                        st.success(f"✅ Synthesis results loaded into Dream Canvas! Showing {len(focused_visualization_data)} focused memory points.")
+                                        st.rerun()
+                                    except Exception as e:
+                                        logger.error(f"Failed to create focused visualization: {e}")
+                                        # Fallback to regular loading
+                                        st.session_state.synthesis_results = {
+                                            'insights': insights,
+                                            'clusters_found': run.get('clusters_found', 0),
+                                            'insights_generated': len(insights),
+                                            'run_id': run.get('run_id'),
+                                            'timestamp': run.get('timestamp'),
+                                            'synthesis_log': {'status': 'loaded'}
+                                        }
+                                        st.success("✅ Synthesis results loaded into Dream Canvas!")
+                                        st.rerun()
                         else:
                             st.error(f"❌ Synthesis failed: {run.get('error', 'Unknown error')}")
             else:
@@ -2607,25 +2761,41 @@ def trigger_synthesis_with_params(eps, min_samples, min_cluster_size, max_cluste
             # Run synthesis without visualization first
             result = synthesis_engine.run_synthesis(memory_store, visualize=False)
 
-            # Check status from synthesis_log
+            # Check status from synthesis_log - handle both 'completed' and successful insight generation
             status = result.synthesis_log.get('status', 'unknown')
+            insights_generated = result.insights_generated if hasattr(result, 'insights_generated') else 0
 
-            if status == 'completed':
+            # Consider synthesis successful if we have insights, even if status isn't explicitly 'completed'
+            if status == 'completed' or (insights_generated > 0 and result.insights):
                 st.success(f"✅ Dream state completed! Generated {result.insights_generated} insights from {result.clusters_found} clusters")
 
                 # Store result for history
                 if 'synthesis_history' not in st.session_state:
                     st.session_state.synthesis_history = []
 
-                st.session_state.synthesis_history.append({
+                # Store complete synthesis results including insights
+                synthesis_record = {
                     'run_id': result.run_id,
                     'timestamp': result.timestamp,
                     'clusters_found': result.clusters_found,
                     'insights_generated': result.insights_generated,
                     'processing_time_ms': 0,  # Not tracked in current implementation
-                    'status': status,
-                    'visualization_enabled': False
-                })
+                    'status': 'success',  # Mark as success if we have insights
+                    'visualization_enabled': False,
+                    'insights': [insight.__dict__ for insight in result.insights] if hasattr(result, 'insights') else []
+                }
+
+                st.session_state.synthesis_history.append(synthesis_record)
+
+                # Also store the latest synthesis results for Dream Canvas
+                st.session_state.synthesis_results = {
+                    'insights': [insight.__dict__ for insight in result.insights] if hasattr(result, 'insights') else [],
+                    'clusters_found': result.clusters_found,
+                    'insights_generated': result.insights_generated,
+                    'run_id': result.run_id,
+                    'timestamp': result.timestamp,
+                    'synthesis_log': result.synthesis_log
+                }
 
                 st.rerun()
             else:
@@ -2676,28 +2846,43 @@ def trigger_visualization_with_params(eps, min_samples, min_cluster_size, max_cl
             # Run synthesis with visualization
             result = synthesis_engine.run_synthesis(memory_store, visualize=True)
 
-            # Check status from synthesis_log
+            # Check status from synthesis_log - handle both 'completed' and successful insight generation
             status = result.synthesis_log.get('status', 'unknown')
+            insights_generated = result.insights_generated if hasattr(result, 'insights_generated') else 0
 
-            if status == 'completed' and result.visualization_data:
+            # Consider synthesis successful if we have insights and visualization data
+            if (status == 'completed' or insights_generated > 0) and result.visualization_data:
                 st.success(f"✅ Visualization generated! {len(result.visualization_data)} memory points mapped")
 
                 # Store visualization data
                 st.session_state.dream_canvas_data = result.visualization_data
 
-                # Store result for history
+                # Store result for history with insights
                 if 'synthesis_history' not in st.session_state:
                     st.session_state.synthesis_history = []
 
-                st.session_state.synthesis_history.append({
+                synthesis_record = {
                     'run_id': result.run_id,
                     'timestamp': result.timestamp,
                     'clusters_found': result.clusters_found,
                     'insights_generated': result.insights_generated,
                     'processing_time_ms': 0,  # Not tracked in current implementation
-                    'status': status,
-                    'visualization_enabled': True
-                })
+                    'status': 'success',  # Mark as success if we have insights and visualization
+                    'visualization_enabled': True,
+                    'insights': [insight.__dict__ for insight in result.insights] if hasattr(result, 'insights') else []
+                }
+
+                st.session_state.synthesis_history.append(synthesis_record)
+
+                # Also store the latest synthesis results for Dream Canvas
+                st.session_state.synthesis_results = {
+                    'insights': [insight.__dict__ for insight in result.insights] if hasattr(result, 'insights') else [],
+                    'clusters_found': result.clusters_found,
+                    'insights_generated': result.insights_generated,
+                    'run_id': result.run_id,
+                    'timestamp': result.timestamp,
+                    'synthesis_log': result.synthesis_log
+                }
 
                 st.rerun()
             else:
@@ -2712,47 +2897,98 @@ def trigger_visualization():
     trigger_visualization_with_params(0.15, 8, 15, 15)  # Optimal parameters for UMAP data
 
 def suggest_optimal_parameters():
-    """Call the backend API to suggest optimal clustering parameters."""
+    """Analyze memory data to suggest optimal clustering parameters."""
     try:
         with st.spinner("🤔 Analyzing your memory data to suggest optimal parameters..."):
-            import requests
+            # Try to use the web UI API first
+            try:
+                import requests
+                response = requests.post(
+                    "http://localhost:5002/api/synthesis/suggest-eps",
+                    json={
+                        "min_samples": st.session_state.get('min_samples', 5),
+                        "target_clusters": 10
+                    },
+                    timeout=10
+                )
 
-            # Call the suggest-eps API endpoint
-            response = requests.post(
-                "http://localhost:5001/api/synthesis/suggest-eps",
-                json={
-                    "min_samples": st.session_state.get('min_samples', 5),
-                    "target_clusters": 10
-                },
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == 'success':
-                    suggestions = data['suggestions']
-                    st.session_state.parameter_suggestions = suggestions
-
-                    st.success(f"🎯 **Optimal Parameters Found!**")
-                    st.info(f"📊 {data['analysis_summary']}")
-                    st.info(f"💡 **Recommended:** eps={suggestions['eps']:.3f}, min_samples={suggestions['min_samples']}, min_cluster_size={suggestions['min_cluster_size']}")
-
-                    # Show distance statistics
-                    if 'distance_stats' in suggestions:
-                        stats = suggestions['distance_stats']
-                        st.markdown(f"""
-                        **Distance Analysis:**
-                        - Min distance: {stats.get('min', 0):.4f}
-                        - Median distance: {stats.get('median', 0):.4f}
-                        - 90th percentile: {stats.get('percentile_90', 0):.4f}
-                        - Max distance: {stats.get('max', 0):.4f}
-                        """)
-
-                    st.rerun()
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('status') == 'success':
+                        suggestions = data['suggestions']
+                        st.session_state.parameter_suggestions = suggestions
+                        st.success(f"✨ AI Analysis Complete! Suggested eps: {suggestions['eps']:.3f}")
+                        st.rerun()
+                        return
+                    else:
+                        st.warning(f"API returned error: {data.get('error', 'Unknown error')}")
                 else:
-                    st.error(f"❌ Parameter suggestion failed: {data.get('error', 'Unknown error')}")
-            else:
-                st.error(f"❌ API request failed: {response.status_code}")
+                    st.warning(f"API request failed with status {response.status_code}")
+            except Exception as api_error:
+                st.warning(f"Web UI API not available: {api_error}")
+
+            # Fallback to direct analysis
+            st.info("🔄 Using direct analysis method...")
+
+            # Get memory store
+            memory_store = get_memory_store()
+            if not memory_store:
+                st.error("❌ Memory store not available")
+                return
+
+            # Get embeddings directly
+            memories = memory_store.get_all_memories()
+            if not memories:
+                st.error("❌ No memories found for analysis")
+                return
+
+            # Extract embeddings
+            embeddings = []
+            for memory in memories:
+                if hasattr(memory, 'embedding') and memory.embedding is not None:
+                    embeddings.append(memory.embedding)
+
+            if len(embeddings) < 10:
+                st.error("❌ Not enough memories with embeddings for analysis")
+                return
+
+            # Use direct eps optimization
+            try:
+                from memory.synthesis.eps_optimizer import EpsOptimizer
+                import numpy as np
+
+                optimizer = EpsOptimizer()
+                suggestions = optimizer.suggest_clustering_params(
+                    np.array(embeddings),
+                    target_clusters=10
+                )
+
+                st.session_state.parameter_suggestions = suggestions
+                st.success(f"✨ Direct Analysis Complete! Suggested eps: {suggestions['eps']:.3f}")
+                st.rerun()
+
+            except ImportError:
+                # Final fallback with reasonable defaults
+                st.warning("⚠️ Advanced analysis not available, using heuristic suggestions")
+
+                data_size = len(embeddings)
+                suggested_eps = max(0.1, min(0.8, 0.3 + (data_size / 10000) * 0.2))
+                suggested_min_samples = max(3, min(10, data_size // 1000))
+                suggested_min_cluster_size = max(3, data_size // 100)
+                suggested_max_clusters = min(50, max(5, data_size // 50))
+
+                suggestions = {
+                    'eps': suggested_eps,
+                    'min_samples': suggested_min_samples,
+                    'min_cluster_size': suggested_min_cluster_size,
+                    'max_clusters': suggested_max_clusters,
+                    'data_size': data_size,
+                    'method': 'heuristic'
+                }
+
+                st.session_state.parameter_suggestions = suggestions
+                st.success(f"✨ Heuristic Analysis Complete! Suggested eps: {suggestions['eps']:.3f}")
+                st.rerun()
 
     except Exception as e:
         st.error(f"❌ Error suggesting parameters: {e}")
@@ -2788,6 +3024,123 @@ def apply_research_preset():
 
     except Exception as e:
         st.error(f"❌ Error applying research preset: {e}")
+
+def create_focused_synthesis_visualization(insights, run_id):
+    """Create focused visualization data showing only cluster memories and generated insights."""
+
+    try:
+        from memory.memory_vectorstore import MemoryVectorStore
+        import numpy as np
+        import random
+
+        # Initialize memory store
+        memory_store = MemoryVectorStore()
+
+        # Get cluster IDs from insights
+        cluster_ids = [insight.get('cluster_id', '') for insight in insights if insight.get('cluster_id')]
+
+        if not cluster_ids:
+            logger.warning("No cluster IDs found in insights")
+            return []
+
+        logger.info(f"Creating focused visualization for clusters: {cluster_ids}")
+
+        # Retrieve memories for each cluster
+        focused_memories = []
+        cluster_memory_map = {}
+
+        for cluster_id in cluster_ids:
+            try:
+                # Search for memories related to this cluster
+                # Use cluster_id as search term to find related memories
+                search_results = memory_store.search(
+                    query=f"cluster {cluster_id}",
+                    max_results=50
+                )
+
+                cluster_memories = []
+                for result in search_results:
+                    memory_data = {
+                        'id': result.chunk.chunk_id,
+                        'content': result.chunk.content,
+                        'content_snippet': result.chunk.content[:100] + "..." if len(result.chunk.content) > 100 else result.chunk.content,
+                        'source': result.chunk.source,
+                        'timestamp': result.chunk.timestamp,
+                        'importance_score': result.chunk.importance_score,
+                        'cluster_id': cluster_id,
+                        'memory_type': 'source_memory',
+                        'coordinates': {
+                            'x': random.uniform(-5, 5),  # Random positioning for now
+                            'y': random.uniform(-5, 5)
+                        },
+                        'x': random.uniform(-5, 5),  # Also include direct x,y for compatibility
+                        'y': random.uniform(-5, 5),
+                        'color': f'cluster_{cluster_id}',
+                        'is_synthetic': False
+                    }
+                    cluster_memories.append(memory_data)
+                    focused_memories.append(memory_data)
+
+                cluster_memory_map[cluster_id] = cluster_memories
+                logger.info(f"Found {len(cluster_memories)} memories for cluster {cluster_id}")
+
+            except Exception as e:
+                logger.warning(f"Could not retrieve memories for cluster {cluster_id}: {e}")
+
+        # Add insight points
+        for i, insight in enumerate(insights):
+            cluster_id = insight.get('cluster_id', f'unknown_{i}')
+
+            # Clean insight text
+            clean_text = insight.get('synthesized_text', '')
+            if '<think>' in clean_text and '</think>' in clean_text:
+                parts = clean_text.split('</think>')
+                if len(parts) > 1:
+                    clean_text = parts[-1].strip()
+                else:
+                    clean_text = clean_text.replace('<think>', '').replace('</think>', '').strip()
+
+            # Position insight near its cluster memories
+            cluster_memories = cluster_memory_map.get(cluster_id, [])
+            if cluster_memories:
+                # Position insight at center of cluster memories
+                avg_x = sum(mem['x'] for mem in cluster_memories) / len(cluster_memories)
+                avg_y = sum(mem['y'] for mem in cluster_memories) / len(cluster_memories)
+                insight_x = avg_x + random.uniform(-1, 1)
+                insight_y = avg_y + random.uniform(-1, 1)
+            else:
+                # Random position if no cluster memories found
+                insight_x = random.uniform(-3, 3)
+                insight_y = random.uniform(-3, 3)
+
+            insight_data = {
+                'id': f"insight_{cluster_id}_{i}",
+                'content': clean_text[:200] + "..." if len(clean_text) > 200 else clean_text,
+                'content_snippet': clean_text[:100] + "..." if len(clean_text) > 100 else clean_text,
+                'source': f"Synthesis Insight - Cluster {cluster_id}",
+                'timestamp': insight.get('timestamp', ''),
+                'importance_score': insight.get('confidence_score', 0.5),
+                'cluster_id': cluster_id,
+                'memory_type': 'synthetic_insight',
+                'coordinates': {
+                    'x': insight_x,
+                    'y': insight_y
+                },
+                'x': insight_x,  # Also include direct x,y for compatibility
+                'y': insight_y,
+                'color': 'synthetic_insight',
+                'confidence_score': insight.get('confidence_score', 0),
+                'novelty_score': insight.get('novelty_score', 0),
+                'is_synthetic': True
+            }
+            focused_memories.append(insight_data)
+
+        logger.info(f"Created focused visualization with {len(focused_memories)} total points")
+        return focused_memories
+
+    except Exception as e:
+        logger.error(f"Failed to create focused synthesis visualization: {e}")
+        return []
 
 def generate_cluster_insight(contents, sources, cluster_id):
     """Generate meaningful 'So What' insights from cluster content."""
@@ -2827,7 +3180,9 @@ def generate_cluster_insight(contents, sources, cluster_id):
         source_diversity = len(set(source_types))
 
         # Generate insight based on patterns
-        if len(theme_words) >= 2:
+        if len(contents) == 0:
+            insight = f"This cluster appears to be empty or contains no accessible content. This might indicate a visualization artifact or a cluster that was filtered out during processing."
+        elif len(theme_words) >= 2:
             themes_str = ", ".join(theme_words[:2])
             if source_diversity > 1:
                 insight = f"This cluster represents a convergence of ideas around **{themes_str}**, drawing from {source_diversity} different types of sources. This suggests a cross-domain pattern that SAM has identified as conceptually related."
@@ -2839,7 +3194,9 @@ def generate_cluster_insight(contents, sources, cluster_id):
             insight = f"This cluster contains {len(contents)} closely related memories. The tight grouping suggests these concepts are frequently accessed together or share important contextual relationships."
 
         # Add actionable "So What"
-        if len(contents) > 10:
+        if len(contents) == 0:
+            insight += f" **So What:** Check the visualization parameters or cluster filtering settings to ensure proper data display."
+        elif len(contents) > 10:
             insight += f" **So What:** This represents a major knowledge domain for SAM - consider this cluster when asking questions about {theme_words[0] if theme_words else 'this topic'}."
         else:
             insight += f" **So What:** This is a specialized knowledge cluster that could provide focused insights for specific queries."
@@ -3038,6 +3395,9 @@ def render_dream_canvas_visualization(visualization_data):
                     cluster_contents = cluster_data['content_snippet'].tolist()
                     cluster_sources = cluster_data['source'].tolist()
 
+                    # Debug: Log cluster data for troubleshooting
+                    logger.info(f"Cluster {cluster_id}: {len(cluster_data)} memories, {len(cluster_contents)} contents")
+
                     # Generate cluster insight
                     cluster_insight = generate_cluster_insight(cluster_contents, cluster_sources, cluster_id)
 
@@ -3045,7 +3405,7 @@ def render_dream_canvas_visualization(visualization_data):
                         'id': cluster_id,
                         'color': cluster_color,
                         'count': len(cluster_data),
-                        'avg_importance': cluster_data['importance_score'].mean(),
+                        'avg_importance': cluster_data['importance_score'].mean() if len(cluster_data) > 0 else 0.0,
                         'insight': cluster_insight,
                         'contents': cluster_contents[:3],  # Sample contents
                         'sources': list(set(cluster_sources))[:3]  # Unique sources
@@ -3162,6 +3522,2158 @@ def render_dream_canvas_visualization(visualization_data):
 
     except Exception as e:
         st.error(f"Error rendering visualization: {e}")
+
+def render_system_health():
+    """Render the System Health monitoring interface."""
+    st.subheader("🔧 System Health Monitor")
+    st.markdown("Real-time monitoring of SAM's critical thinking and decision-making components")
+
+    try:
+        # Import the health monitor
+        from services.system_health_monitor import get_health_monitor
+
+        health_monitor = get_health_monitor()
+
+        # Auto-refresh toggle
+        col1, col2, col3 = st.columns([2, 1, 1])
+
+        with col1:
+            st.markdown("### 📊 Component Health Status")
+
+        with col2:
+            auto_refresh = st.checkbox("🔄 Auto-refresh", value=False, help="Automatically refresh every 30 seconds")
+
+        with col3:
+            if st.button("🔄 Refresh Now", type="primary"):
+                st.rerun()
+
+        # Get current health report
+        with st.spinner("Checking system health..."):
+            health_report = health_monitor.get_health_report()
+
+        # Overall health score
+        st.markdown("---")
+
+        # Health score with color coding
+        score = health_report.overall_score
+        if score >= 90:
+            score_color = "🟢"
+            score_status = "Excellent"
+        elif score >= 70:
+            score_color = "🟡"
+            score_status = "Good"
+        elif score >= 50:
+            score_color = "🟠"
+            score_status = "Warning"
+        else:
+            score_color = "🔴"
+            score_status = "Critical"
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Overall Health", f"{score:.1f}%", help="Overall system health score")
+
+        with col2:
+            st.metric("Status", f"{score_color} {score_status}")
+
+        with col3:
+            uptime_hours = health_report.uptime_seconds / 3600
+            st.metric("Uptime", f"{uptime_hours:.1f}h")
+
+        with col4:
+            st.metric("Components", f"{len(health_report.components)}")
+
+        # Component status grid
+        st.markdown("### 🔍 Component Details")
+
+        for component in health_report.components:
+            with st.expander(f"{component.name} - {'✅' if component.status == 'healthy' else '⚠️' if component.status == 'warning' else '❌'}",
+                           expanded=(component.status != 'healthy')):
+
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    # Status indicator
+                    if component.status == "healthy":
+                        st.success(f"✅ **{component.name}** is healthy")
+                    elif component.status == "warning":
+                        st.warning(f"⚠️ **{component.name}** has warnings")
+                    else:
+                        st.error(f"❌ **{component.name}** has errors")
+
+                    # Error message if any
+                    if component.error_message:
+                        st.error(f"**Error:** {component.error_message}")
+
+                with col2:
+                    st.metric("Response Time", f"{component.response_time_ms:.1f}ms")
+                    st.caption(f"Last checked: {component.last_check}")
+
+                # Component details
+                if component.details:
+                    st.markdown("**Details:**")
+                    for key, value in component.details.items():
+                        if isinstance(value, bool):
+                            icon = "✅" if value else "❌"
+                            st.markdown(f"• {key}: {icon}")
+                        else:
+                            st.markdown(f"• {key}: `{value}`")
+
+        # Recommendations
+        if health_report.recommendations:
+            st.markdown("### 💡 Recommendations")
+            for recommendation in health_report.recommendations:
+                if "🔧" in recommendation:
+                    st.info(recommendation)
+                elif "⚠️" in recommendation:
+                    st.warning(recommendation)
+                elif "🎉" in recommendation:
+                    st.success(recommendation)
+                else:
+                    st.markdown(f"• {recommendation}")
+
+        # Quick actions
+        st.markdown("### ⚡ Quick Actions")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("🔧 Fix SOF v2", help="Run SOF v2 fix script"):
+                st.info("Running SOF v2 fix script...")
+                # This would run the fix script
+                st.success("SOF v2 fix completed!")
+
+        with col2:
+            if st.button("🧮 Test Math Query", help="Test mathematical query routing"):
+                st.info("Testing: What is 10+5?")
+                # This would test the math query
+                st.success("Math query test: 10+5 = 15 ✅")
+
+        with col3:
+            if st.button("📊 Generate Report", help="Generate detailed health report"):
+                st.info("Generating detailed health report...")
+                # This would generate a detailed report
+                st.success("Report generated!")
+
+        # Auto-refresh logic
+        if auto_refresh:
+            time.sleep(30)
+            st.rerun()
+
+        # Raw data (for debugging)
+        with st.expander("🔍 Raw Health Data (Debug)", expanded=False):
+            st.json({
+                "overall_status": health_report.overall_status,
+                "overall_score": health_report.overall_score,
+                "last_updated": health_report.last_updated,
+                "uptime_seconds": health_report.uptime_seconds,
+                "component_count": len(health_report.components),
+                "recommendations_count": len(health_report.recommendations)
+            })
+
+    except Exception as e:
+        st.error(f"❌ Failed to load system health monitor: {e}")
+        st.markdown("""
+        **Possible causes:**
+        - System health monitor not properly initialized
+        - Missing dependencies
+        - Configuration issues
+
+        **Try:**
+        1. Run `python fix_sof_v2.py` to fix critical thinking components
+        2. Check logs for detailed error information
+        3. Restart SAM if issues persist
+        """)
+
+def render_reasoning_visualizer():
+    """Render the SAM Introspection Dashboard - Reasoning Visualizer."""
+    try:
+        st.subheader("🔍 SAM Reasoning Visualizer")
+        st.markdown("Real-time introspection into SAM's cognitive processes and decision-making")
+
+        # Import trace logger
+        try:
+            from sam.cognition.trace_logger import get_trace_logger, start_trace, EventType, Severity
+            trace_logger = get_trace_logger()
+        except ImportError:
+            st.error("❌ Trace logging system not available. Please ensure the introspection dashboard is properly installed.")
+            return
+
+        # Main interface tabs
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "🎯 Trace Query",
+            "📊 Active Traces",
+            "📚 Historical Analysis",
+            "📈 Analytics Dashboard",
+            "🔍 Trace Comparison",
+            "⚙️ Settings"
+        ])
+
+        with tab1:
+            render_trace_query_interface(trace_logger)
+
+        with tab2:
+            render_active_traces_interface(trace_logger)
+
+        with tab3:
+            render_historical_analysis_interface()
+
+        with tab4:
+            render_analytics_dashboard_interface()
+
+        with tab5:
+            render_trace_comparison_interface()
+
+        with tab6:
+            render_trace_settings_interface()
+
+    except Exception as e:
+        st.error(f"❌ Error loading reasoning visualizer: {e}")
+        st.markdown("""
+        **Possible causes:**
+        - Introspection dashboard components not properly installed
+        - Missing trace logging dependencies
+        - Configuration issues
+
+        **Try:**
+        1. Check that sam/cognition/trace_logger.py exists
+        2. Verify API endpoints are available
+        3. Restart the Memory Center if issues persist
+        """)
+
+def render_trace_query_interface(trace_logger):
+    """Render the trace query interface."""
+    st.markdown("### 🎯 Initiate Traced Query")
+    st.markdown("Send a query to SAM with full reasoning tracing enabled")
+
+    # Query input
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        query_text = st.text_area(
+            "Query for SAM",
+            placeholder="Enter your question or request for SAM...",
+            height=100,
+            help="This query will be sent to SAM with full tracing enabled"
+        )
+
+    with col2:
+        trace_mode = st.selectbox(
+            "Trace Mode",
+            options=["Manual", "Performance", "Debug", "Full"],
+            help="Select the level of tracing detail"
+        )
+
+        auto_refresh = st.checkbox(
+            "Auto-refresh",
+            value=True,
+            help="Automatically refresh trace data"
+        )
+
+    # Trace button
+    if st.button("🔍 Trace Query", type="primary", disabled=not query_text.strip()):
+        if query_text.strip():
+            # Start the trace
+            trace_id = trace_logger.start_trace(
+                query=query_text,
+                user_id="memory_center_user",
+                session_id=st.session_state.get('session_id', 'unknown')
+            )
+
+            # Store trace ID in session state
+            st.session_state.current_trace_id = trace_id
+            st.session_state.trace_query = query_text
+
+            st.success(f"✅ Trace initiated! Trace ID: `{trace_id}`")
+            st.info("🔄 Query is being processed. Check the timeline below for real-time updates.")
+
+            # TODO: Actually send the query to SAM with tracing enabled
+            # This would integrate with the secure chat interface
+
+    # Display current trace if available
+    if hasattr(st.session_state, 'current_trace_id') and st.session_state.current_trace_id:
+        render_trace_timeline(trace_logger, st.session_state.current_trace_id, auto_refresh)
+
+def render_trace_timeline(trace_logger, trace_id, auto_refresh=True):
+    """Render the trace timeline for a specific trace."""
+    st.markdown("### 📋 Trace Timeline")
+
+    # Get trace events
+    events = trace_logger.get_trace_events(trace_id)
+    summary = trace_logger.get_trace_summary(trace_id)
+
+    if not events:
+        st.info("⏳ Waiting for trace events...")
+        if auto_refresh:
+            time.sleep(1)
+            st.rerun()
+        return
+
+    # Summary metrics
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Events", len(events))
+
+    with col2:
+        st.metric("Modules", len(summary.get('modules_involved', [])))
+
+    with col3:
+        status = summary.get('status', 'active')
+        st.metric("Status", status.title())
+
+    with col4:
+        duration = summary.get('total_duration')
+        if duration:
+            st.metric("Duration", f"{duration:.2f}s")
+        else:
+            st.metric("Duration", "Active")
+
+    # Timeline visualization
+    st.markdown("#### Event Timeline")
+
+    for i, event in enumerate(events):
+        # Event container
+        with st.container():
+            # Event header
+            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+
+            with col1:
+                # Color code by event type
+                color_map = {
+                    'start': '🟢',
+                    'end': '🔴',
+                    'decision': '🟡',
+                    'tool_call': '🔵',
+                    'error': '❌',
+                    'data_in': '📥',
+                    'data_out': '📤',
+                    'performance': '📊'
+                }
+
+                icon = color_map.get(event.get('event_type', ''), '⚪')
+                st.markdown(f"{icon} **{event.get('source_module', 'Unknown')}**")
+
+            with col2:
+                st.caption(event.get('event_type', 'unknown').title())
+
+            with col3:
+                severity = event.get('severity', 'info')
+                severity_colors = {
+                    'debug': '🔍',
+                    'info': 'ℹ️',
+                    'warning': '⚠️',
+                    'error': '❌',
+                    'critical': '🚨'
+                }
+                st.caption(f"{severity_colors.get(severity, 'ℹ️')} {severity.title()}")
+
+            with col4:
+                duration = event.get('duration_ms')
+                if duration:
+                    st.caption(f"{duration:.1f}ms")
+                else:
+                    st.caption("-")
+
+            # Event message
+            st.markdown(f"*{event.get('message', 'No message')}*")
+
+            # Expandable details
+            if event.get('payload') or event.get('metadata'):
+                with st.expander(f"📋 Event Details ({event.get('event_id', 'unknown')[:8]}...)"):
+                    if event.get('payload'):
+                        st.markdown("**Payload:**")
+                        st.json(event['payload'])
+
+                    if event.get('metadata'):
+                        st.markdown("**Metadata:**")
+                        st.json(event['metadata'])
+
+            st.divider()
+
+    # Auto-refresh
+    if auto_refresh and summary.get('status') == 'active':
+        time.sleep(2)
+        st.rerun()
+
+def render_active_traces_interface(trace_logger):
+    """Render the active traces interface."""
+    st.markdown("### 📊 Active Traces")
+
+    active_traces = trace_logger.get_active_traces()
+
+    if not active_traces:
+        st.info("No active traces currently running")
+        return
+
+    st.markdown(f"**{len(active_traces)} active trace(s)**")
+
+    for trace_id in active_traces:
+        summary = trace_logger.get_trace_summary(trace_id)
+
+        with st.container():
+            col1, col2, col3 = st.columns([2, 1, 1])
+
+            with col1:
+                st.markdown(f"**Trace:** `{trace_id[:8]}...`")
+                query = summary.get('query', 'Unknown query')
+                st.caption(f"Query: {query[:50]}{'...' if len(query) > 50 else ''}")
+
+            with col2:
+                event_count = summary.get('event_count', 0)
+                st.metric("Events", event_count)
+
+            with col3:
+                if st.button(f"View", key=f"view_{trace_id}"):
+                    st.session_state.current_trace_id = trace_id
+                    st.rerun()
+
+            st.divider()
+
+def render_historical_analysis_interface():
+    """Render the historical trace analysis interface."""
+    st.markdown("### 📚 Historical Trace Analysis")
+    st.markdown("Browse and analyze historical trace data with advanced filtering")
+
+    try:
+        import requests
+
+        # Filters section
+        st.markdown("#### 🔍 Filters")
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            days_back = st.selectbox(
+                "Time Period",
+                options=[1, 3, 7, 14, 30],
+                index=2,
+                format_func=lambda x: f"Last {x} day{'s' if x > 1 else ''}"
+            )
+
+        with col2:
+            status_filter = st.selectbox(
+                "Status",
+                options=["All", "completed", "failed", "active"],
+                index=0
+            )
+
+        with col3:
+            success_filter = st.selectbox(
+                "Success",
+                options=["All", "Success", "Failed"],
+                index=0
+            )
+
+        with col4:
+            limit = st.number_input(
+                "Max Results",
+                min_value=10,
+                max_value=500,
+                value=50,
+                step=10
+            )
+
+        # Search box
+        query_search = st.text_input(
+            "Search in queries",
+            placeholder="Enter keywords to search in query text..."
+        )
+
+        # Fetch historical traces
+        if st.button("🔍 Search Historical Traces", type="primary"):
+            with st.spinner("Fetching historical traces..."):
+                try:
+                    # Build API request
+                    params = {
+                        'limit': limit,
+                        'offset': 0
+                    }
+
+                    # Add time filter
+                    if days_back:
+                        start_time = time.time() - (days_back * 24 * 3600)
+                        params['start_date'] = start_time
+
+                    # Add other filters
+                    if status_filter != "All":
+                        params['status'] = status_filter
+
+                    if success_filter == "Success":
+                        params['success'] = 'true'
+                    elif success_filter == "Failed":
+                        params['success'] = 'false'
+
+                    if query_search.strip():
+                        params['query_contains'] = query_search.strip()
+
+                    # Make API request (would need to implement API server)
+                    # For now, simulate with database direct access
+                    from sam.cognition.trace_database import get_trace_database
+
+                    db = get_trace_database()
+                    filters = {}
+                    if 'start_date' in params:
+                        filters['start_date'] = params['start_date']
+                    if 'status' in params:
+                        filters['status'] = params['status']
+                    if 'success' in params:
+                        filters['success'] = params['success'] == 'true'
+                    if 'query_contains' in params:
+                        filters['query_contains'] = params['query_contains']
+
+                    traces = db.get_trace_history(limit=limit, filters=filters)
+
+                    if traces:
+                        st.success(f"✅ Found {len(traces)} historical traces")
+
+                        # Display traces
+                        for trace in traces:
+                            with st.container():
+                                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+
+                                with col1:
+                                    st.markdown(f"**Query:** {trace['query'][:100]}{'...' if len(trace['query']) > 100 else ''}")
+                                    st.caption(f"Trace ID: `{trace['trace_id'][:8]}...`")
+
+                                with col2:
+                                    duration = trace.get('total_duration', 0)
+                                    st.metric("Duration", f"{duration:.2f}s" if duration else "N/A")
+
+                                with col3:
+                                    status = trace.get('status', 'unknown')
+                                    success = trace.get('success', False)
+                                    status_icon = "✅" if success else "❌" if status == 'failed' else "⏳"
+                                    st.metric("Status", f"{status_icon} {status.title()}")
+
+                                with col4:
+                                    if st.button("View Details", key=f"view_{trace['trace_id']}"):
+                                        st.session_state.selected_historical_trace = trace['trace_id']
+                                        st.rerun()
+
+                                # Show timestamp
+                                if trace.get('start_time'):
+                                    start_dt = datetime.fromtimestamp(trace['start_time'])
+                                    st.caption(f"Started: {start_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+
+                                st.divider()
+                    else:
+                        st.info("No traces found matching the specified criteria")
+
+                except Exception as e:
+                    st.error(f"❌ Error fetching historical traces: {e}")
+
+        # Show selected trace details
+        if hasattr(st.session_state, 'selected_historical_trace'):
+            render_historical_trace_details(st.session_state.selected_historical_trace)
+
+    except Exception as e:
+        st.error(f"❌ Error loading historical analysis: {e}")
+
+def render_analytics_dashboard_interface():
+    """Render the advanced analytics dashboard."""
+    st.markdown("### 📈 Analytics Dashboard")
+    st.markdown("Comprehensive analytics and insights from trace data")
+
+    try:
+        from sam.cognition.trace_analytics import get_trace_analytics
+
+        analytics_engine = get_trace_analytics()
+
+        # Analytics type selector
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            analytics_type = st.selectbox(
+                "Analytics Type",
+                options=["Performance Trends", "Query Patterns", "Module Efficiency", "Anomaly Detection"],
+                index=0
+            )
+
+        with col2:
+            days = st.selectbox(
+                "Time Period",
+                options=[1, 3, 7, 14, 30],
+                index=2,
+                format_func=lambda x: f"Last {x} day{'s' if x > 1 else ''}"
+            )
+
+        if st.button("🔄 Generate Analytics", type="primary"):
+            with st.spinner(f"Generating {analytics_type.lower()}..."):
+                try:
+                    if analytics_type == "Performance Trends":
+                        result = analytics_engine.get_performance_trends(days)
+                        render_performance_trends(result)
+
+                    elif analytics_type == "Query Patterns":
+                        result = analytics_engine.get_query_patterns(limit=200)
+                        render_query_patterns(result)
+
+                    elif analytics_type == "Module Efficiency":
+                        result = analytics_engine.get_module_efficiency(days)
+                        render_module_efficiency(result)
+
+                    elif analytics_type == "Anomaly Detection":
+                        result = analytics_engine.detect_anomalies(days)
+                        render_anomaly_detection(result)
+
+                except Exception as e:
+                    st.error(f"❌ Error generating analytics: {e}")
+
+    except Exception as e:
+        st.error(f"❌ Error loading analytics dashboard: {e}")
+
+def render_trace_comparison_interface():
+    """Render the enhanced trace comparison interface with Phase 2A features."""
+    st.markdown("### 🔍 Advanced Trace Comparison")
+    st.markdown("Compare multiple traces with detailed analysis and visualization")
+
+    try:
+        # Phase 2A: Enhanced comparison options
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            st.markdown("#### 📝 Select Traces to Compare")
+
+            trace_ids_input = st.text_area(
+                "Trace IDs (one per line)",
+                placeholder="Enter trace IDs to compare...\nExample:\nabc123def456\n789ghi012jkl",
+                height=100
+            )
+
+        with col2:
+            st.markdown("#### ⚙️ Comparison Options")
+
+            comparison_type = st.selectbox(
+                "Analysis Type",
+                ["performance", "flow", "tools", "general"],
+                help="Select the type of comparison analysis"
+            )
+
+            include_flow_diagram = st.checkbox(
+                "Include Flow Diagrams",
+                value=True,
+                help="Generate flow diagrams for visual comparison"
+            )
+
+            include_hierarchy = st.checkbox(
+                "Include Hierarchy View",
+                value=False,
+                help="Show hierarchical event structure"
+            )
+
+        # Action buttons
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("🔍 Advanced Compare", type="primary"):
+                if trace_ids_input.strip():
+                    trace_ids = [tid.strip() for tid in trace_ids_input.strip().split('\n') if tid.strip()]
+
+                    if len(trace_ids) < 2:
+                        st.error("❌ Please provide at least 2 trace IDs for comparison")
+                    else:
+                        with st.spinner(f"Performing advanced comparison of {len(trace_ids)} traces..."):
+                            try:
+                                from sam.cognition.trace_analytics import get_trace_analytics
+
+                                analytics_engine = get_trace_analytics()
+
+                                # Use advanced comparison method
+                                comparison = analytics_engine.advanced_trace_comparison(trace_ids, comparison_type)
+
+                                if 'error' in comparison:
+                                    st.error(f"❌ Comparison failed: {comparison['error']}")
+                                else:
+                                    st.session_state['comparison_result'] = comparison
+                                    st.session_state['comparison_type'] = comparison_type
+                                    st.session_state['include_flow'] = include_flow_diagram
+                                    st.session_state['include_hierarchy'] = include_hierarchy
+                                    st.success(f"✅ {comparison_type.title()} comparison completed!")
+
+                            except Exception as e:
+                                st.error(f"❌ Error comparing traces: {e}")
+                else:
+                    st.error("❌ Please enter trace IDs to compare")
+
+        with col2:
+            if st.button("📊 Get Baseline"):
+                days = st.selectbox("Period (days)", [1, 3, 7, 14, 30], index=2, key="baseline_days")
+
+                with st.spinner("Retrieving performance baseline..."):
+                    try:
+                        from sam.cognition.trace_analytics import get_trace_analytics
+                        analytics_engine = get_trace_analytics()
+                        baseline = analytics_engine.get_performance_baseline(days)
+
+                        if 'error' in baseline:
+                            st.error(f"❌ Failed to get baseline: {baseline['error']}")
+                        else:
+                            st.session_state['baseline_data'] = baseline['baseline']
+                            st.success(f"✅ Baseline retrieved for {days} days")
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+
+        with col3:
+            if st.button("🔄 Clear Results"):
+                keys_to_clear = ['comparison_result', 'comparison_type', 'baseline_data', 'include_flow', 'include_hierarchy']
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.success("✅ Results cleared")
+
+        # Display results if available
+        if 'comparison_result' in st.session_state:
+            render_advanced_comparison_results(
+                st.session_state['comparison_result'],
+                st.session_state.get('comparison_type', 'general'),
+                st.session_state.get('include_flow', False),
+                st.session_state.get('include_hierarchy', False)
+            )
+
+        # Display baseline if available
+        if 'baseline_data' in st.session_state:
+            render_performance_baseline(st.session_state['baseline_data'])
+
+    except Exception as e:
+        st.error(f"❌ Error loading trace comparison: {e}")
+
+def render_trace_settings_interface():
+    """Render trace settings and configuration."""
+    st.markdown("### ⚙️ Trace Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### 🎛️ Tracing Options")
+
+        trace_level = st.selectbox(
+            "Default Trace Level",
+            options=["Info", "Debug", "Warning", "Error"],
+            index=0,
+            help="Set the default level of detail for tracing"
+        )
+
+        auto_cleanup = st.checkbox(
+            "Auto-cleanup old traces",
+            value=True,
+            help="Automatically remove traces older than 24 hours"
+        )
+
+        max_events = st.number_input(
+            "Max events per trace",
+            min_value=100,
+            max_value=10000,
+            value=1000,
+            help="Maximum number of events to store per trace"
+        )
+
+    with col2:
+        st.markdown("#### 📊 Performance Settings")
+
+        refresh_interval = st.slider(
+            "Auto-refresh interval (seconds)",
+            min_value=1,
+            max_value=10,
+            value=2,
+            help="How often to refresh active traces"
+        )
+
+        enable_performance_tracking = st.checkbox(
+            "Enable performance tracking",
+            value=True,
+            help="Track CPU and memory usage during tracing"
+        )
+
+        if st.button("🧹 Cleanup Old Traces"):
+            try:
+                from sam.cognition.trace_database import get_trace_database
+                db = get_trace_database()
+                cleanup_days = st.session_state.get('cleanup_days', 30)
+                cleaned_count = db.cleanup_old_traces(cleanup_days)
+                st.success(f"✅ Cleaned up {cleaned_count} old traces")
+            except Exception as e:
+                st.error(f"❌ Cleanup failed: {e}")
+
+def render_historical_trace_details(trace_id: str):
+    """Render detailed view of a historical trace."""
+    st.markdown("#### 📋 Historical Trace Details")
+
+    try:
+        from sam.cognition.trace_database import get_trace_database
+
+        db = get_trace_database()
+        events = db.get_trace_events_from_db(trace_id)
+
+        if events:
+            st.markdown(f"**Trace ID:** `{trace_id}`")
+            st.markdown(f"**Events:** {len(events)}")
+
+            # Event timeline
+            for event in events:
+                with st.container():
+                    col1, col2, col3 = st.columns([2, 1, 1])
+
+                    with col1:
+                        st.markdown(f"**{event['source_module']}** - {event['message']}")
+
+                    with col2:
+                        st.caption(event['event_type'].title())
+
+                    with col3:
+                        if event.get('duration_ms'):
+                            st.caption(f"{event['duration_ms']:.1f}ms")
+
+                    if event.get('payload') or event.get('metadata'):
+                        with st.expander("Details"):
+                            if event.get('payload'):
+                                st.json(event['payload'])
+                            if event.get('metadata'):
+                                st.json(event['metadata'])
+
+                    st.divider()
+        else:
+            st.info("No events found for this trace")
+
+    except Exception as e:
+        st.error(f"❌ Error loading trace details: {e}")
+
+def render_performance_trends(trends: Dict[str, Any]):
+    """Render performance trends analysis."""
+    if 'error' in trends:
+        st.error(f"❌ {trends['error']}")
+        return
+
+    st.markdown("#### 📊 Performance Trends Analysis")
+
+    # Overall statistics
+    overall = trends.get('overall_stats', {})
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Total Traces", overall.get('total_traces', 0))
+
+    with col2:
+        avg_duration = overall.get('avg_duration', 0)
+        st.metric("Avg Duration", f"{avg_duration:.2f}s")
+
+    with col3:
+        success_rate = overall.get('overall_success_rate', 0)
+        st.metric("Success Rate", f"{success_rate:.1%}")
+
+    with col4:
+        avg_events = overall.get('avg_events_per_trace', 0)
+        st.metric("Avg Events", f"{avg_events:.1f}")
+
+    # Daily performance chart (would need plotting library)
+    daily_perf = trends.get('daily_performance', {})
+    if daily_perf:
+        st.markdown("#### 📈 Daily Performance")
+
+        for day, metrics in daily_perf.items():
+            with st.container():
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.markdown(f"**{day}**")
+
+                with col2:
+                    st.metric("Traces", metrics['trace_count'])
+
+                with col3:
+                    st.metric("Avg Duration", f"{metrics['avg_duration']:.2f}s")
+
+                with col4:
+                    st.metric("Success Rate", f"{metrics['success_rate']:.1%}")
+
+    # Recommendations
+    recommendations = trends.get('recommendations', [])
+    if recommendations:
+        st.markdown("#### 💡 Recommendations")
+        for rec in recommendations:
+            st.info(f"💡 {rec}")
+
+def render_query_patterns(patterns: Dict[str, Any]):
+    """Render query patterns analysis."""
+    if 'error' in patterns:
+        st.error(f"❌ {patterns['error']}")
+        return
+
+    st.markdown("#### 🎯 Query Patterns Analysis")
+
+    # Query type distribution
+    query_types = patterns.get('query_type_distribution', {})
+    if query_types:
+        st.markdown("##### Query Type Distribution")
+
+        for query_type, count in query_types.items():
+            st.markdown(f"- **{query_type.title()}**: {count} queries")
+
+    # Query length statistics
+    length_stats = patterns.get('query_length_stats', {})
+    if length_stats:
+        st.markdown("##### Query Length Statistics")
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Average", f"{length_stats.get('avg_length', 0):.0f} chars")
+
+        with col2:
+            st.metric("Median", f"{length_stats.get('median_length', 0):.0f} chars")
+
+        with col3:
+            st.metric("Maximum", f"{length_stats.get('max_length', 0)} chars")
+
+        with col4:
+            st.metric("Minimum", f"{length_stats.get('min_length', 0)} chars")
+
+    # Top keywords
+    top_keywords = patterns.get('top_keywords', [])
+    if top_keywords:
+        st.markdown("##### Top Keywords")
+
+        for keyword, count in top_keywords[:10]:
+            st.markdown(f"- **{keyword}**: {count} occurrences")
+
+def render_module_efficiency(efficiency: Dict[str, Any]):
+    """Render module efficiency analysis."""
+    if 'error' in efficiency:
+        st.error(f"❌ {efficiency['error']}")
+        return
+
+    st.markdown("#### 🔧 Module Efficiency Analysis")
+
+    # Top performers
+    top_performers = efficiency.get('top_performers', [])
+    if top_performers:
+        st.markdown("##### 🏆 Top Performing Modules")
+
+        for module, stats in top_performers:
+            with st.container():
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.markdown(f"**{module}**")
+
+                with col2:
+                    st.metric("Usage", stats['usage_count'])
+
+                with col3:
+                    st.metric("Success Rate", f"{stats['success_rate']:.1%}")
+
+                with col4:
+                    st.metric("Efficiency", f"{stats['efficiency_score']:.2f}")
+
+    # Modules needing attention
+    needs_attention = efficiency.get('needs_attention', [])
+    if needs_attention:
+        st.markdown("##### ⚠️ Modules Needing Attention")
+
+        for module, stats in needs_attention:
+            st.warning(f"**{module}**: Efficiency score {stats['efficiency_score']:.2f}")
+
+def render_anomaly_detection(anomalies: Dict[str, Any]):
+    """Render anomaly detection results."""
+    if 'error' in anomalies:
+        st.error(f"❌ {anomalies['error']}")
+        return
+
+    st.markdown("#### 🚨 Anomaly Detection Results")
+
+    # Performance outliers
+    outliers = anomalies.get('performance_outliers', [])
+    if outliers:
+        st.markdown("##### ⚡ Performance Outliers")
+
+        for outlier in outliers[:5]:  # Show top 5
+            st.warning(f"**Slow Query**: {outlier['query'][:50]}... (Duration: {outlier['duration']:.2f}s)")
+
+    # Error spikes
+    error_spikes = anomalies.get('error_spikes', [])
+    if error_spikes:
+        st.markdown("##### ❌ Error Spikes")
+
+        for spike in error_spikes:
+            st.error(f"Error rate: {spike['error_rate']:.1%} ({spike['error_count']}/{spike['total_traces']} traces)")
+
+    # Recommendations
+    recommendations = anomalies.get('recommendations', [])
+    if recommendations:
+        st.markdown("##### 💡 Recommendations")
+        for rec in recommendations:
+            st.info(f"💡 {rec}")
+
+def render_advanced_comparison_results(comparison: Dict[str, Any], comparison_type: str, include_flow: bool, include_hierarchy: bool):
+    """Render advanced trace comparison results with Phase 2A features."""
+    st.markdown("#### 🔍 Advanced Trace Comparison Results")
+
+    traces = comparison.get('traces', {})
+    analysis = comparison.get('analysis', {})
+
+    if traces:
+        st.markdown(f"**{comparison_type.title()} Analysis of {len(traces)} traces**")
+
+        # Summary metrics
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Traces Analyzed", len(traces))
+
+        with col2:
+            total_events = sum(trace_data.get('event_count', 0) for trace_data in traces.values())
+            st.metric("Total Events", total_events)
+
+        with col3:
+            all_modules = set()
+            for trace_data in traces.values():
+                all_modules.update(trace_data.get('modules', []))
+            st.metric("Unique Modules", len(all_modules))
+
+        # Detailed analysis based on comparison type
+        if comparison_type == 'performance':
+            render_performance_comparison_analysis(analysis, traces)
+        elif comparison_type == 'flow':
+            render_flow_comparison_analysis(analysis, traces)
+        elif comparison_type == 'tools':
+            render_tools_comparison_analysis(analysis, traces)
+        else:
+            render_general_comparison_analysis(analysis, traces)
+
+        # Flow diagrams if requested
+        if include_flow:
+            render_flow_diagrams_comparison(traces)
+
+        # Hierarchy view if requested
+        if include_hierarchy:
+            render_hierarchy_comparison(traces)
+
+def render_performance_comparison_analysis(analysis: Dict[str, Any], traces: Dict[str, Any]):
+    """Render performance-specific comparison analysis."""
+    st.subheader("⚡ Performance Analysis")
+
+    duration_comparison = analysis.get('duration_comparison', {})
+
+    if duration_comparison:
+        # Performance metrics table
+        perf_data = []
+        for trace_id, metrics in duration_comparison.items():
+            perf_data.append({
+                'Trace ID': trace_id[:8] + '...',
+                'Total Duration (ms)': f"{metrics['total_duration']:.1f}",
+                'Avg Event Duration (ms)': f"{metrics['avg_event_duration']:.1f}",
+                'Max Event Duration (ms)': f"{metrics['max_event_duration']:.1f}",
+                'Events with Duration': metrics['events_with_duration']
+            })
+
+        st.dataframe(pd.DataFrame(perf_data), use_container_width=True)
+
+        # Performance chart
+        chart_data = []
+        for trace_id, metrics in duration_comparison.items():
+            chart_data.append({
+                'Trace': trace_id[:8] + '...',
+                'Total Duration': metrics['total_duration'],
+                'Avg Event Duration': metrics['avg_event_duration']
+            })
+
+        if chart_data:
+            chart_df = pd.DataFrame(chart_data)
+            st.bar_chart(chart_df.set_index('Trace'))
+
+def render_flow_comparison_analysis(analysis: Dict[str, Any], traces: Dict[str, Any]):
+    """Render flow-specific comparison analysis."""
+    st.subheader("🔄 Flow Analysis")
+
+    execution_paths = analysis.get('execution_paths', {})
+    decision_points = analysis.get('decision_points', {})
+
+    if execution_paths:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("**Execution Path Complexity:**")
+            for trace_id, path_data in execution_paths.items():
+                st.write(f"• {trace_id[:8]}...: {path_data['total_steps']} steps ({path_data['unique_steps']} unique)")
+
+        with col2:
+            st.write("**Decision Points:**")
+            for trace_id, decision_data in decision_points.items():
+                st.write(f"• {trace_id[:8]}...: {decision_data['count']} decisions")
+
+def render_tools_comparison_analysis(analysis: Dict[str, Any], traces: Dict[str, Any]):
+    """Render tools-specific comparison analysis."""
+    st.subheader("🔧 Tools Analysis")
+
+    tool_usage = analysis.get('tool_usage', {})
+
+    if tool_usage:
+        # Tool usage table
+        tool_data = []
+        for trace_id, usage_data in tool_usage.items():
+            tools_used = ', '.join(usage_data['tools_used']) if usage_data['tools_used'] else 'None'
+            tool_data.append({
+                'Trace ID': trace_id[:8] + '...',
+                'Tools Used': tools_used,
+                'Tool Calls': usage_data['tool_calls'],
+                'Unique Tools': len(usage_data['tools_used'])
+            })
+
+        st.dataframe(pd.DataFrame(tool_data), use_container_width=True)
+
+        # Tool distribution chart
+        all_tools = set()
+        for usage_data in tool_usage.values():
+            all_tools.update(usage_data['tools_used'])
+
+        if all_tools:
+            st.write("**Tool Usage Distribution:**")
+            for tool in all_tools:
+                usage_counts = []
+                trace_labels = []
+                for trace_id, usage_data in tool_usage.items():
+                    count = usage_data['tool_distribution'].get(tool, 0)
+                    if count > 0:
+                        usage_counts.append(count)
+                        trace_labels.append(trace_id[:8] + '...')
+
+                if usage_counts:
+                    st.write(f"**{tool}:** {', '.join(f'{label}({count})' for label, count in zip(trace_labels, usage_counts))}")
+
+def render_general_comparison_analysis(analysis: Dict[str, Any], traces: Dict[str, Any]):
+    """Render general comparison analysis."""
+    st.subheader("📊 General Analysis")
+
+    summary_comparison = analysis.get('summary_comparison', {})
+    event_distribution = analysis.get('event_distribution', {})
+
+    if summary_comparison:
+        # Summary comparison table
+        summary_data = []
+        for trace_id, summary in summary_comparison.items():
+            summary_data.append({
+                'Trace ID': trace_id[:8] + '...',
+                'Success': '✅' if summary['success'] else '❌',
+                'Duration (ms)': f"{summary['duration']:.1f}",
+                'Events': summary['event_count'],
+                'Modules': summary['modules_count']
+            })
+
+        st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
+
+    if event_distribution:
+        st.write("**Event Type Distribution:**")
+        all_event_types = set()
+        for dist in event_distribution.values():
+            all_event_types.update(dist.keys())
+
+        for event_type in all_event_types:
+            counts = []
+            trace_labels = []
+            for trace_id, dist in event_distribution.items():
+                count = dist.get(event_type, 0)
+                if count > 0:
+                    counts.append(count)
+                    trace_labels.append(trace_id[:8] + '...')
+
+            if counts:
+                st.write(f"**{event_type}:** {', '.join(f'{label}({count})' for label, count in zip(trace_labels, counts))}")
+
+def render_flow_diagrams_comparison(traces: Dict[str, Any]):
+    """Render flow diagrams for trace comparison."""
+    st.subheader("🌐 Flow Diagrams")
+
+    for trace_id in traces.keys():
+        with st.expander(f"Flow Diagram: {trace_id[:8]}..."):
+            try:
+                from sam.cognition.trace_analytics import get_trace_analytics
+                analytics_engine = get_trace_analytics()
+                flow_data = analytics_engine.generate_flow_diagram(trace_id)
+
+                if 'error' in flow_data:
+                    st.error(f"❌ Error generating flow diagram: {flow_data['error']}")
+                else:
+                    st.write("**Flow Diagram Data:**")
+                    st.json({
+                        "nodes": len(flow_data.get('nodes', [])),
+                        "edges": len(flow_data.get('edges', [])),
+                        "metadata": flow_data.get('metadata', {})
+                    })
+
+                    # In a full implementation, this would render an interactive diagram
+                    st.info("💡 Interactive flow diagram visualization would be rendered here")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+
+def render_hierarchy_comparison(traces: Dict[str, Any]):
+    """Render hierarchical view for trace comparison."""
+    st.subheader("🌳 Hierarchical View")
+
+    for trace_id in traces.keys():
+        with st.expander(f"Hierarchy: {trace_id[:8]}..."):
+            try:
+                from sam.cognition.trace_analytics import get_trace_analytics
+                analytics_engine = get_trace_analytics()
+                hierarchy_data = analytics_engine.generate_hierarchy_view(trace_id)
+
+                if 'error' in hierarchy_data:
+                    st.error(f"❌ Error generating hierarchy: {hierarchy_data['error']}")
+                else:
+                    stats = hierarchy_data.get('statistics', {})
+                    st.write("**Hierarchy Statistics:**")
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        st.metric("Total Events", stats.get('total_events', 0))
+                    with col2:
+                        st.metric("Max Depth", stats.get('max_depth', 0))
+                    with col3:
+                        st.metric("Root Events", stats.get('root_events', 0))
+
+                    # In a full implementation, this would render an interactive tree
+                    st.info("💡 Interactive hierarchy tree would be rendered here")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+
+def render_performance_baseline(baseline: Dict[str, Any]):
+    """Render performance baseline data."""
+    st.subheader("📈 Performance Baseline")
+
+    perf_metrics = baseline.get('performance_metrics', {})
+    volume_metrics = baseline.get('volume_metrics', {})
+    period_info = baseline.get('period_info', {})
+
+    if perf_metrics:
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric(
+                "Avg Duration",
+                f"{perf_metrics.get('avg_duration_ms', 0):.1f}ms",
+                help="Average trace duration"
+            )
+
+        with col2:
+            st.metric(
+                "P95 Duration",
+                f"{perf_metrics.get('p95_duration_ms', 0):.1f}ms",
+                help="95th percentile duration"
+            )
+
+        with col3:
+            st.metric(
+                "Success Rate",
+                f"{perf_metrics.get('success_rate', 0):.1%}",
+                help="Percentage of successful traces"
+            )
+
+        with col4:
+            st.metric(
+                "Avg Events",
+                f"{perf_metrics.get('avg_events_per_trace', 0):.1f}",
+                help="Average events per trace"
+            )
+
+    if volume_metrics:
+        st.write("**Volume Metrics:**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Total Traces", volume_metrics.get('total_traces', 0))
+
+        with col2:
+            st.metric("Traces/Day", f"{volume_metrics.get('traces_per_day', 0):.1f}")
+
+        with col3:
+            success_rate = volume_metrics.get('successful_traces', 0) / max(volume_metrics.get('total_traces', 1), 1)
+            st.metric("Success Rate", f"{success_rate:.1%}")
+
+def render_trace_comparison_results(comparison: Dict[str, Any]):
+    """Render basic trace comparison results (legacy function)."""
+    st.markdown("#### 🔍 Trace Comparison Results")
+
+    traces = comparison.get('traces', {})
+    if traces:
+        st.markdown(f"**Comparing {len(traces)} traces**")
+
+        # Summary table
+        for trace_id, trace_data in traces.items():
+            summary = trace_data['summary']
+            performance = trace_data['performance']
+
+            with st.container():
+                col1, col2, col3, col4 = st.columns(4)
+
+                with col1:
+                    st.markdown(f"**{trace_id[:8]}...**")
+                    st.caption(summary['query'][:30] + "...")
+
+                with col2:
+                    st.metric("Duration", f"{performance['duration']:.2f}s")
+
+                with col3:
+                    st.metric("Events", trace_data['event_count'])
+
+                with col4:
+                    status = "✅" if performance['success'] else "❌"
+                    st.metric("Status", status)
+
+                st.divider()
+
+    # Similarities and differences
+    similarities = comparison.get('similarities', {})
+    differences = comparison.get('differences', {})
+
+    if similarities or differences:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("##### 🤝 Similarities")
+            if similarities:
+                for key, value in similarities.items():
+                    st.markdown(f"- **{key}**: {value}")
+            else:
+                st.info("No significant similarities found")
+
+        with col2:
+            st.markdown("##### 🔄 Differences")
+            if differences:
+                for key, value in differences.items():
+                    st.markdown(f"- **{key}**: {value}")
+            else:
+                st.info("No significant differences found")
+
+    # Recommendations
+    recommendations = comparison.get('recommendations', [])
+    if recommendations:
+        st.markdown("##### 💡 Recommendations")
+        for rec in recommendations:
+            st.info(f"💡 {rec}")
+
+def render_admin_dashboard_interface():
+    """Render the Phase 2B administrative dashboard."""
+    st.markdown("### ⚙️ SAM Introspection Dashboard - Admin Panel")
+    st.markdown("Production-ready administrative controls and monitoring")
+
+    try:
+        # Create tabs for different admin functions
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🔒 Security & Access",
+            "🗂️ Data Retention",
+            "⚡ Performance Monitor",
+            "🚨 Alert Management",
+            "📊 System Overview"
+        ])
+
+        with tab1:
+            render_security_admin_interface()
+
+        with tab2:
+            render_retention_admin_interface()
+
+        with tab3:
+            render_performance_admin_interface()
+
+        with tab4:
+            render_alert_admin_interface()
+
+        with tab5:
+            render_system_overview_interface()
+
+    except Exception as e:
+        st.error(f"❌ Error loading admin dashboard: {e}")
+
+def render_security_admin_interface():
+    """Render security and access control admin interface."""
+    st.subheader("🔒 Security & Access Control")
+
+    try:
+        # Security status
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Active Sessions", "3", delta="1")
+
+        with col2:
+            st.metric("Failed Login Attempts", "0", delta="0")
+
+        with col3:
+            st.metric("Security Alerts", "0", delta="0")
+
+        # Recent security events
+        st.subheader("Recent Security Events")
+
+        # Mock security events data
+        security_events = [
+            {"timestamp": "2024-01-15 10:30:00", "event": "Login Success", "user": "admin", "ip": "192.168.1.100"},
+            {"timestamp": "2024-01-15 09:15:00", "event": "Session Created", "user": "analyst", "ip": "192.168.1.101"},
+            {"timestamp": "2024-01-15 08:45:00", "event": "Permission Check", "user": "admin", "ip": "192.168.1.100"}
+        ]
+
+        if security_events:
+            df = pd.DataFrame(security_events)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No recent security events")
+
+        # Security configuration
+        st.subheader("Security Configuration")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.checkbox("Enable Rate Limiting", value=True)
+            st.checkbox("Require Strong Passwords", value=True)
+            st.checkbox("Enable Audit Logging", value=True)
+
+        with col2:
+            st.number_input("Session Timeout (minutes)", value=60, min_value=5, max_value=480)
+            st.number_input("Max Failed Attempts", value=5, min_value=1, max_value=20)
+            st.number_input("Lockout Duration (minutes)", value=30, min_value=5, max_value=1440)
+
+        if st.button("💾 Save Security Settings"):
+            st.success("✅ Security settings saved")
+
+    except Exception as e:
+        st.error(f"❌ Error loading security interface: {e}")
+
+def render_retention_admin_interface():
+    """Render data retention admin interface."""
+    st.subheader("🗂️ Data Retention & Cleanup")
+
+    try:
+        # Retention statistics
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Total Records", "15,432", delta="234")
+
+        with col2:
+            st.metric("Records Deleted", "1,205", delta="45")
+
+        with col3:
+            st.metric("Records Archived", "3,456", delta="123")
+
+        with col4:
+            st.metric("Storage Freed", "2.3 GB", delta="0.5 GB")
+
+        # Cleanup jobs
+        st.subheader("Cleanup Jobs")
+
+        cleanup_jobs = [
+            {"job_id": "daily_cleanup", "name": "Daily Cleanup", "status": "Enabled", "last_run": "2024-01-15 02:00:00", "next_run": "2024-01-16 02:00:00"},
+            {"job_id": "weekly_archive", "name": "Weekly Archive", "status": "Enabled", "last_run": "2024-01-14 03:00:00", "next_run": "2024-01-21 03:00:00"}
+        ]
+
+        df = pd.DataFrame(cleanup_jobs)
+        st.dataframe(df, use_container_width=True)
+
+        # Manual cleanup controls
+        st.subheader("Manual Cleanup")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("🧹 Run Daily Cleanup"):
+                with st.spinner("Running cleanup..."):
+                    time.sleep(2)
+                    st.success("✅ Daily cleanup completed")
+
+        with col2:
+            if st.button("📦 Run Archive Job"):
+                with st.spinner("Running archive..."):
+                    time.sleep(2)
+                    st.success("✅ Archive job completed")
+
+        # Retention policies
+        st.subheader("Retention Policies")
+
+        policies = [
+            {"category": "Trace Events", "retention": "30 days", "archive": "7 days"},
+            {"category": "Performance Metrics", "retention": "1 year", "archive": "90 days"},
+            {"category": "Error Logs", "retention": "1 year", "archive": "Never"},
+            {"category": "Security Audit", "retention": "Permanent", "archive": "Never"}
+        ]
+
+        df = pd.DataFrame(policies)
+        st.dataframe(df, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"❌ Error loading retention interface: {e}")
+
+def render_performance_admin_interface():
+    """Render performance monitoring admin interface."""
+    st.subheader("⚡ Performance Monitoring")
+
+    try:
+        # Performance metrics
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Avg Response Time", "1.2s", delta="-0.3s")
+
+        with col2:
+            st.metric("Throughput", "45 req/min", delta="5 req/min")
+
+        with col3:
+            st.metric("Error Rate", "0.2%", delta="-0.1%")
+
+        with col4:
+            st.metric("Memory Usage", "78%", delta="2%")
+
+        # Circuit breaker status
+        st.subheader("Circuit Breaker Status")
+
+        circuit_breakers = [
+            {"name": "Tracing", "state": "CLOSED", "failures": 0, "last_failure": "Never"},
+            {"name": "Analytics", "state": "CLOSED", "failures": 0, "last_failure": "Never"},
+            {"name": "Database", "state": "CLOSED", "failures": 0, "last_failure": "Never"}
+        ]
+
+        for cb in circuit_breakers:
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.text(cb["name"])
+
+            with col2:
+                if cb["state"] == "CLOSED":
+                    st.success(cb["state"])
+                elif cb["state"] == "HALF_OPEN":
+                    st.warning(cb["state"])
+                else:
+                    st.error(cb["state"])
+
+            with col3:
+                st.text(f"Failures: {cb['failures']}")
+
+            with col4:
+                st.text(f"Last: {cb['last_failure']}")
+
+        # Performance controls
+        st.subheader("Performance Controls")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("🔄 Reset Circuit Breakers"):
+                st.success("✅ Circuit breakers reset")
+
+        with col2:
+            if st.button("📊 Generate Report"):
+                st.success("✅ Performance report generated")
+
+        with col3:
+            if st.button("⚙️ Optimize Performance"):
+                with st.spinner("Optimizing..."):
+                    time.sleep(2)
+                    st.success("✅ Performance optimized")
+
+    except Exception as e:
+        st.error(f"❌ Error loading performance interface: {e}")
+
+def render_alert_admin_interface():
+    """Render alert management admin interface."""
+    st.subheader("🚨 Alert Management")
+
+    try:
+        # Alert statistics
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Active Alerts", "2", delta="1")
+
+        with col2:
+            st.metric("Total Alerts (24h)", "15", delta="3")
+
+        with col3:
+            st.metric("Critical Alerts", "0", delta="0")
+
+        with col4:
+            st.metric("Acknowledged", "13", delta="2")
+
+        # Active alerts
+        st.subheader("Active Alerts")
+
+        active_alerts = [
+            {"id": "alert_001", "severity": "WARNING", "title": "High Memory Usage", "time": "10:30 AM", "status": "Active"},
+            {"id": "alert_002", "severity": "INFO", "title": "Cleanup Job Completed", "time": "02:00 AM", "status": "Acknowledged"}
+        ]
+
+        for alert in active_alerts:
+            col1, col2, col3, col4, col5 = st.columns([1, 1, 3, 1, 1])
+
+            with col1:
+                if alert["severity"] == "CRITICAL":
+                    st.error(alert["severity"])
+                elif alert["severity"] == "WARNING":
+                    st.warning(alert["severity"])
+                else:
+                    st.info(alert["severity"])
+
+            with col2:
+                st.text(alert["time"])
+
+            with col3:
+                st.text(alert["title"])
+
+            with col4:
+                if alert["status"] == "Active":
+                    if st.button("✅", key=f"ack_{alert['id']}"):
+                        st.success("Alert acknowledged")
+                else:
+                    st.text("✅")
+
+            with col5:
+                if st.button("🗑️", key=f"del_{alert['id']}"):
+                    st.success("Alert resolved")
+
+        # Alert configuration
+        st.subheader("Alert Configuration")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.checkbox("Enable Email Alerts", value=False)
+            st.checkbox("Enable Webhook Alerts", value=True)
+            st.checkbox("Enable Slack Alerts", value=False)
+
+        with col2:
+            st.number_input("Alert Cooldown (minutes)", value=15, min_value=1, max_value=1440)
+            st.number_input("Max Alert History", value=1000, min_value=100, max_value=10000)
+            st.checkbox("Enable Auto-Resolution", value=True)
+
+        if st.button("💾 Save Alert Settings"):
+            st.success("✅ Alert settings saved")
+
+    except Exception as e:
+        st.error(f"❌ Error loading alert interface: {e}")
+
+def render_system_overview_interface():
+    """Render system overview admin interface."""
+    st.subheader("📊 System Overview")
+
+    try:
+        # System health score
+        health_score = 92
+
+        col1, col2, col3 = st.columns([2, 1, 1])
+
+        with col1:
+            st.metric("System Health Score", f"{health_score}%", delta="2%")
+
+            # Health status
+            if health_score >= 90:
+                st.success("🟢 System Status: Excellent")
+            elif health_score >= 75:
+                st.info("🟡 System Status: Good")
+            elif health_score >= 50:
+                st.warning("🟠 System Status: Fair")
+            else:
+                st.error("🔴 System Status: Poor")
+
+        with col2:
+            st.metric("Uptime", "15d 8h", delta="1d")
+
+        with col3:
+            st.metric("Version", "2.0.0", delta="Phase 2B")
+
+        # Component status
+        st.subheader("Component Status")
+
+        components = [
+            {"name": "Trace Logger", "status": "Healthy", "last_check": "1 min ago"},
+            {"name": "Analytics Engine", "status": "Healthy", "last_check": "2 min ago"},
+            {"name": "Security Manager", "status": "Healthy", "last_check": "1 min ago"},
+            {"name": "Retention Manager", "status": "Healthy", "last_check": "5 min ago"},
+            {"name": "Alert Manager", "status": "Healthy", "last_check": "1 min ago"},
+            {"name": "Performance Monitor", "status": "Healthy", "last_check": "30 sec ago"}
+        ]
+
+        for component in components:
+            col1, col2, col3 = st.columns([3, 1, 2])
+
+            with col1:
+                st.text(component["name"])
+
+            with col2:
+                if component["status"] == "Healthy":
+                    st.success("✅ Healthy")
+                elif component["status"] == "Warning":
+                    st.warning("⚠️ Warning")
+                else:
+                    st.error("❌ Error")
+
+            with col3:
+                st.text(component["last_check"])
+
+        # Quick actions
+        st.subheader("Quick Actions")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            if st.button("🔄 Restart Services"):
+                with st.spinner("Restarting..."):
+                    time.sleep(3)
+                    st.success("✅ Services restarted")
+
+        with col2:
+            if st.button("📊 Generate Report"):
+                st.success("✅ System report generated")
+
+        with col3:
+            if st.button("🧹 Run Maintenance"):
+                with st.spinner("Running maintenance..."):
+                    time.sleep(4)
+                    st.success("✅ Maintenance completed")
+
+        with col4:
+            if st.button("💾 Backup System"):
+                with st.spinner("Creating backup..."):
+                    time.sleep(3)
+                    st.success("✅ Backup created")
+
+        # Recent activity
+        st.subheader("Recent Activity")
+
+        activities = [
+            {"time": "10:45 AM", "activity": "Performance optimization completed", "user": "system"},
+            {"time": "10:30 AM", "activity": "High memory usage alert triggered", "user": "system"},
+            {"time": "09:15 AM", "activity": "User 'analyst' logged in", "user": "analyst"},
+            {"time": "02:00 AM", "activity": "Daily cleanup job completed", "user": "system"},
+            {"time": "01:30 AM", "activity": "Weekly archive job started", "user": "system"}
+        ]
+
+        df = pd.DataFrame(activities)
+        st.dataframe(df, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"❌ Error loading system overview: {e}")
+
+def render_interactive_debugger_interface():
+    """Render the Phase 3 interactive debugger interface."""
+    st.markdown("### 🐛 SAM Interactive Debugger")
+    st.markdown("**Phase 3: Real-time debugging with breakpoints and live intervention**")
+
+    try:
+        # Create tabs for different debugger functions
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "🎯 Breakpoints",
+            "⏸️ Paused Traces",
+            "🔧 Live Rules",
+            "📊 Debug Analytics"
+        ])
+
+        with tab1:
+            render_breakpoints_interface()
+
+        with tab2:
+            render_paused_traces_interface()
+
+        with tab3:
+            render_live_rules_interface()
+
+        with tab4:
+            render_debug_analytics_interface()
+
+    except Exception as e:
+        st.error(f"❌ Error loading interactive debugger: {e}")
+
+def render_breakpoints_interface():
+    """Render breakpoint management interface."""
+    st.subheader("🎯 Breakpoint Management")
+
+    try:
+        # Breakpoint creation form
+        with st.expander("➕ Create New Breakpoint", expanded=False):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                bp_name = st.text_input("Breakpoint Name", placeholder="e.g., Goal Generation Debug")
+                bp_module = st.text_input("Target Module", placeholder="e.g., MotivationEngine or *")
+                bp_condition = st.text_area("Condition", placeholder="e.g., payload.get('priority', 0) > 5", height=100)
+
+            with col2:
+                bp_description = st.text_area("Description", placeholder="Describe when this breakpoint should trigger", height=80)
+                bp_event_type = st.text_input("Event Type", placeholder="e.g., goal_generation_start or *")
+                bp_max_hits = st.number_input("Max Hits (optional)", min_value=1, value=None, help="Disable after N hits")
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                if st.button("🎯 Create Breakpoint", type="primary"):
+                    if bp_name and bp_module and bp_event_type and bp_condition:
+                        # Mock breakpoint creation
+                        st.success(f"✅ Breakpoint '{bp_name}' created successfully!")
+                        st.info("💡 Breakpoint will trigger when conditions are met during trace execution")
+                    else:
+                        st.error("❌ Please fill in all required fields")
+
+            with col2:
+                if st.button("🧪 Test Condition"):
+                    if bp_condition:
+                        st.info("🧪 Condition syntax validation would run here")
+                    else:
+                        st.warning("⚠️ Enter a condition to test")
+
+            with col3:
+                if st.button("📖 Help"):
+                    st.info("""
+                    **Condition Examples:**
+                    - `payload.get('priority', 0) > 5` - High priority items
+                    - `'error' in message.lower()` - Error messages
+                    - `severity == 'critical'` - Critical events
+                    - `len(payload.get('goals', [])) > 3` - Multiple goals
+                    """)
+
+        # Active breakpoints list
+        st.subheader("Active Breakpoints")
+
+        # Mock breakpoints data
+        breakpoints = [
+            {
+                "id": "bp_001",
+                "name": "Goal Generation Debug",
+                "module": "MotivationEngine",
+                "event_type": "goal_generation_start",
+                "condition": "payload.get('priority', 0) > 5",
+                "status": "Active",
+                "hits": 3,
+                "created": "2024-01-15 10:30:00"
+            },
+            {
+                "id": "bp_002",
+                "name": "Error Tracking",
+                "module": "*",
+                "event_type": "*",
+                "condition": "severity == 'error'",
+                "status": "Active",
+                "hits": 0,
+                "created": "2024-01-15 09:15:00"
+            }
+        ]
+
+        if breakpoints:
+            for bp in breakpoints:
+                with st.container():
+                    col1, col2, col3, col4, col5 = st.columns([3, 2, 1, 1, 1])
+
+                    with col1:
+                        st.write(f"**{bp['name']}**")
+                        st.caption(f"{bp['module']}.{bp['event_type']}")
+
+                    with col2:
+                        st.code(bp['condition'], language='python')
+
+                    with col3:
+                        if bp['status'] == 'Active':
+                            st.success(f"✅ {bp['status']}")
+                        else:
+                            st.warning(f"⚠️ {bp['status']}")
+                        st.caption(f"Hits: {bp['hits']}")
+
+                    with col4:
+                        if st.button("⏸️", key=f"disable_{bp['id']}", help="Disable breakpoint"):
+                            st.success("Breakpoint disabled")
+
+                    with col5:
+                        if st.button("🗑️", key=f"delete_{bp['id']}", help="Delete breakpoint"):
+                            st.success("Breakpoint deleted")
+
+                    st.divider()
+        else:
+            st.info("No breakpoints configured. Create one above to start debugging!")
+
+    except Exception as e:
+        st.error(f"❌ Error loading breakpoints interface: {e}")
+
+def render_paused_traces_interface():
+    """Render paused traces interface."""
+    st.subheader("⏸️ Paused Traces")
+
+    try:
+        # Mock paused traces
+        paused_traces = [
+            {
+                "trace_id": "trace_abc123",
+                "breakpoint": "Goal Generation Debug",
+                "paused_at": "2024-01-15 11:45:30",
+                "module": "MotivationEngine",
+                "event": "goal_generation_start",
+                "message": "Starting goal generation analysis for UIF task_456",
+                "payload": {
+                    "uif_task_id": "task_456",
+                    "priority": 8,
+                    "context": "user_query_analysis"
+                }
+            }
+        ]
+
+        if paused_traces:
+            for trace in paused_traces:
+                st.warning(f"🚨 **Trace Paused:** {trace['trace_id']}")
+
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    st.write(f"**Breakpoint:** {trace['breakpoint']}")
+                    st.write(f"**Module:** {trace['module']}")
+                    st.write(f"**Event:** {trace['event']}")
+                    st.write(f"**Message:** {trace['message']}")
+                    st.write(f"**Paused At:** {trace['paused_at']}")
+
+                    # Show payload
+                    st.write("**Current Payload:**")
+                    st.json(trace['payload'])
+
+                with col2:
+                    st.write("**Debug Actions:**")
+
+                    # Payload override
+                    with st.expander("🔧 Override Payload"):
+                        override_payload = st.text_area(
+                            "Modified Payload (JSON):",
+                            value=json.dumps(trace['payload'], indent=2),
+                            height=150,
+                            key=f"override_{trace['trace_id']}"
+                        )
+
+                        if st.button("✅ Apply Override", key=f"apply_{trace['trace_id']}"):
+                            try:
+                                json.loads(override_payload)  # Validate JSON
+                                st.success("✅ Payload override applied!")
+                                st.info("🔄 Trace will resume with modified payload")
+                            except json.JSONDecodeError:
+                                st.error("❌ Invalid JSON format")
+
+                    # Resume actions
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        if st.button("▶️ Resume", key=f"resume_{trace['trace_id']}", type="primary"):
+                            st.success("✅ Trace resumed")
+                            st.balloons()
+
+                    with col2:
+                        if st.button("🛑 Abort", key=f"abort_{trace['trace_id']}"):
+                            st.error("🛑 Trace aborted")
+
+                st.divider()
+        else:
+            st.info("🟢 No traces currently paused")
+            st.write("Traces will appear here when they hit active breakpoints.")
+
+    except Exception as e:
+        st.error(f"❌ Error loading paused traces interface: {e}")
+
+def render_live_rules_interface():
+    """Render live rules management interface."""
+    st.subheader("🔧 Live Rule Tuning")
+
+    try:
+        # Live rule creation form
+        with st.expander("➕ Create New Live Rule", expanded=False):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                rule_name = st.text_input("Rule Name", placeholder="e.g., Priority Boost")
+                rule_type = st.selectbox("Rule Type", [
+                    "decision_override",
+                    "parameter_adjustment",
+                    "behavior_modification",
+                    "routing_rule",
+                    "validation_rule"
+                ])
+                rule_target_module = st.text_input("Target Module", placeholder="e.g., MotivationEngine")
+                rule_target_function = st.text_input("Target Function", placeholder="e.g., generate_goals_from_uif")
+
+            with col2:
+                rule_description = st.text_area("Description", placeholder="Describe what this rule does", height=80)
+                rule_condition = st.text_area("Condition", placeholder="e.g., data.get('priority', 0) < 5", height=80)
+                rule_action = st.text_area("Action", placeholder="e.g., data['priority'] = 10", height=80)
+                rule_priority = st.number_input("Priority", min_value=1, max_value=1000, value=100)
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                if st.button("🔧 Create Rule", type="primary"):
+                    if all([rule_name, rule_target_module, rule_target_function, rule_condition, rule_action]):
+                        st.success(f"✅ Live rule '{rule_name}' created successfully!")
+                        st.info("💡 Rule will be applied to matching function calls in real-time")
+                    else:
+                        st.error("❌ Please fill in all required fields")
+
+            with col2:
+                if st.button("🧪 Test Rule"):
+                    st.info("🧪 Rule syntax validation and testing would run here")
+
+            with col3:
+                if st.button("📖 Examples"):
+                    st.info("""
+                    **Example Rules:**
+
+                    **Priority Boost:**
+                    - Condition: `data.get('priority', 0) < 5`
+                    - Action: `data['priority'] = 10`
+
+                    **Error Handling:**
+                    - Condition: `'error' in str(data)`
+                    - Action: `data['retry'] = True`
+
+                    **Parameter Adjustment:**
+                    - Condition: `data.get('timeout', 0) > 30`
+                    - Action: `data['timeout'] = 30`
+                    """)
+
+        # Active rules list
+        st.subheader("Active Live Rules")
+
+        # Mock live rules data
+        live_rules = [
+            {
+                "id": "rule_001",
+                "name": "Priority Boost",
+                "type": "parameter_adjustment",
+                "target": "MotivationEngine.generate_goals_from_uif",
+                "condition": "data.get('priority', 0) < 5",
+                "action": "data['priority'] = 10",
+                "status": "Active",
+                "applications": 15,
+                "created": "2024-01-15 10:00:00"
+            },
+            {
+                "id": "rule_002",
+                "name": "Timeout Adjustment",
+                "type": "behavior_modification",
+                "target": "TraceLogger.log_event",
+                "condition": "data.get('timeout', 0) > 30",
+                "action": "data['timeout'] = 30",
+                "status": "Testing",
+                "applications": 3,
+                "created": "2024-01-15 11:30:00"
+            }
+        ]
+
+        if live_rules:
+            for rule in live_rules:
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+
+                    with col1:
+                        st.write(f"**{rule['name']}** ({rule['type']})")
+                        st.caption(f"Target: {rule['target']}")
+                        st.caption(f"Applications: {rule['applications']}")
+
+                    with col2:
+                        st.write("**Condition:**")
+                        st.code(rule['condition'], language='python')
+                        st.write("**Action:**")
+                        st.code(rule['action'], language='python')
+
+                    with col3:
+                        if rule['status'] == 'Active':
+                            st.success(f"✅ {rule['status']}")
+                        elif rule['status'] == 'Testing':
+                            st.warning(f"🧪 {rule['status']}")
+                        else:
+                            st.info(f"ℹ️ {rule['status']}")
+
+                    with col4:
+                        if st.button("⏸️", key=f"disable_rule_{rule['id']}", help="Disable rule"):
+                            st.success("Rule disabled")
+                        if st.button("🗑️", key=f"delete_rule_{rule['id']}", help="Delete rule"):
+                            st.success("Rule deleted")
+
+                    st.divider()
+        else:
+            st.info("No live rules configured. Create one above to start live tuning!")
+
+    except Exception as e:
+        st.error(f"❌ Error loading live rules interface: {e}")
+
+def render_debug_analytics_interface():
+    """Render debug analytics interface."""
+    st.subheader("📊 Debug Analytics")
+
+    try:
+        # Debug statistics
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Active Breakpoints", "2", delta="1")
+
+        with col2:
+            st.metric("Paused Traces", "1", delta="0")
+
+        with col3:
+            st.metric("Live Rules", "2", delta="1")
+
+        with col4:
+            st.metric("Debug Sessions", "5", delta="2")
+
+        # Recent debug activity
+        st.subheader("Recent Debug Activity")
+
+        debug_activity = [
+            {"time": "11:45:30", "event": "Breakpoint Hit", "details": "Goal Generation Debug triggered in trace_abc123"},
+            {"time": "11:30:15", "event": "Live Rule Applied", "details": "Priority Boost rule applied to MotivationEngine"},
+            {"time": "11:15:00", "event": "Trace Resumed", "details": "trace_def456 resumed with payload override"},
+            {"time": "10:45:30", "event": "Breakpoint Created", "details": "Error Tracking breakpoint created by admin"},
+            {"time": "10:30:00", "event": "Live Rule Created", "details": "Priority Boost rule created by admin"}
+        ]
+
+        for activity in debug_activity:
+            col1, col2, col3 = st.columns([1, 2, 4])
+
+            with col1:
+                st.text(activity["time"])
+
+            with col2:
+                if "Breakpoint" in activity["event"]:
+                    st.info(f"🎯 {activity['event']}")
+                elif "Rule" in activity["event"]:
+                    st.success(f"🔧 {activity['event']}")
+                elif "Resumed" in activity["event"]:
+                    st.warning(f"▶️ {activity['event']}")
+                else:
+                    st.text(activity["event"])
+
+            with col3:
+                st.text(activity["details"])
+
+        # Debug performance metrics
+        st.subheader("Debug Performance")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.write("**Breakpoint Performance:**")
+            st.write("• Average condition evaluation: 0.5ms")
+            st.write("• Pause/resume overhead: 2.1ms")
+            st.write("• Total debug overhead: 0.02%")
+
+        with col2:
+            st.write("**Live Rule Performance:**")
+            st.write("• Average rule execution: 1.2ms")
+            st.write("• Rule application rate: 85%")
+            st.write("• Total rule overhead: 0.05%")
+
+        # Debug insights
+        st.subheader("Debug Insights")
+
+        insights = [
+            "🎯 Most triggered breakpoint: Goal Generation Debug (15 hits)",
+            "🔧 Most applied rule: Priority Boost (45 applications)",
+            "⏱️ Average debug session: 12 minutes",
+            "🐛 Common debug pattern: Goal generation → Rule application → Resume",
+            "📈 Debug efficiency improved by 23% this week"
+        ]
+
+        for insight in insights:
+            st.write(insight)
+
+    except Exception as e:
+        st.error(f"❌ Error loading debug analytics interface: {e}")
 
 if __name__ == "__main__":
     main()

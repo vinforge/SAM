@@ -26,6 +26,7 @@ import sys
 import logging
 import time
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
@@ -283,9 +284,182 @@ def initialize_secure_sam():
 
 # TPV control sidebar function removed to clean up the interface
 
+def render_messages_from_sam_alert():
+    """Render Messages from SAM alert with notification badges and blinking effects."""
+    try:
+        # Import discovery orchestrator for state checking
+        from sam.orchestration.discovery_cycle import get_discovery_orchestrator
+        from sam.state.state_manager import get_state_manager
+
+        orchestrator = get_discovery_orchestrator()
+        state_manager = get_state_manager()
+
+        # Check for new insights
+        insights_status = orchestrator.get_new_insights_status()
+        new_insights_available = insights_status.get('new_insights_available', False)
+
+        # Check for pending vetting items
+        try:
+            from sam.state.vetting_queue import get_vetting_queue_manager
+            vetting_manager = get_vetting_queue_manager()
+            pending_review = len(vetting_manager.get_pending_review_files())
+        except:
+            pending_review = 0
+
+        # Calculate total notifications
+        total_notifications = (1 if new_insights_available else 0) + (1 if pending_review > 0 else 0)
+
+        if total_notifications > 0:
+            # Create blinking CSS for urgent notifications
+            st.markdown("""
+            <style>
+            .blinking-alert {
+                animation: blink 2s linear infinite;
+                background: linear-gradient(45deg, #ff4b4b, #ff6b6b);
+                color: white;
+                padding: 0.5rem;
+                border-radius: 0.5rem;
+                text-align: center;
+                font-weight: bold;
+                margin-bottom: 1rem;
+                box-shadow: 0 2px 4px rgba(255, 75, 75, 0.3);
+            }
+
+            @keyframes blink {
+                0%, 50% { opacity: 1; }
+                51%, 100% { opacity: 0.7; }
+            }
+
+            .notification-badge {
+                background: #ff4b4b;
+                color: white;
+                border-radius: 50%;
+                padding: 0.2rem 0.5rem;
+                font-size: 0.8rem;
+                font-weight: bold;
+                margin-left: 0.5rem;
+            }
+
+            .messages-container {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 1rem;
+                border-radius: 0.5rem;
+                margin-bottom: 1rem;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+
+            .message-item {
+                background: rgba(255, 255, 255, 0.1);
+                padding: 0.5rem;
+                border-radius: 0.3rem;
+                margin: 0.5rem 0;
+                border-left: 3px solid #ffd700;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+            # Main alert container
+            st.markdown(f"""
+            <div class="blinking-alert">
+                ✉️ <strong>Messages from SAM</strong>
+                <span class="notification-badge">{total_notifications}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Messages container
+            st.markdown('<div class="messages-container">', unsafe_allow_html=True)
+
+            # New insights notification
+            if new_insights_available:
+                timestamp = insights_status.get('last_insights_timestamp')
+                time_str = ""
+                if timestamp:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(timestamp)
+                        time_str = f" at {dt.strftime('%H:%M')}"
+                    except:
+                        pass
+
+                st.markdown(f"""
+                <div class="message-item">
+                    💡 <strong>New Insights Available!</strong><br>
+                    <small>Generated{time_str} - Ready for research</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Action button for insights
+                if st.button("🧠 View New Insights", key="view_insights_alert", use_container_width=True):
+                    # Clear the flag and navigate to Dream Canvas
+                    orchestrator.clear_new_insights_flag()
+                    st.session_state.show_memory_control_center = True
+                    st.session_state.memory_page_override = "🧠🎨 Dream Canvas"
+                    st.rerun()
+
+            # Pending vetting notification
+            if pending_review > 0:
+                st.markdown(f"""
+                <div class="message-item">
+                    🔍 <strong>Papers Awaiting Review</strong><br>
+                    <small>{pending_review} research paper{'' if pending_review == 1 else 's'} need{'' if pending_review == 1 else ''} your approval</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Action button for vetting
+                if st.button("📋 Review Papers", key="review_papers_alert", use_container_width=True):
+                    # Navigate to vetting queue
+                    st.session_state.show_memory_control_center = True
+                    st.session_state.memory_page_override = "🔍 Vetting Queue"
+                    st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # Quick dismiss option
+            if st.button("🔕 Dismiss Alerts", key="dismiss_alerts", help="Temporarily hide alerts"):
+                st.session_state.alerts_dismissed = True
+                st.rerun()
+
+        else:
+            # No notifications - show subtle indicator
+            st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #a8e6cf 0%, #88d8a3 100%);
+                color: #2d5a3d;
+                padding: 0.5rem;
+                border-radius: 0.5rem;
+                text-align: center;
+                margin-bottom: 1rem;
+                font-size: 0.9rem;
+            ">
+                ✉️ <strong>Messages from SAM</strong><br>
+                <small>All caught up! 🎉</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+    except Exception as e:
+        # Fallback display if components not available
+        st.markdown("""
+        <div style="
+            background: #f0f0f0;
+            color: #666;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        ">
+            ✉️ <strong>Messages from SAM</strong><br>
+            <small>System initializing...</small>
+        </div>
+        """, unsafe_allow_html=True)
+
 def render_sam_pro_sidebar():
     """Render SAM Pro activation sidebar with key entry (preserving 100% of existing functionality)."""
     with st.sidebar:
+        # Messages from SAM Alert (Task 27)
+        render_messages_from_sam_alert()
+
         st.header("🔑 SAM Pro Activation")
 
         # Check current activation status
@@ -599,12 +773,176 @@ def render_tpv_status():
     except Exception as e:
         logger.debug(f"TPV status display error: {e}")
 
+def render_chat_document_upload():
+    """Render drag & drop document upload interface for chat."""
+    with st.expander("📁 Upload Documents to Chat", expanded=False):
+        st.markdown("""
+        **Drag & drop documents directly into your conversation with SAM!**
+
+        🎯 **Quick Upload**: Upload documents and immediately start discussing them
+        📄 **Supported Formats**: PDF, TXT, DOCX, MD files
+        🔒 **Secure Processing**: All uploads are encrypted and processed securely
+
+        💡 **What happens after upload:**
+        - Document is securely processed and encrypted
+        - SAM automatically analyzes the content
+        - You get instant suggestions for questions to ask
+        - Quick action buttons for summary, analysis, and key insights
+        """)
+
+        # File uploader with drag & drop
+        uploaded_files = st.file_uploader(
+            "Drop files here or click to browse",
+            type=['pdf', 'txt', 'docx', 'md'],
+            accept_multiple_files=True,
+            help="Upload documents to discuss with SAM. Files are processed securely and encrypted.",
+            key="chat_file_upload"
+        )
+
+        # Process uploaded files
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                if f"processed_{uploaded_file.name}" not in st.session_state:
+                    with st.spinner(f"🔐 Processing {uploaded_file.name} securely..."):
+                        try:
+                            # Process the document using existing secure processing
+                            result = process_secure_document(uploaded_file)
+
+                            if result.get('success', False):
+                                # Mark as processed
+                                st.session_state[f"processed_{uploaded_file.name}"] = True
+
+                                # Add success message to chat history
+                                success_message = f"📄 **Document Uploaded**: {uploaded_file.name}\n\n✅ Successfully processed and added to my knowledge. You can now ask me questions about this document!"
+
+                                # Add to chat history
+                                if 'chat_history' not in st.session_state:
+                                    st.session_state.chat_history = []
+
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": success_message,
+                                    "document_upload": True,
+                                    "filename": uploaded_file.name
+                                })
+
+                                # Show success notification
+                                st.success(f"✅ {uploaded_file.name} uploaded and processed successfully!")
+
+                                # Auto-generate discussion prompt with intelligent suggestions
+                                discussion_prompt = f"I just uploaded '{uploaded_file.name}'. Can you give me a brief summary of what this document contains?"
+
+                                # Add discussion prompt to chat
+                                st.session_state.chat_history.append({
+                                    "role": "user",
+                                    "content": discussion_prompt,
+                                    "auto_generated": True
+                                })
+
+                                # Generate response about the document
+                                with st.spinner("🤔 SAM is analyzing your document..."):
+                                    try:
+                                        # Use existing chat response generation
+                                        response = generate_secure_chat_response(discussion_prompt)
+
+                                        st.session_state.chat_history.append({
+                                            "role": "assistant",
+                                            "content": response,
+                                            "document_analysis": True,
+                                            "filename": uploaded_file.name
+                                        })
+
+                                        # Add helpful suggestions as a follow-up message
+                                        suggestions = generate_document_suggestions(uploaded_file.name, uploaded_file.type)
+                                        st.session_state.chat_history.append({
+                                            "role": "assistant",
+                                            "content": suggestions,
+                                            "document_suggestions": True,
+                                            "filename": uploaded_file.name
+                                        })
+
+                                    except Exception as e:
+                                        logger.error(f"Error generating document analysis: {e}")
+                                        fallback_response = f"I've successfully processed '{uploaded_file.name}' and it's now part of my knowledge base. Feel free to ask me any questions about its contents!"
+
+                                        st.session_state.chat_history.append({
+                                            "role": "assistant",
+                                            "content": fallback_response,
+                                            "document_analysis": True,
+                                            "filename": uploaded_file.name
+                                        })
+
+                                # Trigger rerun to show new messages
+                                st.rerun()
+
+                            else:
+                                st.error(f"❌ Failed to process {uploaded_file.name}: {result.get('error', 'Unknown error')}")
+
+                        except Exception as e:
+                            logger.error(f"Error processing uploaded file {uploaded_file.name}: {e}")
+                            st.error(f"❌ Error processing {uploaded_file.name}: {e}")
+
+def generate_document_suggestions(filename: str, file_type: str) -> str:
+    """Generate helpful suggestions for document interaction based on file type."""
+    suggestions = []
+
+    # Base suggestions for all documents
+    base_suggestions = [
+        f"What are the main topics covered in {filename}?",
+        f"Can you summarize the key points from {filename}?",
+        f"What are the most important insights from {filename}?"
+    ]
+
+    # Type-specific suggestions
+    if file_type == "application/pdf" or filename.lower().endswith('.pdf'):
+        suggestions.extend([
+            f"What are the main sections or chapters in {filename}?",
+            f"Are there any charts, graphs, or data visualizations in {filename}?",
+            f"What conclusions or recommendations does {filename} make?"
+        ])
+    elif file_type == "text/plain" or filename.lower().endswith(('.txt', '.md')):
+        suggestions.extend([
+            f"What is the writing style or format of {filename}?",
+            f"Are there any action items or next steps mentioned in {filename}?",
+            f"What questions does {filename} raise or answer?"
+        ])
+    elif filename.lower().endswith('.docx'):
+        suggestions.extend([
+            f"What is the document structure of {filename}?",
+            f"Are there any tables or lists in {filename}?",
+            f"What is the purpose or objective of {filename}?"
+        ])
+
+    # Combine base and specific suggestions
+    all_suggestions = base_suggestions + suggestions
+
+    # Format as a helpful response
+    suggestion_text = "Here are some questions you might want to ask about this document:\n\n"
+    for i, suggestion in enumerate(all_suggestions[:6], 1):  # Limit to 6 suggestions
+        suggestion_text += f"{i}. {suggestion}\n"
+
+    suggestion_text += f"\nFeel free to ask any other questions about {filename} - I've processed its content and can help you understand, analyze, or extract information from it!"
+
+    return suggestion_text
+
+def generate_secure_chat_response(prompt: str) -> str:
+    """Generate a secure chat response for document analysis and general queries."""
+    try:
+        # Use existing secure response generation with local knowledge preference
+        return generate_secure_response(prompt, force_local=True)
+    except Exception as e:
+        logger.error(f"Error generating secure chat response: {e}")
+        return f"I apologize, but I encountered an error while processing your request. Please try again or rephrase your question."
+
 def render_chat_interface():
     """Render the chat interface."""
     st.header("💬 Secure Chat")
 
     # Render TPV status if available
     render_tpv_status()
+
+    # NEW: Drag & Drop Document Upload Integration
+    render_chat_document_upload()
 
     # Simple greeting (removed extra feature text as requested)
     if len(st.session_state.get('chat_history', [])) == 0:
@@ -739,8 +1077,52 @@ def render_chat_interface():
     # Display chat history
     for i, message in enumerate(st.session_state.chat_history):
         with st.chat_message(message["role"]):
+            # Check if this is a document upload message that needs special rendering
+            if message.get("document_upload"):
+                # Special formatting for document upload success messages
+                st.success(f"📄 **Document Uploaded**: {message.get('filename', 'Unknown')}")
+                st.markdown("✅ Successfully processed and added to my knowledge. You can now ask me questions about this document!")
+
+                # Add quick action buttons for document discussion
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button(f"📋 Summarize", key=f"summarize_{i}_{message.get('filename', 'doc')}"):
+                        summary_prompt = f"Please provide a comprehensive summary of the document '{message.get('filename', 'the uploaded document')}'."
+                        st.session_state.chat_history.append({"role": "user", "content": summary_prompt})
+                        st.rerun()
+
+                with col2:
+                    if st.button(f"❓ Key Questions", key=f"questions_{i}_{message.get('filename', 'doc')}"):
+                        questions_prompt = f"What are the most important questions I should ask about '{message.get('filename', 'the uploaded document')}'?"
+                        st.session_state.chat_history.append({"role": "user", "content": questions_prompt})
+                        st.rerun()
+
+                with col3:
+                    if st.button(f"🔍 Deep Analysis", key=f"analysis_{i}_{message.get('filename', 'doc')}"):
+                        analysis_prompt = f"Please provide a detailed analysis of '{message.get('filename', 'the uploaded document')}', including key insights, implications, and recommendations."
+                        st.session_state.chat_history.append({"role": "user", "content": analysis_prompt})
+                        st.rerun()
+
+            # Check if this is a document analysis response
+            elif message.get("document_analysis"):
+                # Special formatting for document analysis responses
+                st.info(f"📊 **Document Analysis**: {message.get('filename', 'Unknown')}")
+                st.markdown(message["content"])
+
+            # Check if this is a document suggestions message
+            elif message.get("document_suggestions"):
+                # Special formatting for document suggestions
+                st.success(f"💡 **Suggested Questions**: {message.get('filename', 'Unknown')}")
+                st.markdown(message["content"])
+
+            # Check if this is an auto-generated user message
+            elif message.get("auto_generated") and message["role"] == "user":
+                # Special formatting for auto-generated prompts
+                st.info("🤖 **Auto-generated prompt based on your document upload:**")
+                st.markdown(message["content"])
+
             # Check if this is a table analysis result that needs special rendering
-            if (message["role"] == "assistant" and
+            elif (message["role"] == "assistant" and
                 "Table Analysis & Code Generation Complete!" in message["content"]):
                 render_table_analysis_result(message["content"])
             else:
@@ -778,7 +1160,10 @@ def render_chat_interface():
             # Add feedback system for all assistant messages (preserving 100% of functionality)
             elif message["role"] == "assistant":
                 render_feedback_system(i)
-    
+
+    # Document upload reminder
+    st.markdown("💡 **Tip**: Upload documents using the '📁 Upload Documents to Chat' section above for instant analysis and discussion!")
+
     # Chat input
     if prompt := st.chat_input("Ask SAM anything..."):
         # Add user message to chat history
@@ -1358,24 +1743,36 @@ def render_integrated_memory_control_center():
         st.markdown("---")
         st.subheader("🎛️ Navigation")
 
-        # Navigation menu
+        # Navigation menu with override support for Messages from SAM
+        default_options = [
+            "💬 Enhanced Chat",
+            "📖 Document Library",
+            "🔍 Memory Browser",
+            "✏️ Memory Editor",
+            "🕸️ Memory Graph",
+            "💻 Command Interface",
+            "📁 Bulk Ingestion",
+            "🔑 API Key Manager",
+            "🧠🎨 Dream Canvas",
+            "🏆 Memory Ranking",
+            "📊 Memory Analytics",
+            "🧠⚡ SLP Analytics",
+            "🔍 Vetting Queue"
+        ]
+
+        # Handle page override from Messages from SAM alerts
+        default_index = 0
+        if st.session_state.get('memory_page_override'):
+            override_page = st.session_state.memory_page_override
+            if override_page in default_options:
+                default_index = default_options.index(override_page)
+            # Clear the override after using it
+            del st.session_state.memory_page_override
+
         memory_page = st.selectbox(
             "Select Feature",
-            options=[
-                "💬 Enhanced Chat",
-                "📖 Document Library",
-                "🔍 Memory Browser",
-                "✏️ Memory Editor",
-                "🕸️ Memory Graph",
-                "💻 Command Interface",
-                "📁 Bulk Ingestion",
-                "🔑 API Key Manager",
-                "🧠🎨 Dream Canvas",
-                "🏆 Memory Ranking",
-                "📊 Memory Analytics",
-                "🧠⚡ SLP Analytics"
-            ],
-            index=0,
+            options=default_options,
+            index=default_index,
             help="Choose a Memory Control Center feature to access"
         )
 
@@ -1388,10 +1785,17 @@ def render_integrated_memory_control_center():
             # Quick stats
             try:
                 stats = memory_store.get_memory_stats()
-                st.metric("Total Memories", stats['total_memories'])
-                st.metric("Storage Size", f"{stats['total_size_mb']:.1f} MB")
+                # Use .get() with fallback values to prevent KeyError
+                total_memories = stats.get('total_memories', len(getattr(memory_store, 'memory_chunks', {})))
+                total_size_mb = stats.get('total_size_mb', 0.0)
+
+                st.metric("Total Memories", total_memories)
+                st.metric("Storage Size", f"{total_size_mb:.1f} MB")
             except Exception as e:
                 st.error(f"Error loading stats: {e}")
+                # Provide fallback metrics
+                st.metric("Total Memories", "N/A")
+                st.metric("Storage Size", "N/A")
 
         # Render selected page
         if memory_page == "💬 Enhanced Chat":
@@ -1418,6 +1822,8 @@ def render_integrated_memory_control_center():
             render_memory_analytics_integrated()
         elif memory_page == "🧠⚡ SLP Analytics":
             render_slp_analytics_integrated()
+        elif memory_page == "🔍 Vetting Queue":
+            render_vetting_queue_integrated()
 
     except ImportError as e:
         st.error(f"❌ Memory Control Center components not available: {e}")
@@ -1531,19 +1937,32 @@ def render_basic_memory_interface():
     st.subheader("📊 Memory Statistics")
     try:
         stats = st.session_state.secure_memory_store.get_memory_stats()
-        
+
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Total Memories", stats.get('total_memories', 0))
+            # Enhanced fallback for total_memories
+            total_memories = stats.get('total_memories',
+                                     len(getattr(st.session_state.secure_memory_store, 'memory_chunks', {})))
+            st.metric("Total Memories", total_memories)
         with col2:
-            st.metric("Store Type", stats.get('store_type', 'Unknown'))
+            st.metric("Store Type", stats.get('store_type', 'Secure'))
         with col3:
             st.metric("Storage Size", f"{stats.get('total_size_mb', 0):.1f} MB")
         with col4:
             st.metric("Embedding Dim", stats.get('embedding_dimension', 0))
-            
+
     except Exception as e:
         st.warning(f"Could not load memory statistics: {e}")
+        # Provide fallback interface
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Memories", "N/A")
+        with col2:
+            st.metric("Store Type", "Secure")
+        with col3:
+            st.metric("Storage Size", "N/A")
+        with col4:
+            st.metric("Embedding Dim", "N/A")
 
 def render_slp_analytics_integrated():
     """Render SLP analytics dashboard integrated into Memory Control Center."""
@@ -2418,7 +2837,7 @@ def submit_secure_feedback(message_index: int, feedback_type: str, correction_te
             'message_index': message_index,
             'feedback_type': feedback_type,
             'correction_text': correction_text,
-            'timestamp': time.time(),
+            'timestamp': datetime.now().isoformat(),  # Use ISO format string instead of Unix timestamp
             'interface': 'secure_streamlit',
             # Enhanced data for learning integration
             'original_query': original_query,
@@ -6273,21 +6692,22 @@ def search_unified_memory(query: str, max_results: int = 5) -> list:
         try:
             if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
                 # Use enhanced search if available for better document retrieval
+                # Fix: Use MemoryType enum values instead of strings to prevent API errors
+                from memory.memory_vectorstore import MemoryType
                 if hasattr(st.session_state.secure_memory_store, 'enhanced_search_memories'):
                     secure_results = st.session_state.secure_memory_store.enhanced_search_memories(
                         query=query,
                         max_results=max_results * 2,  # Get more candidates for better results
-                        memory_types=['document', 'consolidated'],  # Focus on documents
+                        memory_types=[MemoryType.DOCUMENT],  # Focus on documents - using enum
                         tags=['uploaded', 'document', 'whitepaper', 'pdf']  # Target uploaded content
                     )
                     logger.info(f"📄 Enhanced secure search returned {len(secure_results)} document results")
                 else:
-                    # Fallback to regular search with document-specific parameters
                     secure_results = st.session_state.secure_memory_store.search_memories(
                         query=query,
-                        max_results=max_results * 2,
-                        memory_types=['document'],
-                        tags=['uploaded', 'document']
+                        max_results=max_results * 2,  # Get more candidates for better results
+                        memory_types=[MemoryType.DOCUMENT],  # Focus on documents - using enum
+                        tags=['uploaded', 'document', 'whitepaper', 'pdf']  # Target uploaded content
                     )
                     logger.info(f"📄 Regular secure search returned {len(secure_results)} document results")
 
@@ -6311,10 +6731,11 @@ def search_unified_memory(query: str, max_results: int = 5) -> list:
 
             # Use enhanced search if available
             if hasattr(web_store, 'enhanced_search_memories'):
+                # Fix: Use MemoryType enum values instead of strings
                 web_results = web_store.enhanced_search_memories(
                     query=query,
                     max_results=max_results,
-                    memory_types=['document', 'consolidated'],
+                    memory_types=[MemoryType.DOCUMENT],  # Use enum instead of strings
                     tags=['consolidated', 'knowledge']
                 )
                 logger.info(f"🌐 Enhanced web knowledge search returned {len(web_results)} results")
@@ -8217,13 +8638,31 @@ def render_memory_ranking_integrated():
                             st.markdown(f"**Type:** {memory.memory_type.value}")
 
                             if hasattr(memory, 'timestamp') and memory.timestamp:
-                                st.markdown(f"**📅 Created:** {memory.timestamp[:10]}")
+                                # Handle both string and integer timestamps
+                                if isinstance(memory.timestamp, str):
+                                    timestamp_display = memory.timestamp[:10]
+                                elif isinstance(memory.timestamp, (int, float)):
+                                    # Convert Unix timestamp to readable format
+                                    from datetime import datetime
+                                    timestamp_display = datetime.fromtimestamp(memory.timestamp).strftime('%Y-%m-%d')
+                                else:
+                                    timestamp_display = str(memory.timestamp)
+                                st.markdown(f"**📅 Created:** {timestamp_display}")
 
                             if hasattr(memory, 'access_count'):
                                 st.markdown(f"**👁️ Access Count:** {memory.access_count}")
 
                             if hasattr(memory, 'last_accessed') and memory.last_accessed:
-                                st.markdown(f"**🕒 Last Accessed:** {memory.last_accessed[:10]}")
+                                # Handle both string and integer timestamps
+                                if isinstance(memory.last_accessed, str):
+                                    last_accessed_display = memory.last_accessed[:10]
+                                elif isinstance(memory.last_accessed, (int, float)):
+                                    # Convert Unix timestamp to readable format
+                                    from datetime import datetime
+                                    last_accessed_display = datetime.fromtimestamp(memory.last_accessed).strftime('%Y-%m-%d')
+                                else:
+                                    last_accessed_display = str(memory.last_accessed)
+                                st.markdown(f"**🕒 Last Accessed:** {last_accessed_display}")
 
                 # Enhanced ranking analytics (preserving 100% of story)
                 st.subheader("📈 Ranking Analytics")
@@ -9474,6 +9913,252 @@ def render_dream_canvas_integrated():
 
     except Exception as e:
         st.error(f"❌ Error loading Dream Canvas: {e}")
+        import traceback
+        st.error(f"Details: {traceback.format_exc()}")
+
+def render_vetting_queue_integrated():
+    """Render integrated vetting queue interface for research paper review."""
+    st.subheader("🔍 Vetting Queue")
+    st.markdown("*Review and approve downloaded research papers*")
+
+    try:
+        from sam.state.vetting_queue import get_vetting_queue_manager, VettingStatus
+        from sam.vetting.analyzer import get_vetting_analyzer
+
+        vetting_manager = get_vetting_queue_manager()
+        vetting_analyzer = get_vetting_analyzer()
+
+        # Get queue summary
+        summary = vetting_manager.get_queue_summary()
+
+        # Display summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            pending_count = summary.get('requires_manual_review', 0)
+            if pending_count > 0:
+                st.metric("🔍 Pending Review", pending_count, delta=None, delta_color="normal")
+            else:
+                st.metric("🔍 Pending Review", pending_count)
+
+        with col2:
+            approved_count = summary.get('auto_approved', 0) + summary.get('manually_approved', 0)
+            st.metric("✅ Approved", approved_count)
+
+        with col3:
+            rejected_count = summary.get('rejected', 0)
+            st.metric("❌ Rejected", rejected_count)
+
+        with col4:
+            total_count = summary.get('total', 0)
+            st.metric("📊 Total", total_count)
+
+        st.markdown("---")
+
+        # Get files requiring manual review
+        pending_files = vetting_manager.get_pending_review_files()
+
+        if pending_files:
+            st.markdown("### 📋 Files Awaiting Your Review")
+
+            for i, entry in enumerate(pending_files):
+                with st.expander(f"📄 **{entry.original_filename}** - Review Required", expanded=i == 0):
+
+                    # File information
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown("**📄 File Information:**")
+                        st.markdown(f"- **Original Insight:** {entry.original_insight_text[:100]}...")
+                        st.markdown(f"- **Created:** {entry.created_at}")
+                        st.markdown(f"- **Status:** {entry.status.value}")
+
+                        # Paper metadata if available
+                        if entry.paper_metadata:
+                            metadata = entry.paper_metadata
+                            st.markdown(f"- **Title:** {metadata.get('title', 'N/A')}")
+                            st.markdown(f"- **Authors:** {', '.join(metadata.get('authors', [])[:3])}")
+                            if len(metadata.get('authors', [])) > 3:
+                                st.markdown(f"  *...and {len(metadata.get('authors', [])) - 3} more*")
+
+                    with col2:
+                        if entry.scores:
+                            st.markdown("**📊 Analysis Scores:**")
+
+                            # Security risk (inverted for display)
+                            security_score = 1.0 - entry.scores.security_risk_score
+                            st.progress(security_score, text=f"🛡️ Security: {security_score:.1%}")
+
+                            # Relevance
+                            st.progress(entry.scores.relevance_score, text=f"🎯 Relevance: {entry.scores.relevance_score:.1%}")
+
+                            # Credibility
+                            st.progress(entry.scores.credibility_score, text=f"⭐ Credibility: {entry.scores.credibility_score:.1%}")
+
+                            # Overall
+                            st.progress(entry.scores.overall_score, text=f"📈 Overall: {entry.scores.overall_score:.1%}")
+                        else:
+                            st.warning("⚠️ Analysis scores not available")
+
+                    # Paper summary if available
+                    if entry.paper_metadata and entry.paper_metadata.get('summary'):
+                        st.markdown("**📝 Paper Summary:**")
+                        summary_text = entry.paper_metadata['summary']
+                        if len(summary_text) > 300:
+                            st.markdown(f"{summary_text[:300]}...")
+                        else:
+                            st.markdown(summary_text)
+
+                    # Action buttons
+                    st.markdown("---")
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        if st.button(f"✅ Approve", key=f"approve_{entry.file_id}", type="primary"):
+                            success = vetting_manager.approve_file(
+                                entry.file_id,
+                                "manual_user",
+                                "Manually approved via vetting queue interface"
+                            )
+                            if success:
+                                st.success("✅ Paper approved!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to approve paper")
+
+                    with col2:
+                        if st.button(f"❌ Reject", key=f"reject_{entry.file_id}"):
+                            # Show rejection reason input
+                            st.session_state[f"show_reject_reason_{entry.file_id}"] = True
+
+                    with col3:
+                        if st.button(f"📄 View File", key=f"view_{entry.file_id}"):
+                            st.info(f"📁 File location: {entry.quarantine_path}")
+
+                    # Handle rejection reason input
+                    if st.session_state.get(f"show_reject_reason_{entry.file_id}", False):
+                        st.markdown("**Rejection Reason:**")
+                        reason = st.text_area(
+                            "Why are you rejecting this paper?",
+                            key=f"reject_reason_{entry.file_id}",
+                            placeholder="e.g., Not relevant to current research, Security concerns, Low quality..."
+                        )
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button(f"Confirm Rejection", key=f"confirm_reject_{entry.file_id}", type="secondary"):
+                                if reason.strip():
+                                    success = vetting_manager.reject_file(
+                                        entry.file_id,
+                                        reason.strip(),
+                                        "manual_user"
+                                    )
+                                    if success:
+                                        st.success("❌ Paper rejected!")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to reject paper")
+                                else:
+                                    st.error("Please provide a rejection reason")
+
+                        with col2:
+                            if st.button(f"Cancel", key=f"cancel_reject_{entry.file_id}"):
+                                del st.session_state[f"show_reject_reason_{entry.file_id}"]
+                                st.rerun()
+
+        else:
+            st.success("🎉 **All caught up!** No papers are currently awaiting review.")
+            st.info("💡 **Tip:** Papers are automatically downloaded and analyzed when new insights are discovered. Check the Discovery Cycle in the Bulk Ingestion tab to trigger research.")
+
+        # Show approved files section
+        st.markdown("---")
+        st.markdown("### ✅ Recently Approved Papers")
+
+        approved_files = vetting_manager.get_approved_files()
+        if approved_files:
+            # Show last 5 approved files
+            for entry in approved_files[-5:]:
+                with st.expander(f"✅ **{entry.original_filename}** - {entry.status.value}", expanded=False):
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown(f"**Approved:** {entry.approved_at}")
+                        st.markdown(f"**Approved by:** {entry.approved_by}")
+                        if entry.scores:
+                            st.markdown(f"**Overall Score:** {entry.scores.overall_score:.1%}")
+
+                    with col2:
+                        if entry.paper_metadata:
+                            st.markdown(f"**Title:** {entry.paper_metadata.get('title', 'N/A')}")
+                            st.markdown(f"**Authors:** {', '.join(entry.paper_metadata.get('authors', [])[:2])}")
+        else:
+            st.info("📝 No approved papers yet.")
+
+        # Auto-approval settings
+        st.markdown("---")
+        st.markdown("### ⚙️ Auto-Approval Settings")
+
+        with st.expander("🔧 Configure Auto-Approval Thresholds", expanded=False):
+            current_thresholds = vetting_manager.get_auto_approval_thresholds()
+
+            st.markdown("**Adjust the thresholds for automatic paper approval:**")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                security_max = st.slider(
+                    "🛡️ Max Security Risk",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=current_thresholds['security_risk_max'],
+                    step=0.05,
+                    help="Maximum security risk score for auto-approval"
+                )
+
+                relevance_min = st.slider(
+                    "🎯 Min Relevance Score",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=current_thresholds['relevance_min'],
+                    step=0.05,
+                    help="Minimum relevance score for auto-approval"
+                )
+
+            with col2:
+                credibility_min = st.slider(
+                    "⭐ Min Credibility Score",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=current_thresholds['credibility_min'],
+                    step=0.05,
+                    help="Minimum credibility score for auto-approval"
+                )
+
+                overall_min = st.slider(
+                    "📈 Min Overall Score",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=current_thresholds['overall_min'],
+                    step=0.05,
+                    help="Minimum overall score for auto-approval"
+                )
+
+            if st.button("💾 Update Thresholds", type="primary"):
+                new_thresholds = {
+                    'security_risk_max': security_max,
+                    'relevance_min': relevance_min,
+                    'credibility_min': credibility_min,
+                    'overall_min': overall_min
+                }
+                vetting_manager.update_auto_approval_thresholds(new_thresholds)
+                st.success("✅ Auto-approval thresholds updated!")
+                st.rerun()
+
+    except ImportError as e:
+        st.error(f"❌ Vetting queue components not available: {e}")
+        st.info("💡 Make sure all Task 27 components are properly installed.")
+    except Exception as e:
+        st.error(f"❌ Error loading vetting queue: {e}")
         import traceback
         st.error(f"Details: {traceback.format_exc()}")
 

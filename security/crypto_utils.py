@@ -1,206 +1,362 @@
 """
-SAM Secure Enclave - Core Cryptographic Utilities
+Cryptographic Utilities for SAM Security Module
 
-Implements enterprise-grade encryption using AES-256-GCM with authenticated encryption.
-Provides secure data encryption/decryption for SAM's knowledge base.
-
-Security Features:
-- AES-256-GCM authenticated encryption
-- Random nonce generation for each encryption
-- Secure memory handling
-- Comprehensive error handling
+Provides AES-256-GCM authenticated encryption with secure key derivation
+using Argon2id. Implements enterprise-grade cryptographic standards.
 
 Author: SAM Development Team
-Version: 1.0.0
+Version: 2.0.0
 """
 
 import os
-import json
 import secrets
 import logging
-from typing import Dict, Any, Optional
+from typing import Optional, Tuple, Dict, Any
+from dataclasses import dataclass
+from datetime import datetime
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidTag
 
-# Configure logging
+try:
+    import argon2
+    ARGON2_AVAILABLE = True
+except ImportError:
+    ARGON2_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
-class SecurityError(Exception):
-    """Base exception for security-related errors"""
-    pass
+@dataclass
+class EncryptionResult:
+    """Result of encryption operation."""
+    ciphertext: bytes
+    nonce: bytes
+    tag: bytes
+    metadata: Dict[str, Any]
 
-class EncryptionError(SecurityError):
-    """Raised when encryption operations fail"""
-    pass
+@dataclass
+class DecryptionResult:
+    """Result of decryption operation."""
+    plaintext: bytes
+    metadata: Dict[str, Any]
 
-class DecryptionError(SecurityError):
-    """Raised when decryption operations fail"""
-    pass
-
-class SAMCrypto:
+class CryptoManager:
     """
-    Core cryptographic engine for SAM Secure Enclave.
+    Enterprise-grade cryptographic manager for SAM.
     
-    Provides AES-256-GCM authenticated encryption with secure key management.
-    All encryption operations use random nonces and include authentication tags
-    to prevent tampering.
+    Features:
+    - AES-256-GCM authenticated encryption
+    - Argon2id key derivation (fallback to PBKDF2-SHA256)
+    - Secure random generation
+    - Session key management
+    - Metadata protection
     """
     
     def __init__(self):
         self.session_key: Optional[bytes] = None
-        self._aes_gcm: Optional[AESGCM] = None
+        self.aesgcm: Optional[AESGCM] = None
+        self.logger = logging.getLogger(f"{__name__}.CryptoManager")
         
+        # Encryption parameters
+        self.key_length = 32  # 256 bits
+        self.nonce_length = 12  # 96 bits for GCM
+        self.salt_length = 16  # 128 bits
+        
+        # Argon2id parameters (enterprise grade)
+        self.argon2_params = {
+            'time_cost': 3,      # Number of iterations
+            'memory_cost': 65536,  # Memory usage in KB (64 MB)
+            'parallelism': 4,    # Number of parallel threads
+            'hash_len': 32,      # Output length in bytes
+            'salt_len': 16       # Salt length in bytes
+        }
+        
+        # PBKDF2 parameters (fallback)
+        self.pbkdf2_iterations = 100000
+        
+        self.logger.info("CryptoManager initialized")
+    
     def set_session_key(self, key: bytes) -> None:
         """
         Set the session encryption key.
         
         Args:
-            key: 256-bit (32-byte) encryption key
-            
-        Raises:
-            SecurityError: If key is invalid
+            key: 32-byte encryption key
         """
-        if not isinstance(key, bytes):
-            raise SecurityError("Session key must be bytes")
-        
-        if len(key) != 32:
-            raise SecurityError("Session key must be 256 bits (32 bytes)")
+        if len(key) != self.key_length:
+            raise ValueError(f"Key must be exactly {self.key_length} bytes")
         
         self.session_key = key
-        self._aes_gcm = AESGCM(key)
-        logger.info("Session key set successfully")
+        self.aesgcm = AESGCM(key)
+        self.logger.info("Session key set and AES-GCM initialized")
     
     def clear_session_key(self) -> None:
-        """
-        Securely clear the session key from memory.
-        """
+        """Clear the session key from memory."""
         if self.session_key:
-            # Overwrite key memory with random data
-            self.session_key = secrets.token_bytes(32)
-            self.session_key = None
+            # Overwrite key in memory (best effort)
+            self.session_key = b'\x00' * len(self.session_key)
         
-        self._aes_gcm = None
-        logger.info("Session key cleared from memory")
+        self.session_key = None
+        self.aesgcm = None
+        self.logger.info("Session key cleared from memory")
     
-    def is_unlocked(self) -> bool:
+    def derive_key_from_password(self, password: str, salt: Optional[bytes] = None) -> Tuple[bytes, bytes]:
         """
-        Check if the crypto engine is unlocked (has a session key).
-        
-        Returns:
-            True if session key is available, False otherwise
-        """
-        return self.session_key is not None
-    
-    def encrypt_data(self, plaintext: str) -> Dict[str, str]:
-        """
-        Encrypt plaintext data using AES-256-GCM.
+        Derive encryption key from password using Argon2id or PBKDF2.
         
         Args:
-            plaintext: String data to encrypt
+            password: Master password
+            salt: Optional salt (generated if not provided)
             
         Returns:
-            Dictionary containing encrypted data and metadata:
-            {
-                'ciphertext': hex-encoded encrypted data,
-                'nonce': hex-encoded nonce,
-                'algorithm': 'AES-256-GCM',
-                'version': '1.0'
-            }
-            
-        Raises:
-            SecurityError: If no session key is available
-            EncryptionError: If encryption fails
+            Tuple of (derived_key, salt)
         """
-        if not self.is_unlocked():
-            raise SecurityError("No session key available - application is locked")
+        if salt is None:
+            salt = secrets.token_bytes(self.salt_length)
         
-        try:
-            # Generate random 96-bit nonce for GCM
-            nonce = os.urandom(12)
-            
-            # Encrypt with authenticated encryption
-            ciphertext = self._aes_gcm.encrypt(nonce, plaintext.encode('utf-8'), None)
-            
-            return {
-                'ciphertext': ciphertext.hex(),
-                'nonce': nonce.hex(),
-                'algorithm': 'AES-256-GCM',
-                'version': '1.0'
-            }
-            
-        except Exception as e:
-            logger.error(f"Encryption failed: {e}")
-            raise EncryptionError(f"Failed to encrypt data: {e}")
+        if ARGON2_AVAILABLE:
+            return self._derive_key_argon2(password, salt), salt
+        else:
+            self.logger.warning("Argon2 not available, falling back to PBKDF2-SHA256")
+            return self._derive_key_pbkdf2(password, salt), salt
     
-    def decrypt_data(self, encrypted_data: Dict[str, str]) -> str:
+    def _derive_key_argon2(self, password: str, salt: bytes) -> bytes:
+        """Derive key using Argon2id."""
+        ph = argon2.PasswordHasher(
+            time_cost=self.argon2_params['time_cost'],
+            memory_cost=self.argon2_params['memory_cost'],
+            parallelism=self.argon2_params['parallelism'],
+            hash_len=self.argon2_params['hash_len'],
+            salt_len=self.argon2_params['salt_len']
+        )
+        
+        # Use low-level API for key derivation
+        return argon2.low_level.hash_secret_raw(
+            secret=password.encode('utf-8'),
+            salt=salt,
+            time_cost=self.argon2_params['time_cost'],
+            memory_cost=self.argon2_params['memory_cost'],
+            parallelism=self.argon2_params['parallelism'],
+            hash_len=self.argon2_params['hash_len'],
+            type=argon2.Type.ID
+        )
+    
+    def _derive_key_pbkdf2(self, password: str, salt: bytes) -> bytes:
+        """Derive key using PBKDF2-SHA256 (fallback)."""
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=self.key_length,
+            salt=salt,
+            iterations=self.pbkdf2_iterations,
+        )
+        return kdf.derive(password.encode('utf-8'))
+    
+    def encrypt(self, plaintext: str, associated_data: Optional[str] = None) -> EncryptionResult:
         """
-        Decrypt data using AES-256-GCM.
+        Encrypt plaintext using AES-256-GCM.
         
         Args:
-            encrypted_data: Dictionary containing encrypted data and metadata
+            plaintext: Text to encrypt
+            associated_data: Optional associated data for authentication
             
         Returns:
-            Decrypted plaintext string
-            
-        Raises:
-            SecurityError: If no session key is available
-            DecryptionError: If decryption fails or data is tampered
+            EncryptionResult with ciphertext, nonce, and metadata
         """
-        if not self.is_unlocked():
-            raise SecurityError("No session key available - application is locked")
+        if not self.aesgcm:
+            raise RuntimeError("No session key set. Call set_session_key() first.")
+        
+        # Generate random nonce
+        nonce = secrets.token_bytes(self.nonce_length)
+        
+        # Convert to bytes
+        plaintext_bytes = plaintext.encode('utf-8')
+        associated_data_bytes = associated_data.encode('utf-8') if associated_data else None
+        
+        # Encrypt with authentication
+        ciphertext = self.aesgcm.encrypt(nonce, plaintext_bytes, associated_data_bytes)
+        
+        # Extract tag (last 16 bytes)
+        tag = ciphertext[-16:]
+        ciphertext_only = ciphertext[:-16]
+        
+        metadata = {
+            'algorithm': 'AES-256-GCM',
+            'nonce_length': len(nonce),
+            'tag_length': len(tag),
+            'encrypted_at': datetime.now().isoformat(),
+            'has_associated_data': associated_data is not None
+        }
+        
+        self.logger.debug(f"Encrypted {len(plaintext_bytes)} bytes")
+        
+        return EncryptionResult(
+            ciphertext=ciphertext_only,
+            nonce=nonce,
+            tag=tag,
+            metadata=metadata
+        )
+    
+    def decrypt(self, ciphertext: bytes, nonce: bytes, tag: bytes, 
+                associated_data: Optional[str] = None) -> DecryptionResult:
+        """
+        Decrypt ciphertext using AES-256-GCM.
+        
+        Args:
+            ciphertext: Encrypted data
+            nonce: Nonce used for encryption
+            tag: Authentication tag
+            associated_data: Optional associated data for authentication
+            
+        Returns:
+            DecryptionResult with plaintext and metadata
+        """
+        if not self.aesgcm:
+            raise RuntimeError("No session key set. Call set_session_key() first.")
         
         try:
-            # Validate encrypted data format
-            required_fields = ['ciphertext', 'nonce', 'algorithm']
-            for field in required_fields:
-                if field not in encrypted_data:
-                    raise DecryptionError(f"Missing required field: {field}")
+            # Reconstruct full ciphertext with tag
+            full_ciphertext = ciphertext + tag
             
-            # Verify algorithm
-            if encrypted_data['algorithm'] != 'AES-256-GCM':
-                raise DecryptionError(f"Unsupported algorithm: {encrypted_data['algorithm']}")
+            # Convert associated data
+            associated_data_bytes = associated_data.encode('utf-8') if associated_data else None
             
-            # Extract ciphertext and nonce
-            ciphertext = bytes.fromhex(encrypted_data['ciphertext'])
-            nonce = bytes.fromhex(encrypted_data['nonce'])
+            # Decrypt and verify
+            plaintext_bytes = self.aesgcm.decrypt(nonce, full_ciphertext, associated_data_bytes)
             
-            # Decrypt and authenticate
-            plaintext_bytes = self._aes_gcm.decrypt(nonce, ciphertext, None)
+            metadata = {
+                'algorithm': 'AES-256-GCM',
+                'decrypted_at': datetime.now().isoformat(),
+                'plaintext_length': len(plaintext_bytes)
+            }
             
-            return plaintext_bytes.decode('utf-8')
+            self.logger.debug(f"Decrypted {len(plaintext_bytes)} bytes")
+            
+            return DecryptionResult(
+                plaintext=plaintext_bytes,
+                metadata=metadata
+            )
             
         except InvalidTag:
-            logger.error("Decryption failed: Authentication tag verification failed")
-            raise DecryptionError("Data integrity check failed - data may be corrupted or tampered")
-        except ValueError as e:
-            logger.error(f"Decryption failed: Invalid data format - {e}")
-            raise DecryptionError(f"Invalid encrypted data format: {e}")
+            self.logger.error("Decryption failed: Invalid authentication tag")
+            raise ValueError("Decryption failed: Data may be corrupted or tampered with")
         except Exception as e:
-            logger.error(f"Decryption failed: {e}")
-            raise DecryptionError(f"Failed to decrypt data: {e}")
+            self.logger.error(f"Decryption failed: {e}")
+            raise ValueError(f"Decryption failed: {e}")
     
-    def encrypt_json(self, data: Any) -> Dict[str, str]:
+    def encrypt_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Encrypt JSON-serializable data.
+        Encrypt a dictionary, preserving structure for searchable fields.
         
         Args:
-            data: Any JSON-serializable object
+            data: Dictionary to encrypt
             
         Returns:
-            Encrypted data dictionary
+            Dictionary with encrypted sensitive fields
         """
-        json_string = json.dumps(data, ensure_ascii=False)
-        return self.encrypt_data(json_string)
+        if not self.aesgcm:
+            raise RuntimeError("No session key set. Call set_session_key() first.")
+        
+        # Define which fields should remain searchable (not encrypted)
+        searchable_fields = {
+            'id', 'timestamp', 'source_type', 'content_type', 
+            'tags', 'importance_score', 'memory_type'
+        }
+        
+        encrypted_data = {}
+        
+        for key, value in data.items():
+            if key in searchable_fields:
+                # Keep searchable fields as plaintext
+                encrypted_data[key] = value
+            else:
+                # Encrypt sensitive fields
+                if isinstance(value, (str, int, float, bool)):
+                    str_value = str(value)
+                    result = self.encrypt(str_value, associated_data=key)
+                    
+                    encrypted_data[f"{key}_encrypted"] = {
+                        'ciphertext': result.ciphertext.hex(),
+                        'nonce': result.nonce.hex(),
+                        'tag': result.tag.hex(),
+                        'metadata': result.metadata
+                    }
+                else:
+                    # For complex objects, convert to string first
+                    import json
+                    str_value = json.dumps(value, default=str)
+                    result = self.encrypt(str_value, associated_data=key)
+                    
+                    encrypted_data[f"{key}_encrypted"] = {
+                        'ciphertext': result.ciphertext.hex(),
+                        'nonce': result.nonce.hex(),
+                        'tag': result.tag.hex(),
+                        'metadata': result.metadata,
+                        'original_type': type(value).__name__
+                    }
+        
+        return encrypted_data
     
-    def decrypt_json(self, encrypted_data: Dict[str, str]) -> Any:
+    def decrypt_dict(self, encrypted_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Decrypt and parse JSON data.
+        Decrypt a dictionary that was encrypted with encrypt_dict.
         
         Args:
-            encrypted_data: Encrypted data dictionary
+            encrypted_data: Dictionary with encrypted fields
             
         Returns:
-            Parsed JSON object
+            Dictionary with decrypted fields
         """
-        json_string = self.decrypt_data(encrypted_data)
-        return json.loads(json_string)
+        if not self.aesgcm:
+            raise RuntimeError("No session key set. Call set_session_key() first.")
+        
+        decrypted_data = {}
+        
+        for key, value in encrypted_data.items():
+            if key.endswith('_encrypted'):
+                # Decrypt encrypted field
+                original_key = key[:-10]  # Remove '_encrypted' suffix
+                
+                if isinstance(value, dict) and 'ciphertext' in value:
+                    try:
+                        ciphertext = bytes.fromhex(value['ciphertext'])
+                        nonce = bytes.fromhex(value['nonce'])
+                        tag = bytes.fromhex(value['tag'])
+                        
+                        result = self.decrypt(ciphertext, nonce, tag, associated_data=original_key)
+                        plaintext = result.plaintext.decode('utf-8')
+                        
+                        # Convert back to original type if specified
+                        if 'original_type' in value:
+                            original_type = value['original_type']
+                            if original_type == 'dict' or original_type == 'list':
+                                import json
+                                decrypted_data[original_key] = json.loads(plaintext)
+                            elif original_type == 'int':
+                                decrypted_data[original_key] = int(plaintext)
+                            elif original_type == 'float':
+                                decrypted_data[original_key] = float(plaintext)
+                            elif original_type == 'bool':
+                                decrypted_data[original_key] = plaintext.lower() == 'true'
+                            else:
+                                decrypted_data[original_key] = plaintext
+                        else:
+                            decrypted_data[original_key] = plaintext
+                            
+                    except Exception as e:
+                        self.logger.error(f"Failed to decrypt field {original_key}: {e}")
+                        decrypted_data[original_key] = f"[DECRYPTION_FAILED: {e}]"
+            else:
+                # Keep non-encrypted fields as-is
+                decrypted_data[key] = value
+        
+        return decrypted_data
+    
+    def generate_secure_token(self, length: int = 32) -> str:
+        """Generate a cryptographically secure random token."""
+        return secrets.token_urlsafe(length)
+    
+    def constant_time_compare(self, a: str, b: str) -> bool:
+        """Constant-time string comparison to prevent timing attacks."""
+        return secrets.compare_digest(a.encode('utf-8'), b.encode('utf-8'))

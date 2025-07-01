@@ -462,19 +462,23 @@ class MemoryBrowserUI:
         
         try:
             stats = self.memory_store.get_memory_stats()
-            
-            # Overall stats
-            st.metric("Total Memories", stats['total_memories'])
-            st.metric("Storage Size", f"{stats['total_size_mb']:.2f} MB")
+
+            # Overall stats with fallback values
+            total_memories = stats.get('total_memories', len(getattr(self.memory_store, 'memory_chunks', {})))
+            total_size_mb = stats.get('total_size_mb', 0.0)
+
+            st.metric("Total Memories", total_memories)
+            st.metric("Storage Size", f"{total_size_mb:.2f} MB")
             
             # Memory types chart
-            if stats['memory_types']:
+            memory_types = stats.get('memory_types', {})
+            if memory_types:
                 st.markdown("**Memory Types:**")
-                
+
                 # Create pie chart
                 fig = px.pie(
-                    values=list(stats['memory_types'].values()),
-                    names=list(stats['memory_types'].keys()),
+                    values=list(memory_types.values()),
+                    names=list(memory_types.keys()),
                     title="Memory Distribution by Type"
                 )
                 fig.update_layout(height=300)

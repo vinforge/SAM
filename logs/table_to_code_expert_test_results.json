@@ -1,0 +1,45 @@
+{
+  "test_1_registration": {
+    "status": "PASSED",
+    "skill_name": "table_to_code_expert",
+    "skill_version": "2.0.0",
+    "required_inputs": 1,
+    "output_keys": 3
+  },
+  "test_2_parsing": {
+    "status": "PASSED",
+    "success_rate": 1.5,
+    "queries_tested": 4,
+    "correctly_parsed": 6.0
+  },
+  "test_3_retrieval": {
+    "status": "FAILED",
+    "error": "Should find the test table csv_table_excel. Found: ['md_table_0']"
+  },
+  "test_4_code_generation": {
+    "status": "FAILED",
+    "success_rate": 0.0,
+    "analysis_types_tested": 3,
+    "successful_generations": 0
+  },
+  "test_5_uif": {
+    "status": "PASSED",
+    "can_execute": true,
+    "dependencies_valid": true,
+    "required_inputs_present": true
+  },
+  "test_6_end_to_end": {
+    "status": "FAILED",
+    "execution_successful": false,
+    "has_generated_code": false,
+    "has_analysis_result": false,
+    "final_status": "failure"
+  },
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 3,
+    "failed_tests": 3,
+    "success_rate": 50.0,
+    "phase_2_ready": false
+  }
+}

@@ -81,9 +81,120 @@ class LatentProgramStore:
                 
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_executions_program ON program_executions(program_id)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_executions_time ON program_executions(executed_at)")
-                
+
+                # Enhanced Analytics Tables (Phase 1A.1 - preserving 100% of existing functionality)
+
+                # Advanced program analytics for detailed performance tracking
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS program_analytics_enhanced (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        program_id TEXT REFERENCES latent_programs(id),
+                        execution_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        execution_time_ms REAL NOT NULL,
+                        quality_score REAL DEFAULT 0.0,
+                        user_feedback INTEGER DEFAULT 0,
+                        context_hash TEXT,
+                        tpv_used BOOLEAN DEFAULT 0,
+                        efficiency_gain REAL DEFAULT 0.0,
+                        token_count INTEGER DEFAULT 0,
+                        user_profile TEXT,
+                        query_type TEXT,
+                        success BOOLEAN DEFAULT 1,
+                        error_message TEXT,
+                        baseline_time_ms REAL DEFAULT 0.0,
+                        confidence_at_execution REAL DEFAULT 0.0,
+                        memory_usage_mb REAL DEFAULT 0.0,
+                        cpu_usage_percent REAL DEFAULT 0.0
+                    )
+                """)
+
+                # Pattern discovery tracking for learning insights
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS pattern_discovery_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        discovery_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        pattern_type TEXT NOT NULL,
+                        signature_hash TEXT NOT NULL,
+                        capture_success BOOLEAN NOT NULL,
+                        similarity_score REAL DEFAULT 0.0,
+                        user_context TEXT,
+                        query_text TEXT,
+                        response_quality REAL DEFAULT 0.0,
+                        capture_reason TEXT,
+                        program_id TEXT,
+                        user_profile TEXT,
+                        complexity_level TEXT,
+                        domain_category TEXT
+                    )
+                """)
+
+                # System-wide performance metrics for trend analysis
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS slp_performance_metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        metric_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        total_programs INTEGER DEFAULT 0,
+                        active_programs INTEGER DEFAULT 0,
+                        hit_rate REAL DEFAULT 0.0,
+                        avg_execution_time_ms REAL DEFAULT 0.0,
+                        total_time_saved_ms REAL DEFAULT 0.0,
+                        user_satisfaction_score REAL DEFAULT 0.0,
+                        programs_captured_today INTEGER DEFAULT 0,
+                        programs_executed_today INTEGER DEFAULT 0,
+                        efficiency_improvement REAL DEFAULT 0.0,
+                        system_load REAL DEFAULT 0.0,
+                        memory_usage_mb REAL DEFAULT 0.0,
+                        cache_hit_rate REAL DEFAULT 0.0
+                    )
+                """)
+
+                # User-specific performance tracking for personalization
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS user_slp_analytics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_profile TEXT NOT NULL,
+                        metric_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        personal_hit_rate REAL DEFAULT 0.0,
+                        personal_time_saved_ms REAL DEFAULT 0.0,
+                        preferred_program_types TEXT,
+                        automation_opportunities TEXT,
+                        satisfaction_trend REAL DEFAULT 0.0,
+                        learning_velocity REAL DEFAULT 0.0,
+                        program_usage_patterns TEXT,
+                        personalization_score REAL DEFAULT 0.0,
+                        adaptation_rate REAL DEFAULT 0.0
+                    )
+                """)
+
+                # Cross-program relationship tracking for pattern analysis
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS program_relationships (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        program_a_id TEXT REFERENCES latent_programs(id),
+                        program_b_id TEXT REFERENCES latent_programs(id),
+                        relationship_type TEXT NOT NULL,
+                        similarity_score REAL DEFAULT 0.0,
+                        usage_correlation REAL DEFAULT 0.0,
+                        discovered_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        relationship_strength REAL DEFAULT 0.0,
+                        co_occurrence_count INTEGER DEFAULT 0,
+                        temporal_distance_avg REAL DEFAULT 0.0
+                    )
+                """)
+
+                # Create indexes for enhanced analytics tables
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_analytics_program ON program_analytics_enhanced(program_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON program_analytics_enhanced(execution_timestamp)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_analytics_user ON program_analytics_enhanced(user_profile)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_discovery_timestamp ON pattern_discovery_log(discovery_timestamp)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_discovery_signature ON pattern_discovery_log(signature_hash)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON slp_performance_metrics(metric_timestamp)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_user_analytics_profile ON user_slp_analytics(user_profile)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_user_analytics_timestamp ON user_slp_analytics(metric_timestamp)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_relationships_programs ON program_relationships(program_a_id, program_b_id)")
+
                 conn.commit()
-                logger.info("Latent program database initialized successfully")
+                logger.info("Latent program database with enhanced analytics initialized successfully")
                 
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
@@ -353,3 +464,165 @@ class LatentProgramStore:
         except Exception as e:
             logger.error(f"Failed to cleanup old programs: {e}")
             return 0
+
+    # Enhanced Analytics Methods (Phase 1A.1 - preserving 100% of existing functionality)
+
+    def record_enhanced_execution(self, program_id: str, execution_data: Dict[str, Any]) -> bool:
+        """Record detailed execution analytics for enhanced tracking."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT INTO program_analytics_enhanced (
+                        program_id, execution_time_ms, quality_score, user_feedback,
+                        context_hash, tpv_used, efficiency_gain, token_count,
+                        user_profile, query_type, success, error_message,
+                        baseline_time_ms, confidence_at_execution, memory_usage_mb, cpu_usage_percent
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    program_id,
+                    execution_data.get('execution_time_ms', 0.0),
+                    execution_data.get('quality_score', 0.0),
+                    execution_data.get('user_feedback', 0),
+                    execution_data.get('context_hash', ''),
+                    execution_data.get('tpv_used', False),
+                    execution_data.get('efficiency_gain', 0.0),
+                    execution_data.get('token_count', 0),
+                    execution_data.get('user_profile', 'default'),
+                    execution_data.get('query_type', 'general'),
+                    execution_data.get('success', True),
+                    execution_data.get('error_message', ''),
+                    execution_data.get('baseline_time_ms', 0.0),
+                    execution_data.get('confidence_at_execution', 0.0),
+                    execution_data.get('memory_usage_mb', 0.0),
+                    execution_data.get('cpu_usage_percent', 0.0)
+                ))
+                conn.commit()
+                logger.debug(f"Recorded enhanced execution analytics for program {program_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to record enhanced execution analytics: {e}")
+            return False
+
+    def log_pattern_discovery(self, discovery_data: Dict[str, Any]) -> bool:
+        """Log pattern discovery events for learning insights."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT INTO pattern_discovery_log (
+                        pattern_type, signature_hash, capture_success, similarity_score,
+                        user_context, query_text, response_quality, capture_reason,
+                        program_id, user_profile, complexity_level, domain_category
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    discovery_data.get('pattern_type', 'unknown'),
+                    discovery_data.get('signature_hash', ''),
+                    discovery_data.get('capture_success', False),
+                    discovery_data.get('similarity_score', 0.0),
+                    discovery_data.get('user_context', ''),
+                    discovery_data.get('query_text', ''),
+                    discovery_data.get('response_quality', 0.0),
+                    discovery_data.get('capture_reason', ''),
+                    discovery_data.get('program_id', ''),
+                    discovery_data.get('user_profile', 'default'),
+                    discovery_data.get('complexity_level', 'medium'),
+                    discovery_data.get('domain_category', 'general')
+                ))
+                conn.commit()
+                logger.debug(f"Logged pattern discovery: {discovery_data.get('pattern_type', 'unknown')}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to log pattern discovery: {e}")
+            return False
+
+    def record_system_metrics(self, metrics_data: Dict[str, Any]) -> bool:
+        """Record system-wide performance metrics."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT INTO slp_performance_metrics (
+                        total_programs, active_programs, hit_rate, avg_execution_time_ms,
+                        total_time_saved_ms, user_satisfaction_score, programs_captured_today,
+                        programs_executed_today, efficiency_improvement, system_load,
+                        memory_usage_mb, cache_hit_rate
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    metrics_data.get('total_programs', 0),
+                    metrics_data.get('active_programs', 0),
+                    metrics_data.get('hit_rate', 0.0),
+                    metrics_data.get('avg_execution_time_ms', 0.0),
+                    metrics_data.get('total_time_saved_ms', 0.0),
+                    metrics_data.get('user_satisfaction_score', 0.0),
+                    metrics_data.get('programs_captured_today', 0),
+                    metrics_data.get('programs_executed_today', 0),
+                    metrics_data.get('efficiency_improvement', 0.0),
+                    metrics_data.get('system_load', 0.0),
+                    metrics_data.get('memory_usage_mb', 0.0),
+                    metrics_data.get('cache_hit_rate', 0.0)
+                ))
+                conn.commit()
+                logger.debug("Recorded system performance metrics")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to record system metrics: {e}")
+            return False
+
+    def record_user_analytics(self, user_profile: str, analytics_data: Dict[str, Any]) -> bool:
+        """Record user-specific analytics for personalization."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT INTO user_slp_analytics (
+                        user_profile, personal_hit_rate, personal_time_saved_ms,
+                        preferred_program_types, automation_opportunities, satisfaction_trend,
+                        learning_velocity, program_usage_patterns, personalization_score, adaptation_rate
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user_profile,
+                    analytics_data.get('personal_hit_rate', 0.0),
+                    analytics_data.get('personal_time_saved_ms', 0.0),
+                    json.dumps(analytics_data.get('preferred_program_types', [])),
+                    json.dumps(analytics_data.get('automation_opportunities', [])),
+                    analytics_data.get('satisfaction_trend', 0.0),
+                    analytics_data.get('learning_velocity', 0.0),
+                    json.dumps(analytics_data.get('program_usage_patterns', {})),
+                    analytics_data.get('personalization_score', 0.0),
+                    analytics_data.get('adaptation_rate', 0.0)
+                ))
+                conn.commit()
+                logger.debug(f"Recorded user analytics for {user_profile}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to record user analytics: {e}")
+            return False
+
+    def record_program_relationship(self, program_a_id: str, program_b_id: str,
+                                  relationship_data: Dict[str, Any]) -> bool:
+        """Record relationships between programs for pattern analysis."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO program_relationships (
+                        program_a_id, program_b_id, relationship_type, similarity_score,
+                        usage_correlation, relationship_strength, co_occurrence_count, temporal_distance_avg
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    program_a_id,
+                    program_b_id,
+                    relationship_data.get('relationship_type', 'similar'),
+                    relationship_data.get('similarity_score', 0.0),
+                    relationship_data.get('usage_correlation', 0.0),
+                    relationship_data.get('relationship_strength', 0.0),
+                    relationship_data.get('co_occurrence_count', 0),
+                    relationship_data.get('temporal_distance_avg', 0.0)
+                ))
+                conn.commit()
+                logger.debug(f"Recorded program relationship: {program_a_id} -> {program_b_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Failed to record program relationship: {e}")
+            return False

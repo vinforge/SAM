@@ -1,0 +1,38 @@
+{
+  "test_1_registration": {
+    "status": "PASSED"
+  },
+  "test_2_parsing": {
+    "status": "PASSED",
+    "success_rate": 1.0
+  },
+  "test_3_retrieval": {
+    "status": "PASSED",
+    "tables_found": 1,
+    "table_ids": [
+      "md_table_0"
+    ]
+  },
+  "test_4_code_generation": {
+    "status": "PASSED",
+    "code_generated": true,
+    "code_length": 2813
+  },
+  "test_5_uif": {
+    "status": "PASSED",
+    "can_execute": true
+  },
+  "test_6_end_to_end": {
+    "status": "PASSED",
+    "execution_completed": true,
+    "has_response": true,
+    "final_status": "success"
+  },
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 6,
+    "failed_tests": 0,
+    "success_rate": 100.0,
+    "target_achieved": true
+  }
+}

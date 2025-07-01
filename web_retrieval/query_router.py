@@ -16,19 +16,36 @@ class QueryRouter:
     """Intelligent router that selects the best tool for each query."""
     
     def __init__(self):
+        # News keywords - more specific to avoid false positives
         self.news_keywords = [
-            'latest', 'breaking', 'news', 'today', 'current', 'recent', 
-            'headlines', 'happening', 'update', 'report', 'announced'
+            'breaking news', 'latest news', 'news update', 'headlines', 'happening now',
+            'just announced', 'breaking', 'urgent news', 'news report', 'press release'
         ]
-        
+
+        # Time-sensitive news keywords (require news context)
+        self.time_news_keywords = [
+            'latest', 'current', 'recent', 'today', 'update', 'report', 'announced'
+        ]
+
         self.search_keywords = [
             'what is', 'how to', 'explain', 'define', 'features', 'benefits',
-            'comparison', 'vs', 'versus', 'difference', 'guide', 'tutorial'
+            'comparison', 'vs', 'versus', 'difference', 'guide', 'tutorial',
+            'average', 'typical', 'standard', 'specifications', 'specs',
+            # Enhanced search triggers (preserving 100% of functionality)
+            'search up', 'search for', 'search about', 'look up', 'look for',
+            'find out', 'find information', 'information about', 'details about',
+            'tell me about', 'learn about', 'research', 'investigate',
+            'discover', 'explore', 'understand', 'clarify', 'describe'
         ]
-        
+
         self.topic_categories = {
             'politics': ['politics', 'political', 'election', 'government', 'congress', 'senate', 'president'],
-            'technology': ['technology', 'tech', 'ai', 'artificial intelligence', 'software', 'programming'],
+            'technology': [
+                'technology', 'tech', 'ai', 'artificial intelligence', 'software', 'programming',
+                'computer', 'monitor', 'lcd', 'led', 'oled', 'display', 'screen', 'refresh rate',
+                'hz', 'hertz', 'fps', 'resolution', 'pixel', 'graphics', 'gpu', 'cpu', 'hardware',
+                'specifications', 'specs', 'performance', 'benchmark', 'gaming', 'processor'
+            ],
             'business': ['business', 'economy', 'finance', 'market', 'stock', 'economic', 'financial'],
             'health': ['health', 'medical', 'medicine', 'covid', 'pandemic', 'disease', 'healthcare'],
             'sports': ['sports', 'football', 'basketball', 'baseball', 'soccer', 'olympics', 'game'],
@@ -66,7 +83,13 @@ class QueryRouter:
             'topic_category': self._detect_topic_category(query_lower),
             'urgency_level': self._assess_urgency(query_lower),
             'query_length': len(query.split()),
-            'contains_specific_source': self._detect_specific_source(query_lower)
+            'contains_specific_source': self._detect_specific_source(query_lower),
+            # NEW: Firecrawl-specific analysis
+            'requires_site_crawling': self._requires_site_crawling(query_lower),
+            'requires_interaction': self._requires_interaction(query_lower),
+            'multiple_urls': self._has_multiple_urls(query),
+            'extracted_urls': self._extract_all_urls(query),
+            'suggested_actions': self._suggest_actions(query_lower)
         }
         
         return analysis
@@ -77,9 +100,36 @@ class QueryRouter:
         return bool(re.search(url_pattern, query))
     
     def _is_news_query(self, query_lower: str) -> bool:
-        """Determine if this is a news-related query."""
-        news_score = sum(1 for keyword in self.news_keywords if keyword in query_lower)
-        return news_score >= 1
+        """Determine if this is a news-related query with improved context awareness."""
+        # Check for explicit news keywords first
+        explicit_news_score = sum(1 for keyword in self.news_keywords if keyword in query_lower)
+        if explicit_news_score >= 1:
+            return True
+
+        # Check for time-sensitive keywords but only if they appear in news context
+        time_keywords_found = [keyword for keyword in self.time_news_keywords if keyword in query_lower]
+        if time_keywords_found:
+            # Look for news context indicators
+            news_context_indicators = [
+                'news', 'article', 'story', 'headline', 'journalist', 'reporter',
+                'press', 'media', 'publication', 'newspaper', 'magazine'
+            ]
+
+            # Also check for topic categories that suggest technical/factual queries (not news)
+            technical_indicators = [
+                'specification', 'specs', 'feature', 'performance', 'benchmark',
+                'average', 'typical', 'standard', 'rate', 'frequency', 'measurement'
+            ]
+
+            # If technical indicators are present, it's likely not a news query
+            if any(indicator in query_lower for indicator in technical_indicators):
+                return False
+
+            # If news context indicators are present, it's likely a news query
+            if any(indicator in query_lower for indicator in news_context_indicators):
+                return True
+
+        return False
     
     def _is_search_query(self, query_lower: str) -> bool:
         """Determine if this is a general search query."""
@@ -123,80 +173,138 @@ class QueryRouter:
         return None
     
     def _make_routing_decision(self, query: str, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Make the routing decision based on analysis."""
-        
-        # Rule 1: URL in query -> URL Content Extractor
+        """Make the routing decision based on analysis with Firecrawl integration."""
+
+        # Rule 1: Website crawling request -> Firecrawl Tool
+        if analysis.get('requires_site_crawling', False):
+            return {
+                'primary_tool': 'firecrawl_tool',
+                'fallback_chain': ['cocoindex_tool', 'search_api_tool'],
+                'reasoning': 'Full website crawling required - using Firecrawl',
+                'confidence': 0.90,
+                'parameters': {
+                    'operation_mode': 'crawl',
+                    'url': self._extract_url_from_query(query) or query,
+                    'max_pages': 20,
+                    'include_subdomains': False
+                }
+            }
+
+        # Rule 2: Interactive content needed -> Firecrawl Tool with actions
+        if analysis.get('requires_interaction', False):
+            return {
+                'primary_tool': 'firecrawl_tool',
+                'fallback_chain': ['url_content_extractor'],
+                'reasoning': 'Interactive content extraction required - using Firecrawl',
+                'confidence': 0.85,
+                'parameters': {
+                    'operation_mode': 'interactive',
+                    'url': self._extract_url_from_query(query) or query,
+                    'actions': analysis.get('suggested_actions', [])
+                }
+            }
+
+        # Rule 3: Multiple URLs -> Firecrawl Batch Tool
+        if analysis.get('multiple_urls', False):
+            return {
+                'primary_tool': 'firecrawl_tool',
+                'fallback_chain': ['cocoindex_tool'],
+                'reasoning': 'Batch processing multiple URLs - using Firecrawl',
+                'confidence': 0.80,
+                'parameters': {
+                    'operation_mode': 'batch',
+                    'urls': analysis.get('extracted_urls', []),
+                    'max_concurrent': 5
+                }
+            }
+
+        # Rule 4: URL in query -> Enhanced routing (Firecrawl vs URL Extractor)
         if analysis['has_url']:
-            return {
-                'primary_tool': 'url_content_extractor',
-                'fallback_chain': ['search_api_tool'],
-                'reasoning': 'Query contains URL - direct content extraction',
-                'confidence': 0.95,
-                'parameters': {
-                    'url': self._extract_url_from_query(query)
+            url = self._extract_url_from_query(query)
+            # Use Firecrawl for complex sites, URL extractor for simple ones
+            if self._is_complex_site(url):
+                return {
+                    'primary_tool': 'firecrawl_tool',
+                    'fallback_chain': ['url_content_extractor', 'search_api_tool'],
+                    'reasoning': 'Complex site detected - using Firecrawl for better extraction',
+                    'confidence': 0.88,
+                    'parameters': {
+                        'operation_mode': 'crawl',
+                        'url': url,
+                        'max_pages': 5
+                    }
                 }
-            }
-        
-        # Rule 2: News query -> News API Tool
-        if analysis['is_news_query']:
-            fallback_chain = ['rss_reader_tool', 'search_api_tool']
-            
-            # Adjust fallback based on topic
-            if analysis['topic_category']:
-                fallback_chain.insert(0, 'rss_reader_tool')
-            
-            return {
-                'primary_tool': 'news_api_tool',
-                'fallback_chain': fallback_chain,
-                'reasoning': 'News-related query detected',
-                'confidence': 0.85,
-                'parameters': {
-                    'topic_category': analysis['topic_category'],
-                    'urgency': analysis['urgency_level'],
-                    'specific_source': analysis['contains_specific_source']
+            else:
+                return {
+                    'primary_tool': 'url_content_extractor',
+                    'fallback_chain': ['firecrawl_tool', 'search_api_tool'],
+                    'reasoning': 'Simple URL - using standard content extraction',
+                    'confidence': 0.95,
+                    'parameters': {
+                        'url': url
+                    }
                 }
-            }
-        
-        # Rule 3: Specific source mentioned -> RSS Reader Tool
-        if analysis['contains_specific_source']:
-            return {
-                'primary_tool': 'rss_reader_tool',
-                'fallback_chain': ['news_api_tool', 'search_api_tool'],
-                'reasoning': f'Specific source mentioned: {analysis["contains_specific_source"]}',
-                'confidence': 0.80,
-                'parameters': {
-                    'source': analysis['contains_specific_source'],
-                    'topic_category': analysis['topic_category']
-                }
-            }
-        
-        # Rule 4: General search query -> CocoIndex Tool (Phase 8.5 upgrade)
-        if analysis['is_search_query'] or analysis['query_length'] > 8:
-            return {
-                'primary_tool': 'cocoindex_tool',
-                'fallback_chain': ['search_api_tool', 'url_content_extractor'],
-                'reasoning': 'General search or complex query - using intelligent cocoindex',
-                'confidence': 0.85,
-                'parameters': {
-                    'topic_category': analysis['topic_category'],
-                    'query_type': 'general_search'
-                }
-            }
-        
-        # Rule 5: Topic-specific query -> CocoIndex Tool with RSS fallback
+
+        # Rule 2: Topic-specific query -> Search API Tool (PRIORITIZED)
+        # CocoIndex temporarily disabled, using Search API as primary
         if analysis['topic_category']:
+            # For technology queries, use search-focused fallback chain
+            if analysis['topic_category'] == 'technology':
+                fallback_chain = ['rss_reader_tool', 'url_content_extractor']
+            else:
+                fallback_chain = ['rss_reader_tool', 'news_api_tool', 'url_content_extractor']
+
             return {
-                'primary_tool': 'cocoindex_tool',
-                'fallback_chain': ['rss_reader_tool', 'news_api_tool', 'search_api_tool'],
-                'reasoning': f'Topic-specific query: {analysis["topic_category"]} - using intelligent search',
-                'confidence': 0.80,
+                'primary_tool': 'search_api_tool',
+                'fallback_chain': fallback_chain,
+                'reasoning': f'Topic-specific query: {analysis["topic_category"]} - using search API (CocoIndex temporarily disabled)',
+                'confidence': 0.85,
                 'parameters': {
                     'topic_category': analysis['topic_category'],
                     'query_type': 'topic_specific'
                 }
             }
-        
-        # Default: Search API Tool
+
+        # Rule 3: General search query -> Search API Tool
+        if analysis['is_search_query'] or analysis['query_length'] > 8:
+            return {
+                'primary_tool': 'search_api_tool',
+                'fallback_chain': ['rss_reader_tool', 'url_content_extractor'],
+                'reasoning': 'General search or complex query - using search API (CocoIndex temporarily disabled)',
+                'confidence': 0.85,
+                'parameters': {
+                    'query_type': 'general_search'
+                }
+            }
+
+        # Rule 4: News query -> News API Tool (now lower priority)
+        if analysis['is_news_query']:
+            fallback_chain = ['rss_reader_tool', 'search_api_tool']
+
+            return {
+                'primary_tool': 'news_api_tool',
+                'fallback_chain': fallback_chain,
+                'reasoning': 'News-related query detected',
+                'confidence': 0.80,
+                'parameters': {
+                    'urgency': analysis['urgency_level'],
+                    'specific_source': analysis['contains_specific_source']
+                }
+            }
+
+        # Rule 5: Specific source mentioned -> RSS Reader Tool
+        if analysis['contains_specific_source']:
+            return {
+                'primary_tool': 'rss_reader_tool',
+                'fallback_chain': ['news_api_tool', 'search_api_tool'],
+                'reasoning': f'Specific source mentioned: {analysis["contains_specific_source"]}',
+                'confidence': 0.75,
+                'parameters': {
+                    'source': analysis['contains_specific_source']
+                }
+            }
+
+        # Default: CocoIndex Tool for intelligent search
         return self._get_default_routing()
     
     def _extract_url_from_query(self, query: str) -> str:
@@ -208,9 +316,9 @@ class QueryRouter:
     def _get_default_routing(self) -> Dict[str, Any]:
         """Get default routing when no specific rules match."""
         return {
-            'primary_tool': 'cocoindex_tool',
-            'fallback_chain': ['search_api_tool', 'news_api_tool', 'rss_reader_tool'],
-            'reasoning': 'Default routing - intelligent web search with cocoindex',
+            'primary_tool': 'search_api_tool',
+            'fallback_chain': ['rss_reader_tool', 'news_api_tool', 'url_content_extractor'],
+            'reasoning': 'Default routing - search API with RSS fallback (CocoIndex temporarily disabled)',
             'confidence': 0.70,
             'parameters': {
                 'query_type': 'default'
@@ -274,6 +382,7 @@ class QueryRouter:
             'name': 'QueryRouter',
             'description': 'Intelligent router that selects the best tool for each query',
             'available_tools': [
+                'firecrawl_tool',
                 'cocoindex_tool',
                 'search_api_tool',
                 'news_api_tool',
@@ -281,11 +390,78 @@ class QueryRouter:
                 'url_content_extractor'
             ],
             'routing_rules': [
-                'URL in query → URL Content Extractor',
+                'Website crawling → Firecrawl Tool (NEW)',
+                'Interactive content → Firecrawl Tool (NEW)',
+                'Multiple URLs → Firecrawl Batch Tool (NEW)',
+                'Complex sites → Firecrawl Tool (NEW)',
+                'Simple URLs → URL Content Extractor',
+                'Topic-specific query → CocoIndex Tool',
+                'General search query → CocoIndex Tool',
                 'News keywords → News API Tool',
                 'Specific source → RSS Reader Tool',
-                'General search → CocoIndex Tool (Phase 8.5)',
-                'Topic-specific → CocoIndex Tool (Phase 8.5)',
-                'Default → CocoIndex Tool (Phase 8.5)'
+                'Default → CocoIndex Tool (intelligent search)'
             ]
         }
+
+    # NEW: Firecrawl-specific analysis methods
+    def _requires_site_crawling(self, query_lower: str) -> bool:
+        """Detect if query requires full website crawling."""
+        crawling_keywords = [
+            'crawl', 'entire site', 'whole website', 'all pages', 'site map',
+            'complete website', 'full site', 'entire domain', 'all content',
+            'website analysis', 'site analysis', 'comprehensive analysis'
+        ]
+        return any(keyword in query_lower for keyword in crawling_keywords)
+
+    def _requires_interaction(self, query_lower: str) -> bool:
+        """Detect if query requires interactive content extraction."""
+        interaction_keywords = [
+            'login', 'sign in', 'form', 'submit', 'click', 'button',
+            'dynamic content', 'javascript', 'interactive', 'ajax',
+            'behind login', 'requires authentication', 'member content'
+        ]
+        return any(keyword in query_lower for keyword in interaction_keywords)
+
+    def _has_multiple_urls(self, query: str) -> bool:
+        """Check if query contains multiple URLs."""
+        urls = self._extract_all_urls(query)
+        return len(urls) > 1
+
+    def _extract_all_urls(self, query: str) -> List[str]:
+        """Extract all URLs from query."""
+        url_pattern = r'https?://[^\s]+'
+        return re.findall(url_pattern, query)
+
+    def _suggest_actions(self, query_lower: str) -> List[Dict[str, Any]]:
+        """Suggest Firecrawl actions based on query content."""
+        actions = []
+
+        if 'login' in query_lower or 'sign in' in query_lower:
+            actions.append({'type': 'wait', 'milliseconds': 2000})
+            actions.append({'type': 'click', 'selector': 'input[type="email"], input[name="username"]'})
+
+        if 'search' in query_lower:
+            actions.append({'type': 'wait', 'milliseconds': 1000})
+            actions.append({'type': 'click', 'selector': 'input[type="search"], input[name="q"]'})
+
+        if 'form' in query_lower or 'submit' in query_lower:
+            actions.append({'type': 'wait', 'milliseconds': 2000})
+
+        return actions
+
+    def _is_complex_site(self, url: str) -> bool:
+        """Determine if a site is complex and would benefit from Firecrawl."""
+        if not url:
+            return False
+
+        # Sites known to be complex or have anti-bot measures
+        complex_domains = [
+            'linkedin.com', 'facebook.com', 'twitter.com', 'instagram.com',
+            'amazon.com', 'ebay.com', 'airbnb.com', 'booking.com',
+            'netflix.com', 'spotify.com', 'youtube.com', 'tiktok.com',
+            'reddit.com', 'quora.com', 'medium.com', 'substack.com'
+        ]
+
+        # Check if URL contains any complex domain
+        url_lower = url.lower()
+        return any(domain in url_lower for domain in complex_domains)

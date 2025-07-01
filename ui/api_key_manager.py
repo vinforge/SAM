@@ -31,6 +31,7 @@ from config.config_manager import ConfigManager
 from web_retrieval.tools.cocoindex_tool import CocoIndexTool
 from web_retrieval.tools.search_api_tool import SearchAPITool
 from web_retrieval.tools.news_api_tool import NewsAPITool
+from web_retrieval.tools.firecrawl_tool import FirecrawlTool
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,11 @@ class APIKeyManager:
         
         # API key configuration sections
         col1, col2 = st.columns(2)
-        
+
         with col1:
             self._render_web_search_config()
-            
+            self._render_firecrawl_config()
+
         with col2:
             self._render_news_services_config()
         
@@ -72,7 +74,7 @@ class APIKeyManager:
         st.subheader("📊 Service Status Overview")
         
         # Create status cards
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             serper_status = "✅ Active" if self.config.serper_api_key else "⚠️ Free Mode"
@@ -99,6 +101,14 @@ class APIKeyManager:
             )
         
         with col4:
+            firecrawl_status = "🔥 Active" if getattr(self.config, 'firecrawl_api_key', None) else "🕷️ Basic Mode"
+            st.metric(
+                "🔥 Firecrawl",
+                firecrawl_status,
+                help="Advanced web crawling with anti-bot mechanisms"
+            )
+
+        with col5:
             provider = self.config.cocoindex_search_provider.title()
             st.metric(
                 "🌐 Search Provider",
@@ -174,7 +184,61 @@ class APIKeyManager:
         if num_pages != current_pages:
             st.session_state.config_changed = True
             st.session_state.new_num_pages = num_pages
-    
+
+    def _render_firecrawl_config(self):
+        """Render Firecrawl API configuration."""
+        st.subheader("🔥 Firecrawl Configuration")
+
+        # Firecrawl API configuration
+        with st.expander("🔥 Firecrawl API (Advanced Crawling)", expanded=True):
+            st.markdown("""
+            **Firecrawl provides advanced web crawling with:**
+            - Anti-bot mechanisms and proxy rotation
+            - JavaScript rendering for dynamic content
+            - Interactive content extraction (forms, logins)
+            - Batch processing for multiple URLs
+            - PDF and document extraction
+            - Full website crawling capabilities
+
+            [Get your API key at firecrawl.dev →](https://firecrawl.dev)
+            """)
+
+            current_firecrawl_key = getattr(self.config, 'firecrawl_api_key', '')
+            firecrawl_key = st.text_input(
+                "Firecrawl API Key",
+                value=current_firecrawl_key,
+                type="password",
+                help="Enter your Firecrawl API key (starts with 'fc-')",
+                key="firecrawl_api_key_input"
+            )
+
+            if firecrawl_key and firecrawl_key != current_firecrawl_key:
+                st.session_state.config_changed = True
+                st.session_state.new_firecrawl_key = firecrawl_key
+
+            # Show current usage info if key is configured
+            if current_firecrawl_key:
+                st.success("✅ Firecrawl API key configured")
+                st.caption("💡 Complex sites and interactive content will use Firecrawl")
+            else:
+                st.info("ℹ️ Without Firecrawl, complex sites may be harder to access")
+
+        # Firecrawl settings
+        st.markdown("**Firecrawl Settings:**")
+        current_timeout = getattr(self.config, 'firecrawl_timeout', 30)
+        firecrawl_timeout = st.slider(
+            "Request Timeout (seconds)",
+            min_value=10,
+            max_value=120,
+            value=current_timeout,
+            help="Timeout for Firecrawl requests",
+            key="firecrawl_timeout_slider"
+        )
+
+        if firecrawl_timeout != current_timeout:
+            st.session_state.config_changed = True
+            st.session_state.new_firecrawl_timeout = firecrawl_timeout
+
     def _render_news_services_config(self):
         """Render news services API configuration."""
         st.subheader("📰 News Services Configuration")
@@ -267,17 +331,21 @@ class APIKeyManager:
         st.subheader("🧪 Test Connectivity")
         st.markdown("Test your API keys and service connectivity")
         
-        col1, col2, col3 = st.columns(3)
-        
+        col1, col2, col3, col4 = st.columns(4)
+
         with col1:
             if st.button("🔍 Test Serper", key="test_serper_btn"):
                 self._test_serper_connection()
-        
+
         with col2:
             if st.button("📰 Test NewsAPI", key="test_newsapi_btn"):
                 self._test_newsapi_connection()
-        
+
         with col3:
+            if st.button("🔥 Test Firecrawl", key="test_firecrawl_btn"):
+                self._test_firecrawl_connection()
+
+        with col4:
             if st.button("🧠 Test CocoIndex", key="test_cocoindex_btn"):
                 self._test_cocoindex_connection()
     
@@ -351,7 +419,28 @@ class APIKeyManager:
                     
         except Exception as e:
             st.error(f"❌ NewsAPI test error: {str(e)}")
-    
+
+    def _test_firecrawl_connection(self):
+        """Test Firecrawl API connection."""
+        try:
+            api_key = st.session_state.get('new_firecrawl_key', getattr(self.config, 'firecrawl_api_key', ''))
+
+            if not api_key:
+                st.error("❌ No Firecrawl API key configured")
+                return
+
+            with st.spinner("Testing Firecrawl connection..."):
+                firecrawl_tool = FirecrawlTool(api_key=api_key)
+
+                if firecrawl_tool.firecrawl_available:
+                    st.success("✅ Firecrawl is available and ready!")
+                    st.caption("🔥 Advanced web crawling capabilities enabled")
+                else:
+                    st.error("❌ Firecrawl is not available - check API key or install firecrawl-py")
+
+        except Exception as e:
+            st.error(f"❌ Firecrawl test error: {str(e)}")
+
     def _test_cocoindex_connection(self):
         """Test CocoIndex functionality."""
         try:
@@ -383,7 +472,13 @@ class APIKeyManager:
             
             if hasattr(st.session_state, 'new_newsapi_key'):
                 self.config.newsapi_api_key = st.session_state.new_newsapi_key
-            
+
+            if hasattr(st.session_state, 'new_firecrawl_key'):
+                self.config.firecrawl_api_key = st.session_state.new_firecrawl_key
+
+            if hasattr(st.session_state, 'new_firecrawl_timeout'):
+                self.config.firecrawl_timeout = st.session_state.new_firecrawl_timeout
+
             if hasattr(st.session_state, 'new_search_provider'):
                 self.config.cocoindex_search_provider = st.session_state.new_search_provider
             
@@ -429,7 +524,13 @@ class APIKeyManager:
         
         if hasattr(st.session_state, 'new_newsapi_key'):
             changes['NewsAPI Key'] = "Updated" if st.session_state.new_newsapi_key else "Removed"
-        
+
+        if hasattr(st.session_state, 'new_firecrawl_key'):
+            changes['Firecrawl API Key'] = "Updated" if st.session_state.new_firecrawl_key else "Removed"
+
+        if hasattr(st.session_state, 'new_firecrawl_timeout'):
+            changes['Firecrawl Timeout'] = f"{st.session_state.new_firecrawl_timeout}s"
+
         if hasattr(st.session_state, 'new_search_provider'):
             changes['Search Provider'] = st.session_state.new_search_provider
         

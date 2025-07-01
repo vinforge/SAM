@@ -62,7 +62,8 @@ class CoordinatorEngine:
                  enable_dynamic_planning: bool = True,
                  enable_loss_balancing: bool = True,
                  enable_domain_constraints: bool = True,
-                 constraints_config_path: Optional[str] = None):
+                 constraints_config_path: Optional[str] = None,
+                 motivation_engine=None):
         """
         Initialize the coordinator engine.
 
@@ -72,13 +73,17 @@ class CoordinatorEngine:
             enable_loss_balancing: Whether to enable PINN-inspired loss balancing
             enable_domain_constraints: Whether to enable domain constraint enforcement
             constraints_config_path: Path to domain constraints configuration file
+            motivation_engine: Optional MotivationEngine for autonomous goal generation
         """
         self.logger = logging.getLogger(f"{__name__}.CoordinatorEngine")
         self._registered_skills: Dict[str, BaseSkillModule] = {}
         self._validator = PlanValidationEngine()
-        self._dynamic_planner = DynamicPlanner() if enable_dynamic_planning else None
+        # Phase B: Pass goal_stack to DynamicPlanner for goal-informed planning
+        goal_stack = getattr(motivation_engine, 'goal_stack', None) if motivation_engine else None
+        self._dynamic_planner = DynamicPlanner(goal_stack=goal_stack) if enable_dynamic_planning else None
         self._fallback_generator = fallback_generator
         self._execution_history: List[ExecutionReport] = []
+        self._motivation_engine = motivation_engine  # Phase B: Autonomous goal generation
 
         # PINN-inspired loss balancer for dynamic effort allocation
         self._loss_balancer = LossBalancer() if enable_loss_balancing else None
@@ -236,6 +241,18 @@ class CoordinatorEngine:
                     execution_time=execution_time
                 )
 
+            # Phase B: Generate autonomous goals after successful execution
+            if (self._motivation_engine and
+                execution_result in [ExecutionResult.SUCCESS, ExecutionResult.PARTIAL_SUCCESS]):
+                try:
+                    generated_goals = self._motivation_engine.generate_goals_from_uif(uif)
+                    if generated_goals:
+                        uif.add_log_entry(f"Generated {len(generated_goals)} autonomous goals")
+                        self.logger.info(f"Generated {len(generated_goals)} autonomous goals from execution")
+                except Exception as e:
+                    self.logger.warning(f"Goal generation failed: {e}")
+                    uif.add_log_entry(f"Goal generation failed: {str(e)}")
+
             return report
             
         except Exception as e:
@@ -261,7 +278,7 @@ class CoordinatorEngine:
         execution_plan = plan  # May be modified by confidence weighting
 
         if self._loss_balancer:
-            query_complexity = self._assess_query_complexity(uif.query)
+            query_complexity = self._assess_query_complexity(uif.input_query)
             initial_confidence = getattr(uif, 'initial_confidence', 0.5)
             effort_allocation = self._loss_balancer.allocate_effort(
                 plan=plan,
@@ -646,16 +663,16 @@ class CoordinatorEngine:
             skill: The skill to configure
             effort_config: Effort configuration to apply
         """
-        # Store effort parameters in UIF for skill to use
-        if not hasattr(uif, 'effort_parameters'):
-            uif.effort_parameters = {}
+        # Store effort parameters in UIF intermediate_data for skill to use
+        if 'effort_parameters' not in uif.intermediate_data:
+            uif.intermediate_data['effort_parameters'] = {}
 
-        uif.effort_parameters[skill.skill_name] = effort_config.parameter_adjustments
+        uif.intermediate_data['effort_parameters'][skill.skill_name] = effort_config.parameter_adjustments
 
         # Set timeout if specified
         if effort_config.timeout_multiplier != 1.0:
-            current_timeout = getattr(uif, 'execution_timeout', 30.0)
-            uif.execution_timeout = current_timeout * effort_config.timeout_multiplier
+            current_timeout = uif.intermediate_data.get('execution_timeout', 30.0)
+            uif.intermediate_data['execution_timeout'] = current_timeout * effort_config.timeout_multiplier
 
         # Log effort application
         self.logger.debug(f"Applied {effort_config.effort_level.value} effort to {skill.skill_name}")
