@@ -209,7 +209,16 @@ class SecurityUI:
                 # Show session time
                 if session_info.get('started_at'):
                     from datetime import datetime
-                    started_at = datetime.fromisoformat(session_info['started_at'])
+                    started_at_timestamp = session_info['started_at']
+
+                    # Handle both timestamp (float) and ISO string formats
+                    if isinstance(started_at_timestamp, (int, float)):
+                        started_at = datetime.fromtimestamp(started_at_timestamp)
+                    elif isinstance(started_at_timestamp, str):
+                        started_at = datetime.fromisoformat(started_at_timestamp)
+                    else:
+                        started_at = datetime.now()  # Fallback
+
                     session_duration = datetime.now() - started_at
                     hours = int(session_duration.total_seconds() // 3600)
                     minutes = int((session_duration.total_seconds() % 3600) // 60)
