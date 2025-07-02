@@ -47,14 +47,13 @@ class SecurityUI:
                 return self._render_setup_interface()
             elif current_state == SecurityState.LOCKED:
                 return self._render_login_interface()
-            elif current_state == SecurityState.UNLOCKED:
+            elif current_state == SecurityState.AUTHENTICATED:
                 return self._render_authenticated_interface()
-            elif current_state == SecurityState.LOCKED_OUT:
-                return self._render_lockout_interface()
-            elif current_state == SecurityState.FAILED_AUTHENTICATION:
-                return self._render_login_interface(show_error=True)
+            elif current_state == SecurityState.ERROR:
+                st.error("Security system error - please restart SAM")
+                return False
             else:
-                st.error("Unknown security state")
+                st.error(f"Unknown security state: {current_state}")
                 return False
 
         except Exception as e:
