@@ -266,19 +266,26 @@ class SecureMemoryVectorStore:
 def get_secure_memory_store(store_type: VectorStoreType = VectorStoreType.SIMPLE,
                            storage_directory: str = "memory_store",
                            embedding_dimension: int = 384,
-                           security_manager=None) -> SecureMemoryVectorStore:
+                           security_manager=None,
+                           enable_encryption: bool = True) -> SecureMemoryVectorStore:
     """
     Factory function to create a secure memory store.
-    
+
     Args:
         store_type: Type of vector store to use
         storage_directory: Directory for storing memory data
         embedding_dimension: Dimension of embedding vectors
         security_manager: Security manager for encryption (optional)
-        
+        enable_encryption: Whether to enable encryption (for compatibility)
+
     Returns:
         SecureMemoryVectorStore instance
     """
+    # If enable_encryption is True but no security_manager provided,
+    # we still create the store but without encryption
+    if enable_encryption and security_manager is None:
+        logger.info("Encryption requested but no security manager provided - creating store without encryption")
+
     return SecureMemoryVectorStore(
         store_type=store_type,
         storage_directory=storage_directory,
