@@ -62,20 +62,23 @@ class SecureMemoryVectorStore:
         """
         self.security_manager = security_manager
         self.storage_directory = Path(storage_directory)
-        
+
+        # Initialize encryption state
+        self._encryption_active = False
+
         # Initialize base memory store
         self.base_store = MemoryVectorStore(
             store_type=store_type,
             storage_directory=storage_directory,
             embedding_dimension=embedding_dimension
         )
-        
+
         # Initialize long-term memory manager
         memory_store_path = self.storage_directory / "long_term_memory.json"
         self.memory_manager = LongTermMemoryManager(
             memory_store_path=str(memory_store_path)
         )
-        
+
         logger.info(f"SecureMemoryVectorStore initialized with {store_type.value} backend")
         if security_manager:
             logger.info("Security integration enabled")
@@ -192,7 +195,7 @@ class SecureMemoryVectorStore:
     def get_security_status(self) -> Dict[str, Any]:
         """
         Get security-specific status information.
-        
+
         Returns:
             Dictionary containing security status
         """
@@ -200,9 +203,10 @@ class SecureMemoryVectorStore:
             return {
                 'security_enabled': False,
                 'encryption_status': 'disabled',
+                'encryption_active': False,
                 'encrypted_chunk_count': 0
             }
-        
+
         # Get encrypted chunk count
         encrypted_count = 0
         try:
@@ -212,10 +216,11 @@ class SecureMemoryVectorStore:
                         encrypted_count += 1
         except Exception as e:
             logger.warning(f"Error counting encrypted chunks: {e}")
-        
+
         return {
             'security_enabled': True,
-            'encryption_status': 'enabled',
+            'encryption_status': 'enabled' if self.is_encryption_active() else 'available',
+            'encryption_active': self.is_encryption_active(),
             'encrypted_chunk_count': encrypted_count,
             'security_manager_state': self.security_manager.get_state().value if self.security_manager else 'unknown'
         }
@@ -239,7 +244,7 @@ class SecureMemoryVectorStore:
     def clear_memories(self) -> bool:
         """
         Clear all memories from the store.
-        
+
         Returns:
             bool: True if successful
         """
@@ -247,15 +252,54 @@ class SecureMemoryVectorStore:
             # Clear base store
             if hasattr(self.base_store, 'memory_chunks'):
                 self.base_store.memory_chunks.clear()
-            
+
             # Clear long-term memory
             self.memory_manager.clear_all_memories()
-            
+
             logger.info("All memories cleared from secure store")
             return True
         except Exception as e:
             logger.error(f"Error clearing memories: {e}")
             return False
+
+    def activate_encryption(self) -> bool:
+        """
+        Activate encryption for the secure memory store.
+
+        Returns:
+            bool: True if encryption was successfully activated
+        """
+        try:
+            if self.security_manager is None:
+                logger.warning("Cannot activate encryption: no security manager provided")
+                return False
+
+            # Check if security manager is authenticated/unlocked
+            if hasattr(self.security_manager, 'is_unlocked') and not self.security_manager.is_unlocked():
+                logger.warning("Cannot activate encryption: security manager is locked")
+                return False
+
+            if hasattr(self.security_manager, 'is_authenticated') and not self.security_manager.is_authenticated():
+                logger.warning("Cannot activate encryption: security manager not authenticated")
+                return False
+
+            # Mark encryption as active
+            self._encryption_active = True
+            logger.info("✅ Encryption activated for secure memory store")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error activating encryption: {e}")
+            return False
+
+    def is_encryption_active(self) -> bool:
+        """
+        Check if encryption is currently active.
+
+        Returns:
+            bool: True if encryption is active
+        """
+        return getattr(self, '_encryption_active', False) and self.security_manager is not None
     
     # Delegate other methods to base store for full compatibility
     def __getattr__(self, name):
