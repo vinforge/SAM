@@ -359,6 +359,69 @@ class KeystoreManager:
         except Exception as e:
             self.logger.error(f"Failed to update access log: {e}")
     
+    def keystore_exists(self) -> bool:
+        """Check if keystore file exists."""
+        return self.keystore_path.exists()
+
+    def is_locked(self) -> bool:
+        """Check if keystore is locked (requires password)."""
+        if not self.keystore_exists():
+            return True
+
+        # If keystore exists but we don't have a session key, it's locked
+        return not hasattr(self.crypto, 'session_key') or self.crypto.session_key is None
+
+    def change_password(self, old_password: str, new_password: str) -> bool:
+        """
+        Change the master password for the keystore.
+
+        Args:
+            old_password: Current password
+            new_password: New password to set
+
+        Returns:
+            bool: True if password changed successfully
+        """
+        try:
+            # Verify old password first
+            is_valid, session_key = self.verify_password(old_password)
+            if not is_valid:
+                self.logger.error("Old password verification failed")
+                return False
+
+            # Load current keystore
+            with open(self.keystore_path, 'r') as f:
+                keystore_data = json.load(f)
+
+            # Create new crypto manager with new password
+            new_crypto = CryptoManager()
+
+            # Generate new salt and derive new key
+            new_salt = secrets.token_bytes(16)
+            new_key = new_crypto._derive_key(new_password, new_salt)
+
+            # Update keystore with new password hash and salt
+            keystore_data['password_hash'] = new_crypto._hash_password(new_password, new_salt).hex()
+            keystore_data['salt'] = new_salt.hex()
+
+            # Update metadata
+            keystore_data['metadata']['last_accessed'] = datetime.now().isoformat()
+
+            # Save updated keystore
+            with open(self.keystore_path, 'w') as f:
+                json.dump(keystore_data, f, indent=2)
+
+            # Update current crypto manager
+            self.crypto = new_crypto
+            self.crypto.session_key = new_key
+
+            self.logger.info("Password changed successfully")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to change password: {e}")
+            return False
+
     def backup_keystore(self, backup_path: Optional[Path] = None) -> bool:
         """Create a backup of the keystore."""
         try:

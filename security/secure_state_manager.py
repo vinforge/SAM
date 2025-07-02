@@ -1,0 +1,246 @@
+"""
+SAM Secure State Manager
+
+Manages security state and session management for SAM.
+Provides centralized security state tracking and validation.
+
+Author: SAM Development Team
+Version: 2.0.0
+"""
+
+import os
+import json
+import time
+from enum import Enum
+from typing import Optional, Dict, Any
+from .keystore_manager import KeystoreManager
+from .crypto_utils import CryptoManager
+
+
+class SecurityState(Enum):
+    """Security state enumeration."""
+    UNINITIALIZED = "uninitialized"
+    SETUP_REQUIRED = "setup_required"
+    AUTHENTICATED = "authenticated"
+    LOCKED = "locked"
+    ERROR = "error"
+
+
+class SecureStateManager:
+    """
+    Manages security state and session management for SAM.
+    
+    Provides centralized security state tracking, session management,
+    and security validation for the SAM application.
+    """
+    
+    def __init__(self):
+        """Initialize the secure state manager."""
+        self.keystore_manager = KeystoreManager()
+        self.crypto_manager = None
+        self.current_state = SecurityState.UNINITIALIZED
+        self.session_start_time = None
+        self.session_timeout = 3600  # 1 hour default
+        self.last_activity = None
+        
+        # Initialize state
+        self._initialize_state()
+    
+    def _initialize_state(self):
+        """Initialize the security state based on current setup."""
+        try:
+            if not self.keystore_manager.keystore_exists():
+                self.current_state = SecurityState.SETUP_REQUIRED
+            elif self.keystore_manager.is_locked():
+                self.current_state = SecurityState.LOCKED
+            else:
+                # Check if we have a valid session
+                if self._has_valid_session():
+                    self.current_state = SecurityState.AUTHENTICATED
+                else:
+                    self.current_state = SecurityState.LOCKED
+                    
+        except Exception as e:
+            print(f"Error initializing security state: {e}")
+            self.current_state = SecurityState.ERROR
+    
+    def is_setup_required(self) -> bool:
+        """Check if initial security setup is required."""
+        return self.current_state == SecurityState.SETUP_REQUIRED
+    
+    def is_authenticated(self) -> bool:
+        """Check if user is currently authenticated."""
+        if self.current_state != SecurityState.AUTHENTICATED:
+            return False
+        
+        # Check session timeout
+        if not self._has_valid_session():
+            self.current_state = SecurityState.LOCKED
+            return False
+        
+        return True
+    
+    def is_locked(self) -> bool:
+        """Check if the system is locked."""
+        return self.current_state == SecurityState.LOCKED
+    
+    def authenticate(self, password: str) -> bool:
+        """
+        Authenticate user with password.
+
+        Args:
+            password: User's master password
+
+        Returns:
+            bool: True if authentication successful
+        """
+        try:
+            # Verify password with keystore
+            is_valid, session_key = self.keystore_manager.verify_password(password)
+            if not is_valid:
+                return False
+
+            # Initialize crypto manager
+            self.crypto_manager = CryptoManager()
+            # Set session key from keystore verification
+            self.crypto_manager.session_key = session_key
+
+            # Start new session
+            self.session_start_time = time.time()
+            self.last_activity = time.time()
+            self.current_state = SecurityState.AUTHENTICATED
+
+            return True
+
+        except Exception as e:
+            print(f"Authentication error: {e}")
+            self.current_state = SecurityState.ERROR
+            return False
+    
+    def lock_session(self):
+        """Lock the current session."""
+        self.crypto_manager = None
+        self.session_start_time = None
+        self.last_activity = None
+        self.current_state = SecurityState.LOCKED
+    
+    def update_activity(self):
+        """Update last activity timestamp."""
+        if self.current_state == SecurityState.AUTHENTICATED:
+            self.last_activity = time.time()
+    
+    def _has_valid_session(self) -> bool:
+        """Check if current session is valid (not timed out)."""
+        if not self.session_start_time or not self.last_activity:
+            return False
+        
+        current_time = time.time()
+        
+        # Check session timeout
+        if current_time - self.last_activity > self.session_timeout:
+            return False
+        
+        return True
+    
+    def get_crypto_manager(self) -> Optional[CryptoManager]:
+        """Get the current crypto manager if authenticated."""
+        if self.is_authenticated():
+            return self.crypto_manager
+        return None
+    
+    def get_state(self) -> SecurityState:
+        """Get current security state."""
+        return self.current_state
+    
+    def get_session_info(self) -> Dict[str, Any]:
+        """Get current session information."""
+        if not self.is_authenticated():
+            return {
+                "authenticated": False,
+                "state": self.current_state.value
+            }
+        
+        current_time = time.time()
+        session_duration = current_time - self.session_start_time if self.session_start_time else 0
+        time_since_activity = current_time - self.last_activity if self.last_activity else 0
+        time_remaining = max(0, self.session_timeout - time_since_activity)
+        
+        return {
+            "authenticated": True,
+            "state": self.current_state.value,
+            "session_duration": session_duration,
+            "time_since_activity": time_since_activity,
+            "time_remaining": time_remaining,
+            "session_timeout": self.session_timeout
+        }
+    
+    def setup_security(self, password: str) -> bool:
+        """
+        Setup initial security configuration.
+        
+        Args:
+            password: Master password to set
+            
+        Returns:
+            bool: True if setup successful
+        """
+        try:
+            # Create keystore
+            if not self.keystore_manager.create_keystore(password):
+                return False
+            
+            # Initialize crypto manager
+            self.crypto_manager = CryptoManager()
+            
+            # Start session
+            self.session_start_time = time.time()
+            self.last_activity = time.time()
+            self.current_state = SecurityState.AUTHENTICATED
+            
+            return True
+            
+        except Exception as e:
+            print(f"Security setup error: {e}")
+            self.current_state = SecurityState.ERROR
+            return False
+    
+    def change_password(self, old_password: str, new_password: str) -> bool:
+        """
+        Change the master password.
+
+        Args:
+            old_password: Current password
+            new_password: New password to set
+
+        Returns:
+            bool: True if password changed successfully
+        """
+        try:
+            # Verify old password
+            is_valid, _ = self.keystore_manager.verify_password(old_password)
+            if not is_valid:
+                return False
+
+            # Update keystore with new password
+            if not self.keystore_manager.change_password(old_password, new_password):
+                return False
+
+            # Update crypto manager
+            self.crypto_manager = CryptoManager()
+
+            return True
+
+        except Exception as e:
+            print(f"Password change error: {e}")
+            return False
+    
+    def export_security_status(self) -> Dict[str, Any]:
+        """Export current security status for monitoring."""
+        return {
+            "security_state": self.current_state.value,
+            "keystore_exists": self.keystore_manager.keystore_exists(),
+            "session_info": self.get_session_info(),
+            "setup_required": self.is_setup_required(),
+            "authenticated": self.is_authenticated(),
+            "locked": self.is_locked()
+        }

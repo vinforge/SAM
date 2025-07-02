@@ -141,7 +141,7 @@ class SecurityUI:
                 st.error("❌ **Too many failed attempts.** Account locked.")
 
         # Show security status
-        metadata = self.security_manager.keystore.get_metadata()
+        metadata = self.security_manager.keystore_manager.get_metadata()
         if metadata:
             st.info(f"🏠 **Installation:** {metadata.installation_id}")
 
