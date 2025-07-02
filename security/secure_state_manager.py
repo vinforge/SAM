@@ -123,6 +123,54 @@ class SecureStateManager:
         self.session_start_time = None
         self.last_activity = None
         self.current_state = SecurityState.LOCKED
+
+    def unlock_application(self, password: str) -> bool:
+        """
+        Unlock the application with password (alias for authenticate).
+
+        Args:
+            password: User's master password
+
+        Returns:
+            bool: True if unlock successful
+        """
+        return self.authenticate(password)
+
+    def lock_application(self):
+        """Lock the application (alias for lock_session)."""
+        self.lock_session()
+
+    def initialize_security(self, password: str) -> bool:
+        """
+        Initialize security system (alias for setup_security).
+
+        Args:
+            password: Master password to set
+
+        Returns:
+            bool: True if initialization successful
+        """
+        return self.setup_security(password)
+
+    def get_failed_attempts(self) -> int:
+        """
+        Get number of failed authentication attempts.
+
+        Returns:
+            int: Number of failed attempts (placeholder implementation)
+        """
+        # TODO: Implement proper failed attempt tracking
+        return 0
+
+    def get_lockout_remaining(self) -> int:
+        """
+        Get remaining lockout time in seconds.
+
+        Returns:
+            int: Remaining lockout time (placeholder implementation)
+        """
+        # TODO: Implement proper lockout tracking
+        return 0
     
     def update_activity(self):
         """Update last activity timestamp."""
@@ -159,15 +207,20 @@ class SecureStateManager:
                 "authenticated": False,
                 "state": self.current_state.value
             }
-        
+
         current_time = time.time()
         session_duration = current_time - self.session_start_time if self.session_start_time else 0
         time_since_activity = current_time - self.last_activity if self.last_activity else 0
         time_remaining = max(0, self.session_timeout - time_since_activity)
-        
+
+        # Generate a session ID based on start time
+        session_id = f"sam_session_{int(self.session_start_time)}" if self.session_start_time else "unknown"
+
         return {
             "authenticated": True,
             "state": self.current_state.value,
+            "session_id": session_id,
+            "started_at": self.session_start_time,
             "session_duration": session_duration,
             "time_since_activity": time_since_activity,
             "time_remaining": time_remaining,
