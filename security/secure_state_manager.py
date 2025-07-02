@@ -72,13 +72,17 @@ class SecureStateManager:
         """Check if user is currently authenticated."""
         if self.current_state != SecurityState.AUTHENTICATED:
             return False
-        
+
         # Check session timeout
         if not self._has_valid_session():
             self.current_state = SecurityState.LOCKED
             return False
-        
+
         return True
+
+    def is_unlocked(self) -> bool:
+        """Check if user is currently unlocked (alias for is_authenticated)."""
+        return self.is_authenticated()
     
     def is_locked(self) -> bool:
         """Check if the system is locked."""
