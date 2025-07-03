@@ -15,7 +15,7 @@ Welcome to SAM (Smart Assistant Memory) Community Edition Beta! This guide will 
 1. **Download SAM**
    ```bash
    # If you have git:
-   git clone <repository-url>
+   git clone https://github.com/forge-1825/SAM.git
    cd SAM
    
    # Or download and extract the ZIP file

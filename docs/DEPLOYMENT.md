@@ -6,7 +6,7 @@
 
 1. **Clone and Setup**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/forge-1825/SAM.git
    cd SAM
    pip install -r requirements.txt
    ```

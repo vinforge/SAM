@@ -5,7 +5,7 @@ Thank you for your interest in contributing to SAM! This document provides guide
 ## 🤝 How to Contribute
 
 ### Reporting Issues
-- Use the [GitHub Issues](https://github.com/your-org/SAM/issues) page
+- Use the [GitHub Issues](https://github.com/forge-1825/SAM/issues) page
 - Search existing issues before creating a new one
 - Provide detailed information including:
   - SAM version
@@ -15,7 +15,7 @@ Thank you for your interest in contributing to SAM! This document provides guide
   - Expected vs actual behavior
 
 ### Suggesting Features
-- Open a [GitHub Discussion](https://github.com/your-org/SAM/discussions)
+- Open a [GitHub Discussion](https://github.com/forge-1825/SAM/discussions)
 - Describe the feature and its use case
 - Explain how it fits with SAM's goals
 - Consider implementation complexity
@@ -25,7 +25,7 @@ Thank you for your interest in contributing to SAM! This document provides guide
 #### Development Setup
 ```bash
 # Fork and clone the repository
-git clone https://github.com/your-username/SAM.git
+git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
 # Create a virtual environment
