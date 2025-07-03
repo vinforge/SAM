@@ -215,17 +215,17 @@ class SAMTPVIntegration:
                                    prompt: str,
                                    query_id: str,
                                    ollama_params: Optional[Dict[str, Any]]) -> str:
-        """Call Ollama API with TPV monitoring simulation.
-        
+        """Call Ollama API with TPV and dissonance monitoring simulation.
+
         Since Ollama doesn't support streaming with hidden states, we simulate
         the token-by-token monitoring by making the call and then analyzing
-        the response progressively.
-        
+        the response progressively with both TPV and dissonance scoring.
+
         Args:
             prompt: The prompt to send to Ollama
             query_id: TPV monitoring query ID
             ollama_params: Parameters for Ollama API call
-            
+
         Returns:
             Generated response content
         """
@@ -240,65 +240,133 @@ class SAMTPVIntegration:
                 "max_tokens": 500
             }
         }
-        
+
         # Merge with provided parameters
         if ollama_params:
             default_params.update(ollama_params)
-        
+
         # Make Ollama API call
         response = requests.post(
             "http://localhost:11434/api/generate",
             json=default_params,
             timeout=180  # Extended timeout for complex reasoning tasks
         )
-        
+
         if response.status_code != 200:
             raise Exception(f"Ollama API error: {response.status_code}")
-        
+
         response_data = response.json()
         full_response = response_data.get('response', '').strip()
-        
+
         if not full_response:
             raise Exception("Empty response from Ollama")
-        
-        # Simulate progressive monitoring by analyzing response in chunks
-        self._simulate_progressive_monitoring(full_response, query_id)
-        
+
+        # Simulate progressive monitoring with dissonance detection
+        self._simulate_progressive_monitoring_with_dissonance(full_response, query_id)
+
         return full_response
     
-    def _simulate_progressive_monitoring(self, full_response: str, query_id: str):
-        """Simulate progressive TPV monitoring of response generation.
-        
+    def _simulate_progressive_monitoring_with_dissonance(self, full_response: str, query_id: str):
+        """Simulate progressive TPV and dissonance monitoring of response generation.
+
         Args:
             full_response: Complete response from Ollama
             query_id: TPV monitoring query ID
         """
         words = full_response.split()
         chunk_size = max(5, len(words) // 10)  # Divide into ~10 chunks
-        
+
         current_text = ""
         for i in range(0, len(words), chunk_size):
             chunk = words[i:i + chunk_size]
             current_text += " " + " ".join(chunk)
             current_text = current_text.strip()
-            
-            # Get TPV score for current text
+
+            # Simulate logits for dissonance calculation
+            # In a real implementation, these would come from the model
+            simulated_logits = self._simulate_logits_for_dissonance(current_text, chunk_size)
+
+            # Get TPV score with dissonance monitoring
             score = self.tpv_monitor.predict_progress(
-                current_text, 
-                query_id, 
-                token_count=len(current_text.split())
+                current_text,
+                query_id,
+                token_count=len(current_text.split()),
+                logits=simulated_logits
             )
-            
-            # Check if should continue (passive mode always returns True)
+
+            # Check if should continue with dissonance-aware control
             trace = self.tpv_monitor.get_trace(query_id)
             if trace:
                 should_continue = self.reasoning_controller.should_continue(trace)
                 if not should_continue:
-                    logger.warning(f"Controller indicated stop for {query_id}")
+                    # Log the reason for stopping
+                    latest_dissonance = trace.get_latest_dissonance()
+                    logger.warning(f"Controller indicated stop for {query_id} "
+                                 f"(TPV: {score:.3f}, Dissonance: {latest_dissonance:.3f if latest_dissonance else 'N/A'})")
                     break
-            
+
             # Small delay to simulate real-time generation
             time.sleep(0.05)
+
+    def _simulate_logits_for_dissonance(self, current_text: str, chunk_size: int) -> Optional[Any]:
+        """
+        Simulate logits for dissonance calculation.
+
+        In a real implementation, these would come directly from the model.
+        This simulation creates realistic logit patterns for testing.
+
+        Args:
+            current_text: Current text being analyzed
+            chunk_size: Size of current chunk
+
+        Returns:
+            Simulated logits tensor or None
+        """
+        try:
+            import torch
+            import numpy as np
+
+            # Get vocab size from config
+            vocab_size = 32000  # Default vocab size
+            try:
+                from .tpv_config import TPVConfig
+                config = TPVConfig()
+                vocab_size = config.get_vocab_size()
+            except:
+                pass
+
+            # Create realistic logit distribution based on text characteristics
+            # This is a simplified simulation for testing purposes
+
+            # Base logits (slightly random)
+            base_logits = torch.randn(vocab_size) * 2.0
+
+            # Simulate different dissonance patterns based on text characteristics
+            text_length = len(current_text.split())
+
+            if "?" in current_text or "uncertain" in current_text.lower():
+                # High uncertainty -> higher dissonance (more uniform distribution)
+                base_logits = torch.randn(vocab_size) * 0.5  # Lower variance
+            elif text_length > 50:
+                # Long text -> potentially higher dissonance
+                noise = torch.randn(vocab_size) * 0.3
+                base_logits += noise
+            elif any(word in current_text.lower() for word in ["complex", "difficult", "analyze"]):
+                # Complex content -> moderate dissonance
+                base_logits = torch.randn(vocab_size) * 1.5
+
+            # Add some top-k structure (realistic for language models)
+            top_k = 50
+            top_indices = torch.topk(base_logits, top_k).indices
+            mask = torch.zeros_like(base_logits)
+            mask[top_indices] = 1.0
+            base_logits = base_logits * mask + torch.full_like(base_logits, -float('inf')) * (1 - mask)
+
+            return base_logits
+
+        except Exception as e:
+            logger.warning(f"Failed to simulate logits: {e}")
+            return None
     
     def _generate_standard_response(self,
                                   prompt: str,
