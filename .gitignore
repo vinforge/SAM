@@ -166,3 +166,21 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+# Database files
+memory_store/chroma_db/
+chroma_db/
+*.sqlite3
+*.db
+
+# Large model files
+models/embeddings/
+web_ui/models/
+
+# Environment files
+.env
+keystore.json
+security/keystore.json
+
+# Logs
+logs/
+*.log
