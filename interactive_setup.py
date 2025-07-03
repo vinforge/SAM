@@ -172,9 +172,52 @@ def setup_encryption():
     """Setup encryption and master password."""
     print("\n🔐 Setting up encryption...")
     print("SAM uses enterprise-grade encryption to protect your data.")
-    print("You'll create a master password during first launch.")
-    print("✅ Encryption will be configured on first run")
-    return True
+    print("Let's create your master password now.")
+
+    print("\n" + "="*60)
+    print("🔑 MASTER PASSWORD CREATION")
+    print("="*60)
+    print("⚠️  IMPORTANT:")
+    print("   • Choose a strong password you'll remember")
+    print("   • This password cannot be recovered if lost")
+    print("   • All your SAM data will be encrypted with this password")
+    print("   • Minimum 8 characters (12+ recommended)")
+
+    # Ask if user wants to create password now or later
+    print("\nYou can create your master password now or during first launch.")
+    response = input("Create master password now? (Y/n): ").strip().lower()
+
+    if response == 'n':
+        print("✅ Master password will be created on first launch")
+        return True
+
+    # Create master password interactively
+    try:
+        import subprocess
+        import sys
+
+        print("\n🔐 Running encryption setup...")
+        result = subprocess.run([sys.executable, "setup_encryption.py"],
+                               capture_output=False, text=True)
+
+        if result.returncode == 0:
+            print("✅ Master password created successfully!")
+            print("✅ Encryption setup completed!")
+            return True
+        else:
+            print("❌ Encryption setup failed!")
+            print("💡 You can set up encryption later by running:")
+            print("   python setup_encryption.py")
+            return True  # Don't fail the entire setup
+
+    except FileNotFoundError:
+        print("❌ setup_encryption.py not found")
+        print("✅ Encryption will be configured on first run")
+        return True
+    except Exception as e:
+        print(f"❌ Encryption setup failed: {e}")
+        print("✅ Encryption will be configured on first run")
+        return True
 
 def check_ollama():
     """Check if Ollama is installed."""
@@ -222,7 +265,17 @@ def final_setup():
     print("✅ SAM installation completed successfully!")
     print("\n🚀 **Next Steps:**")
     print("   1. Start SAM: python start_sam_secure.py --mode full")
-    print("   2. You'll be prompted to create your master password (first time only)")
+
+    # Check if encryption was already set up
+    try:
+        from pathlib import Path
+        if Path("security").exists() and any(Path("security").glob("*.key")):
+            print("   2. Enter your master password when prompted")
+        else:
+            print("   2. Create your master password when prompted (if not done already)")
+    except:
+        print("   2. Create your master password when prompted (if not done already)")
+
     print("   3. Access SAM at http://localhost:8502")
 
     print("\n📍 **Access Points:**")
@@ -232,8 +285,8 @@ def final_setup():
 
     print("\n🔐 **Important:**")
     print("   • Your master password encrypts all SAM data")
-    print("   • Choose a strong password you'll remember")
-    print("   • This password cannot be recovered if lost")
+    print("   • Keep your password safe - it cannot be recovered if lost")
+    print("   • SAM runs entirely on your machine for maximum privacy")
 
     return True
 
@@ -245,7 +298,7 @@ def main():
     print("   • System requirements check")
     print("   • Dependency installation")
     print("   • Directory creation")
-    print("   • Security setup")
+    print("   • Master password creation (interactive)")
     print("   • AI model configuration")
     
     response = input("\n🤔 Continue with interactive setup? (Y/n): ").strip().lower()
