@@ -50,9 +50,18 @@ def check_system_requirements():
 
     try:
         import psutil
-        memory_gb = psutil.virtual_memory().total / (1024**3)
 
-        # Windows-compatible disk usage check
+        # Check memory with error handling
+        try:
+            memory_gb = psutil.virtual_memory().total / (1024**3)
+            print(f"✅ Memory: {memory_gb:.1f}GB")
+            if memory_gb < 4:
+                print("⚠️  Warning: Less than 4GB RAM detected. SAM may run slowly.")
+        except:
+            print("ℹ️  Memory check skipped")
+            memory_gb = 0
+
+        # Check disk space with robust error handling
         try:
             if platform.system() == "Windows":
                 # Use current drive on Windows
@@ -62,27 +71,24 @@ def check_system_requirements():
             else:
                 # Use current directory on Unix-like systems
                 disk_gb = psutil.disk_usage('.').free / (1024**3)
-        except Exception as e:
-            print(f"⚠️  Could not check disk space: {e}")
-            disk_gb = 0  # Set to 0 to skip disk space warning
 
-        print(f"✅ Memory: {memory_gb:.1f}GB")
-        if disk_gb > 0:
             print(f"✅ Disk space: {disk_gb:.1f}GB available")
+            if disk_gb < 2:
+                print("⚠️  Warning: Less than 2GB disk space. Consider freeing up space.")
+        except:
+            # Broad exception handling like install_sam.py for maximum compatibility
+            print("ℹ️  Disk space check skipped")
+            disk_gb = 0
+
         print(f"✅ Platform: {platform.system()} {platform.machine()}")
-
-        if memory_gb < 4:
-            print("⚠️  Warning: Less than 4GB RAM detected. SAM may run slowly.")
-        if disk_gb > 0 and disk_gb < 2:
-            print("⚠️  Warning: Less than 2GB disk space. Consider freeing up space.")
-
         return True
+
     except ImportError:
-        print("⚠️  Could not check system requirements (psutil not available)")
+        print("ℹ️  System requirements check skipped (psutil not available)")
         print(f"✅ Platform: {platform.system()} {platform.machine()}")
         return True
     except Exception as e:
-        print(f"⚠️  System requirements check failed: {e}")
+        print(f"ℹ️  System requirements check skipped: {e}")
         print(f"✅ Platform: {platform.system()} {platform.machine()}")
         return True
 
