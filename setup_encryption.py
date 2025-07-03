@@ -11,6 +11,7 @@ Version: 1.0.0
 
 import os
 import sys
+import time
 import getpass
 from pathlib import Path
 
@@ -38,40 +39,61 @@ def setup_master_password():
     """Setup master password for encryption."""
     print("\n🔐 Master Password Setup")
     print("=" * 50)
-    
+
     try:
         from security import SecureStateManager
         security_manager = SecureStateManager()
-        
+
         if not security_manager.is_setup_required():
-            print("✅ Encryption is already set up!")
-            print("🔑 Use your existing master password to unlock SAM.")
-            return True
-        
-        print("This is your first time setting up SAM encryption.")
+            print("⚠️  Encryption appears to be already set up!")
+            print("🔍 This could mean:")
+            print("   • You already have a master password")
+            print("   • This is a shared/existing SAM installation")
+            print("   • Previous setup was incomplete")
+
+            print("\n🤔 What would you like to do?")
+            print("1. 🔑 Test existing master password")
+            print("2. 🔄 Reset encryption (will delete existing encrypted data)")
+            print("3. ❌ Skip encryption setup")
+
+            while True:
+                choice = input("\nEnter your choice (1-3): ").strip()
+                if choice in ['1', '2', '3']:
+                    break
+                print("❌ Please enter 1, 2, or 3")
+
+            if choice == '1':
+                return test_existing_password(security_manager)
+            elif choice == '2':
+                return reset_encryption_setup(security_manager)
+            else:
+                print("⏭️  Skipping encryption setup")
+                return True
+
+        print("🆕 This is your first time setting up SAM encryption.")
         print("You need to create a master password to encrypt your data.")
         print("\n⚠️  IMPORTANT:")
         print("- Choose a strong password you'll remember")
         print("- This password cannot be recovered if lost")
         print("- All your SAM data will be encrypted with this password")
         print("- Minimum 8 characters (12+ recommended)")
-        
+
         while True:
             password = getpass.getpass("\n🔑 Enter master password: ").strip()
             if len(password) < 8:
                 print("❌ Password must be at least 8 characters long")
                 continue
-            
+
             confirm = getpass.getpass("🔑 Confirm master password: ").strip()
             if password != confirm:
                 print("❌ Passwords do not match")
                 continue
-            
+
             break
-        
+
         print("\n🔐 Setting up secure enclave...")
         success = security_manager.setup_master_password(password)
-        
+
         if success:
             print("✅ Master password setup successful!")
             print("✅ Encryption keys generated")
@@ -80,9 +102,116 @@ def setup_master_password():
         else:
             print("❌ Failed to setup master password")
             return False
-            
+
     except Exception as e:
         print(f"❌ Encryption setup failed: {e}")
+        return False
+
+def test_existing_password(security_manager):
+    """Test if user knows the existing master password."""
+    print("\n🔑 Testing Existing Master Password")
+    print("=" * 40)
+
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            password = getpass.getpass(f"\n🔑 Enter your master password (attempt {attempt + 1}/{max_attempts}): ").strip()
+
+            if security_manager.authenticate(password):
+                print("✅ Master password verified successfully!")
+                print("✅ Encryption is working correctly")
+                print("🎉 You can now use SAM with your existing password")
+                return True
+            else:
+                print("❌ Incorrect master password")
+                if attempt < max_attempts - 1:
+                    print("🔄 Please try again")
+
+        except Exception as e:
+            print(f"❌ Authentication error: {e}")
+
+    print(f"\n💥 Failed to authenticate after {max_attempts} attempts")
+    print("🤔 Would you like to reset encryption instead?")
+
+    reset_choice = input("Reset encryption? (y/N): ").strip().lower()
+    if reset_choice == 'y':
+        return reset_encryption_setup(security_manager)
+    else:
+        print("⏭️  Encryption setup incomplete")
+        return False
+
+def reset_encryption_setup(security_manager):
+    """Reset encryption setup by deleting existing keystore."""
+    print("\n🔄 Resetting Encryption Setup")
+    print("=" * 40)
+
+    print("⚠️  WARNING: This will:")
+    print("   • Delete all existing encryption keys")
+    print("   • Remove encrypted memory data")
+    print("   • Require creating a new master password")
+    print("   • Cannot be undone!")
+
+    confirm = input("\n❓ Are you sure you want to reset? Type 'RESET' to confirm: ").strip()
+    if confirm != 'RESET':
+        print("❌ Reset cancelled")
+        return False
+
+    try:
+        # Delete keystore and encrypted data
+        import shutil
+        from pathlib import Path
+
+        # Backup existing keystore
+        keystore_path = Path("security/keystore.json")
+        if keystore_path.exists():
+            backup_path = Path(f"security/keystore_backup_{int(time.time())}.json")
+            shutil.copy2(keystore_path, backup_path)
+            print(f"📦 Backed up existing keystore to: {backup_path}")
+            keystore_path.unlink()
+
+        # Remove encrypted memory store
+        encrypted_store = Path("memory_store/encrypted")
+        if encrypted_store.exists():
+            shutil.rmtree(encrypted_store)
+            print("🗑️  Removed encrypted memory store")
+
+        # Reinitialize security manager
+        security_manager._initialize_state()
+
+        print("✅ Encryption reset complete!")
+        print("🆕 Now creating new master password...")
+
+        # Now create new master password
+        print("\n🔐 Create New Master Password")
+        print("=" * 35)
+
+        while True:
+            password = getpass.getpass("\n🔑 Enter new master password: ").strip()
+            if len(password) < 8:
+                print("❌ Password must be at least 8 characters long")
+                continue
+
+            confirm = getpass.getpass("🔑 Confirm new master password: ").strip()
+            if password != confirm:
+                print("❌ Passwords do not match")
+                continue
+
+            break
+
+        print("\n🔐 Setting up new secure enclave...")
+        success = security_manager.setup_master_password(password)
+
+        if success:
+            print("✅ New master password setup successful!")
+            print("✅ Fresh encryption keys generated")
+            print("✅ Secure storage reinitialized")
+            return True
+        else:
+            print("❌ Failed to setup new master password")
+            return False
+
+    except Exception as e:
+        print(f"❌ Reset failed: {e}")
         return False
 
 def create_security_directories():
