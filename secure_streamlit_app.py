@@ -649,13 +649,36 @@ def render_sam_pro_sidebar():
             st.caption(item)
 
 def render_tpv_status():
-    """Render TPV (Thinking Process Verification) status display with Phase 2 active control."""
+    """Render enhanced TPV status with Phase 5B dissonance monitoring."""
+    try:
+        # Try to use enhanced visualization first
+        try:
+            from ui.tpv_visualization import render_tpv_status_enhanced
+
+            # Get TPV data from the last response
+            tpv_data = st.session_state.get('tpv_session_data', {}).get('last_response')
+
+            # Use enhanced visualization
+            render_tpv_status_enhanced(tpv_data)
+            return
+
+        except ImportError:
+            logger.debug("Enhanced TPV visualization not available, using fallback")
+
+        # Fallback to enhanced version of original implementation
+        _render_tpv_status_enhanced_fallback()
+
+    except Exception as e:
+        logger.debug(f"TPV status display error: {e}")
+
+def _render_tpv_status_enhanced_fallback():
+    """Enhanced fallback TPV status display with dissonance support."""
     try:
         # Check if TPV data is available
         tpv_data = st.session_state.get('tpv_session_data', {}).get('last_response')
 
         if tpv_data and tpv_data.get('tpv_enabled'):
-            with st.expander("🧠 Thinking Process Analysis (Phase 2: Active Control)", expanded=False):
+            with st.expander("🧠 Cognitive Process Analysis (Phase 5B: Dissonance-Aware)", expanded=False):
                 # Main metrics row
                 col1, col2, col3, col4 = st.columns(4)
 
@@ -674,20 +697,25 @@ def render_tpv_status():
                     )
 
                 with col3:
-                    trigger_type = tpv_data.get('trigger_type', 'none')
-                    st.metric(
-                        "Trigger Type",
-                        trigger_type.title(),
-                        help="What triggered TPV monitoring"
-                    )
+                    # NEW: Dissonance score display
+                    dissonance_score = tpv_data.get('final_dissonance_score')
+                    if dissonance_score is not None:
+                        st.metric(
+                            "Final Dissonance",
+                            f"{dissonance_score:.3f}",
+                            help="Final cognitive dissonance score (0.0 - 1.0)"
+                        )
+                    else:
+                        st.metric("Final Dissonance", "N/A", help="Dissonance monitoring not available")
 
                 with col4:
-                    # Active control decision
+                    # Enhanced control decision with dissonance awareness
                     control_decision = tpv_data.get('control_decision', 'CONTINUE')
                     decision_color = {
                         'COMPLETE': '🟢',
                         'PLATEAU': '🟡',
                         'HALT': '🔴',
+                        'DISSONANCE': '🧠',  # NEW: Dissonance stop
                         'CONTINUE': '⚪'
                     }.get(control_decision, '⚪')
 
@@ -697,9 +725,9 @@ def render_tpv_status():
                         help="Active control decision made during reasoning"
                     )
 
-                # Active Control Details
+                # Enhanced Control Details with Dissonance Awareness
                 if tpv_data.get('control_decision') != 'CONTINUE':
-                    st.subheader("🎛️ Active Control Details")
+                    st.subheader("🎛️ Enhanced Control Details")
                     control_reason = tpv_data.get('control_reason', 'No reason provided')
 
                     if control_decision == 'COMPLETE':
@@ -708,34 +736,60 @@ def render_tpv_status():
                         st.warning(f"📊 **Plateau Detected**: {control_reason}")
                     elif control_decision == 'HALT':
                         st.error(f"🛑 **Hard Stop**: {control_reason}")
+                    elif control_decision == 'DISSONANCE':
+                        st.warning(f"🧠 **High Cognitive Dissonance**: {control_reason}")
 
-                # Performance metrics
+                # NEW: Dissonance Analysis Section
+                if tpv_data.get('dissonance_analysis'):
+                    st.subheader("🧠 Cognitive Dissonance Analysis")
+                    analysis = tpv_data['dissonance_analysis']
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Mean Dissonance", f"{analysis.get('mean_dissonance', 0.0):.3f}")
+                    with col2:
+                        st.metric("Peak Dissonance", f"{analysis.get('max_dissonance', 0.0):.3f}")
+                    with col3:
+                        high_steps = len(analysis.get('high_dissonance_steps', []))
+                        st.metric("High Dissonance Steps", high_steps)
+
+                # Enhanced Performance metrics with dissonance monitoring
                 perf_metrics = tpv_data.get('performance_metrics', {})
                 if perf_metrics:
-                    st.subheader("📊 Performance Metrics")
-                    col1, col2, col3 = st.columns(3)
+                    st.subheader("📊 Enhanced Performance Metrics")
+                    col1, col2, col3, col4 = st.columns(4)
 
                     with col1:
                         st.metric(
                             "Total Time",
-                            f"{perf_metrics.get('total_time', 0.0):.2f}s",
+                            f"{perf_metrics.get('total_time', 0.0):.3f}s",
                             help="Total response generation time"
                         )
 
                     with col2:
                         st.metric(
                             "TPV Overhead",
-                            f"{perf_metrics.get('tpv_overhead', 0.0):.2f}s",
-                            help="Estimated TPV processing overhead"
+                            f"{perf_metrics.get('tpv_overhead', 0.0):.3f}s",
+                            help="TPV monitoring processing overhead"
                         )
 
                     with col3:
-                        efficiency = ((perf_metrics.get('total_time', 1) - perf_metrics.get('tpv_overhead', 0)) /
+                        # NEW: Dissonance processing time
+                        dissonance_time = perf_metrics.get('dissonance_processing_time', 0.0)
+                        st.metric(
+                            "Dissonance Analysis",
+                            f"{dissonance_time:.3f}s",
+                            help="Cognitive dissonance calculation time"
+                        )
+
+                    with col4:
+                        total_overhead = perf_metrics.get('tpv_overhead', 0.0) + dissonance_time
+                        efficiency = ((perf_metrics.get('total_time', 1) - total_overhead) /
                                     perf_metrics.get('total_time', 1) * 100)
                         st.metric(
                             "Efficiency",
                             f"{efficiency:.1f}%",
-                            help="Processing efficiency (lower overhead = higher efficiency)"
+                            help="Processing efficiency (includes dissonance monitoring)"
                         )
 
                 # Control Statistics
@@ -759,11 +813,14 @@ def render_tpv_status():
                             help="Percentage of decisions that allowed reasoning to continue"
                         )
 
-                # Status indicator
-                if tpv_data.get('control_decision') == 'CONTINUE':
-                    st.info("🔍 **Phase 2 TPV Active**: Real-time thinking process monitoring with passive observation.")
+                # Enhanced Status indicator for Phase 5B
+                control_decision = tpv_data.get('control_decision', 'CONTINUE')
+                if control_decision == 'CONTINUE':
+                    st.info("🧠 **Phase 5B Active**: Real-time cognitive dissonance monitoring with meta-reasoning awareness.")
+                elif control_decision == 'DISSONANCE':
+                    st.warning("🧠 **Phase 5B Intervention**: Stopped due to high cognitive dissonance - preventing potential hallucination.")
                 else:
-                    st.success("🎛️ **Phase 2 Active Control**: AI reasoning was actively managed for optimal quality.")
+                    st.success("🎛️ **Phase 5B Enhanced Control**: AI reasoning managed with dissonance-aware meta-cognitive monitoring.")
 
         elif tpv_data and not tpv_data.get('tpv_enabled'):
             with st.expander("🧠 Thinking Process Analysis", expanded=False):
