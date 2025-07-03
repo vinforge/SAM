@@ -298,8 +298,9 @@ def launch_sam_quick():
             return False
 
     print(f"\n🚀 Launching SAM...")
-    print("📝 On first launch, you'll be prompted to create a master password")
+    print("📝 First-time setup: You'll create your master password")
     print("🔒 This password encrypts all your data - choose carefully!")
+    print("💡 SAM will automatically guide you through encryption setup")
     print("\n⚠️  Press Ctrl+C to stop SAM when you're done")
 
     try:
@@ -387,6 +388,7 @@ def main():
     print("   • SAM runs entirely on your machine")
     print("   • All conversations and documents are private")
     print("   • Use the security dashboard to monitor encryption")
+    print("   • Master password setup is automatic on first launch")
     
     print("\n📚 Documentation:")
     print("   • docs/QUICK_ENCRYPTION_SETUP.md - 5-minute setup guide")

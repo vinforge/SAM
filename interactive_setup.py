@@ -218,18 +218,23 @@ def check_ollama():
 def final_setup():
     """Final setup steps."""
     print("\n🎉 Final setup...")
-    
+
     print("✅ SAM installation completed successfully!")
     print("\n🚀 **Next Steps:**")
     print("   1. Start SAM: python start_sam_secure.py --mode full")
-    print("   2. Create your master password when prompted")
+    print("   2. You'll be prompted to create your master password (first time only)")
     print("   3. Access SAM at http://localhost:8502")
-    
+
     print("\n📍 **Access Points:**")
     print("   • Secure Chat: http://localhost:8502")
-    print("   • Memory Center: http://localhost:8501")
+    print("   • Memory Center: Integrated into secure interface")
     print("   • Standard Chat: http://localhost:5001")
-    
+
+    print("\n🔐 **Important:**")
+    print("   • Your master password encrypts all SAM data")
+    print("   • Choose a strong password you'll remember")
+    print("   • This password cannot be recovered if lost")
+
     return True
 
 def main():

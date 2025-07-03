@@ -125,6 +125,32 @@ def check_security_setup():
         print(f"⚠️  Security check failed: {e}")
         return False
 
+def run_encryption_setup():
+    """Run encryption setup for new users."""
+    print("\n🔐 Setting up SAM encryption...")
+
+    try:
+        import subprocess
+        import sys
+
+        # Run the encryption setup script
+        result = subprocess.run([sys.executable, "setup_encryption.py"],
+                               capture_output=False, text=True)
+
+        if result.returncode == 0:
+            print("✅ Encryption setup completed successfully!")
+            return True
+        else:
+            print("❌ Encryption setup failed!")
+            return False
+
+    except FileNotFoundError:
+        print("❌ setup_encryption.py not found")
+        return False
+    except Exception as e:
+        print(f"❌ Encryption setup failed: {e}")
+        return False
+
 def run_migration():
     """Run data migration to encrypted format."""
     print("\n🔄 Starting data migration to encrypted format...")
@@ -339,17 +365,22 @@ def main():
     
     # Check security setup
     security_ready = check_security_setup()
-    
+
     if not security_ready:
         print("\n🔧 Security setup required.")
-        print("You can either:")
-        print("  1. Run migration: python start_sam_secure.py --mode migrate")
-        print("  2. Launch and setup during first use")
-        
-        response = input("\nProceed with launch? (y/N): ").strip().lower()
-        if response != 'y':
-            print("👋 Setup cancelled")
+        print("This is your first time running SAM. Let's set up your master password.")
+
+        # Automatically run encryption setup for new users
+        print("\n🔐 Starting encryption setup...")
+        success = run_encryption_setup()
+
+        if not success:
+            print("❌ Encryption setup failed. You can also try:")
+            print("  1. Run migration: python start_sam_secure.py --mode migrate")
+            print("  2. Manual setup: python setup_encryption.py")
             return
+
+        print("✅ Encryption setup completed! Continuing with SAM launch...")
     
     # Launch based on mode
     if args.mode == "web":
