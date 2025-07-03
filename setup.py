@@ -91,13 +91,13 @@ def run_interactive_setup():
     print("\n🎯 Starting Interactive Setup...")
     print("This will guide you through the complete SAM installation process.")
     
-    if not Path("setup_sam.py").exists():
+    if not Path("interactive_setup.py").exists():
         print("❌ Interactive setup script not found")
         print("Please ensure you're in the SAM directory")
         return False
-    
+
     try:
-        subprocess.run([sys.executable, "setup_sam.py"], check=True)
+        subprocess.run([sys.executable, "interactive_setup.py"], check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Interactive setup failed: {e}")
