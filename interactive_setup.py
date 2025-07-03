@@ -47,24 +47,43 @@ def check_python_version():
 def check_system_requirements():
     """Check system requirements."""
     print("\n💻 Checking system requirements...")
-    
+
     try:
         import psutil
         memory_gb = psutil.virtual_memory().total / (1024**3)
-        disk_gb = psutil.disk_usage('.').free / (1024**3)
-        
+
+        # Windows-compatible disk usage check
+        try:
+            if platform.system() == "Windows":
+                # Use current drive on Windows
+                import os
+                current_drive = os.path.splitdrive(os.getcwd())[0] + os.sep
+                disk_gb = psutil.disk_usage(current_drive).free / (1024**3)
+            else:
+                # Use current directory on Unix-like systems
+                disk_gb = psutil.disk_usage('.').free / (1024**3)
+        except Exception as e:
+            print(f"⚠️  Could not check disk space: {e}")
+            disk_gb = 0  # Set to 0 to skip disk space warning
+
         print(f"✅ Memory: {memory_gb:.1f}GB")
-        print(f"✅ Disk space: {disk_gb:.1f}GB available")
+        if disk_gb > 0:
+            print(f"✅ Disk space: {disk_gb:.1f}GB available")
         print(f"✅ Platform: {platform.system()} {platform.machine()}")
-        
+
         if memory_gb < 4:
             print("⚠️  Warning: Less than 4GB RAM detected. SAM may run slowly.")
-        if disk_gb < 2:
+        if disk_gb > 0 and disk_gb < 2:
             print("⚠️  Warning: Less than 2GB disk space. Consider freeing up space.")
-            
+
         return True
     except ImportError:
         print("⚠️  Could not check system requirements (psutil not available)")
+        print(f"✅ Platform: {platform.system()} {platform.machine()}")
+        return True
+    except Exception as e:
+        print(f"⚠️  System requirements check failed: {e}")
+        print(f"✅ Platform: {platform.system()} {platform.machine()}")
         return True
 
 def install_dependencies():
@@ -96,19 +115,32 @@ numpy>=1.24.0
     
     try:
         print("  🔄 Upgrading pip...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], 
-                      check=True, capture_output=True)
-        
+        pip_result = subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "pip"],
+                                   capture_output=True, text=True, timeout=120)
+        if pip_result.returncode != 0:
+            print(f"⚠️  Pip upgrade warning: {pip_result.stderr}")
+
         print("  📥 Installing SAM dependencies...")
-        result = subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], 
-                               check=True, capture_output=True, text=True)
-        
-        print("✅ Dependencies installed successfully!")
-        return True
-        
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Dependency installation failed:")
-        print(f"Error: {e.stderr if e.stderr else e.stdout}")
+        install_result = subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+                                       capture_output=True, text=True, timeout=300)
+
+        if install_result.returncode == 0:
+            print("✅ Dependencies installed successfully!")
+            return True
+        else:
+            print(f"❌ Dependency installation failed:")
+            print(f"Error: {install_result.stderr if install_result.stderr else install_result.stdout}")
+            print("\n🔧 Try manual installation:")
+            print("   pip install -r requirements.txt")
+            return False
+
+    except subprocess.TimeoutExpired:
+        print("❌ Dependency installation timed out")
+        print("🔧 Try manual installation:")
+        print("   pip install -r requirements.txt")
+        return False
+    except Exception as e:
+        print(f"❌ Dependency installation failed: {e}")
         print("\n🔧 Try manual installation:")
         print("   pip install -r requirements.txt")
         return False
@@ -141,22 +173,39 @@ def setup_encryption():
 def check_ollama():
     """Check if Ollama is installed."""
     print("\n🤖 Checking Ollama installation...")
-    
+
     try:
-        result = subprocess.run(["ollama", "--version"], 
-                               capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            print("✅ Ollama is installed!")
+        # Try different ways to find ollama on different platforms
+        ollama_commands = ["ollama", "ollama.exe"]
+        ollama_found = False
+
+        for cmd in ollama_commands:
+            try:
+                result = subprocess.run([cmd, "--version"],
+                                       capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    print("✅ Ollama is installed!")
+                    ollama_found = True
+                    break
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                continue
+
+        if ollama_found:
             return True
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
-    
+
+    except Exception as e:
+        print(f"⚠️  Error checking Ollama: {e}")
+
     print("⚠️  Ollama not found. SAM can work without it, but AI features will be limited.")
     print("\n📥 To install Ollama:")
     print("   • Visit: https://ollama.ai/download")
     print("   • Download for your platform")
-    print("   • Install and run: ollama pull hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M")
-    
+    if platform.system() == "Windows":
+        print("   • Install Ollama for Windows")
+        print("   • Open Command Prompt and run: ollama pull hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M")
+    else:
+        print("   • Install and run: ollama pull hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M")
+
     response = input("\nContinue without Ollama? (y/N): ").strip().lower()
     return response == 'y'
 
