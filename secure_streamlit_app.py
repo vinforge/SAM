@@ -645,6 +645,28 @@ def render_sam_pro_sidebar():
         else:
             status_items.append("🧠 TPV: ❌ Inactive")
 
+        # Dissonance Monitoring status (Phase 5B)
+        dissonance_active = False
+
+        # Check if dissonance monitoring is active
+        try:
+            # Check if TPV has dissonance monitoring enabled
+            tpv_session_data = st.session_state.get('tpv_session_data', {})
+            last_response = tpv_session_data.get('last_response', {})
+
+            # Check for dissonance data in the last response
+            if (last_response.get('dissonance_analysis') or
+                last_response.get('final_dissonance_score') is not None or
+                (last_response.get('tpv_enabled', False) and tpv_active)):
+                dissonance_active = True
+        except Exception:
+            dissonance_active = False
+
+        if dissonance_active:
+            status_items.append("🧠 Dissonance Monitor: ✅ Active")
+        else:
+            status_items.append("🧠 Dissonance Monitor: ❌ Inactive")
+
         for item in status_items:
             st.caption(item)
 
@@ -2615,7 +2637,52 @@ def get_secure_system_status() -> str:
 **🤖 AI Model:**
 • Model: DeepSeek-R1-0528-Qwen3-8B-GGUF
 • Backend: Ollama (localhost:11434)
-• Status: ✅ Connected"""
+• Status: ✅ Connected
+
+**🧠 Advanced Reasoning Systems:**"""
+
+        # Add TPV status
+        tpv_active = False
+        if (st.session_state.get('tpv_initialized') or
+            st.session_state.get('tpv_session_data', {}).get('last_response', {}).get('tpv_enabled') or
+            st.session_state.get('tpv_active')):
+            tpv_active = True
+
+        tpv_status = "✅ Active" if tpv_active else "❌ Inactive"
+        status_report += f"\n• TPV Active Control: {tpv_status}"
+
+        # Add Dissonance Monitoring status
+        dissonance_active = False
+        try:
+            tpv_session_data = st.session_state.get('tpv_session_data', {})
+            last_response = tpv_session_data.get('last_response', {})
+
+            if (last_response.get('dissonance_analysis') or
+                last_response.get('final_dissonance_score') is not None or
+                (last_response.get('tpv_enabled', False) and tpv_active)):
+                dissonance_active = True
+        except Exception:
+            dissonance_active = False
+
+        dissonance_status = "✅ Active (Phase 5B)" if dissonance_active else "❌ Inactive"
+        status_report += f"\n• Dissonance Monitor: {dissonance_status}"
+
+        # Add dissonance metrics if available
+        if dissonance_active:
+            try:
+                last_response = st.session_state.get('tpv_session_data', {}).get('last_response', {})
+                if last_response.get('final_dissonance_score') is not None:
+                    final_score = last_response['final_dissonance_score']
+                    status_report += f"\n• Last Dissonance Score: {final_score:.3f}"
+
+                if last_response.get('dissonance_analysis'):
+                    analysis = last_response['dissonance_analysis']
+                    mean_score = analysis.get('mean_dissonance', 0.0)
+                    peak_score = analysis.get('max_dissonance', 0.0)
+                    status_report += f"\n• Mean Dissonance: {mean_score:.3f}"
+                    status_report += f"\n• Peak Dissonance: {peak_score:.3f}"
+            except Exception:
+                pass
 
         return status_report
 
