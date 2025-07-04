@@ -681,7 +681,7 @@ def render_sam_pro_sidebar():
             dissonance_active = False
 
         if dissonance_active:
-            status_items.append("🧠 Dissonance Monitor: ✅ Active (Phase 5B)")
+            status_items.append("🧠 Dissonance Monitor: ✅ Active")
         else:
             status_items.append("🧠 Dissonance Monitor: ❌ Inactive")
 
@@ -2690,7 +2690,7 @@ def get_secure_system_status() -> str:
         except Exception:
             dissonance_active = False
 
-        dissonance_status = "✅ Active (Phase 5B)" if dissonance_active else "❌ Inactive"
+        dissonance_status = "✅ Active" if dissonance_active else "❌ Inactive"
         status_report += f"\n• Dissonance Monitor: {dissonance_status}"
 
         # Add dissonance metrics if available
