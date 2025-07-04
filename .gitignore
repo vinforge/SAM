@@ -184,3 +184,15 @@ security/keystore.json
 # Logs
 logs/
 *.log
+
+# SAM Pro Key Distribution (SECURITY SENSITIVE - DO NOT COMMIT TO PUBLIC REPO)
+scripts/generate_pro_activation_key.py
+scripts/enhanced_key_generator.py
+scripts/key_distribution_system.py
+data/key_database.json
+data/user_registrations.json
+data/key_distribution_log.json
+sam_pro_registration.py
+SAM_PRO_KEY_DISTRIBUTION_GUIDE.md
+config/key_distribution.json
+config/key_distribution.json.template
