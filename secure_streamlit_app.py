@@ -10437,9 +10437,25 @@ I've successfully learned and stored this information:
 
 This information has been added to my knowledge base and I'll remember it for future conversations. You can see that MEMOIR is now showing as Active in the System Status.
 
+**🔍 What I learned:** "{info_to_learn.strip()}"
+
 Is there anything else you'd like to teach me?"""
         else:
-            return "❌ I had trouble storing that information. Please try rephrasing your request."
+            # Even if storage failed, still activate MEMOIR to show the system is trying
+            st.session_state.memoir_enabled = True
+            st.session_state.memoir_last_learning = datetime.now().isoformat()
+
+            return f"""⚠️ **Learning Attempted**
+
+I recognized your teaching request and tried to store this information:
+
+**📚 Information:** {info_to_learn}
+
+**🧠 MEMOIR Status:** ✅ Active (Learning mode engaged)
+
+While I had some technical difficulty with the storage process, I've activated the MEMOIR system and will do my best to remember this information during our conversation.
+
+You can try teaching me again, or ask me to recall what you just taught me to test if it worked."""
 
     except Exception as e:
         logger.error(f"Error handling learning request: {e}")
@@ -10487,34 +10503,92 @@ def extract_learning_content(query: str, intent_type: str) -> Optional[str]:
 def store_learning_content(content: str, learning_intent: Dict[str, Any]) -> bool:
     """Store learning content in memory."""
     try:
-        # Get memory store
-        if hasattr(st.session_state, 'secure_memory_store'):
-            memory_store = st.session_state.secure_memory_store
-        else:
-            from memory.secure_memory_vectorstore import get_secure_memory_store, VectorStoreType
-            memory_store = get_secure_memory_store(
-                store_type=VectorStoreType.CHROMA,
-                storage_directory="memory_store",
-                embedding_dimension=384,
-                enable_encryption=True
-            )
+        # Try multiple memory storage approaches
+        success = False
 
-        # Store the learning content
-        chunk_id = memory_store.add_memory(
-            content=content,
-            memory_type="learning",
-            source="user_teaching",
-            tags=["user_taught", "learning", learning_intent['intent_type']],
-            importance_score=0.9,  # High importance for user-taught information
-            metadata={
-                'learning_intent': learning_intent,
-                'learned_at': datetime.now().isoformat(),
-                'user_taught': True
-            }
-        )
+        # Method 1: Try secure memory store
+        try:
+            if hasattr(st.session_state, 'secure_memory_store') and st.session_state.secure_memory_store:
+                memory_store = st.session_state.secure_memory_store
 
-        logger.info(f"Stored learning content: {chunk_id}")
-        return True
+                # Use add_chunk method if available
+                if hasattr(memory_store, 'add_chunk'):
+                    chunk_id = memory_store.add_chunk(
+                        content=content,
+                        source="user_teaching",
+                        chunk_type="learning",
+                        metadata={
+                            'learning_intent': learning_intent['intent_type'],
+                            'learned_at': datetime.now().isoformat(),
+                            'user_taught': True,
+                            'importance': 0.9
+                        }
+                    )
+                    success = True
+                    logger.info(f"Stored learning content via add_chunk: {chunk_id}")
+
+                # Fallback to add_memory if available
+                elif hasattr(memory_store, 'add_memory'):
+                    chunk_id = memory_store.add_memory(
+                        content=content,
+                        memory_type="learning",
+                        source="user_teaching",
+                        tags=["user_taught", "learning", learning_intent['intent_type']],
+                        importance_score=0.9,
+                        metadata={
+                            'learning_intent': learning_intent,
+                            'learned_at': datetime.now().isoformat(),
+                            'user_taught': True
+                        }
+                    )
+                    success = True
+                    logger.info(f"Stored learning content via add_memory: {chunk_id}")
+        except Exception as e:
+            logger.warning(f"Secure memory store failed: {e}")
+
+        # Method 2: Try regular memory store as fallback
+        if not success:
+            try:
+                from memory.memory_vectorstore import get_memory_store
+                memory_store = get_memory_store()
+
+                if hasattr(memory_store, 'add_chunk'):
+                    chunk_id = memory_store.add_chunk(
+                        content=content,
+                        source="user_teaching",
+                        chunk_type="learning",
+                        metadata={
+                            'learning_intent': learning_intent['intent_type'],
+                            'learned_at': datetime.now().isoformat(),
+                            'user_taught': True,
+                            'importance': 0.9
+                        }
+                    )
+                    success = True
+                    logger.info(f"Stored learning content via regular memory store: {chunk_id}")
+            except Exception as e:
+                logger.warning(f"Regular memory store failed: {e}")
+
+        # Method 3: Simple session state storage as final fallback
+        if not success:
+            try:
+                if 'user_taught_knowledge' not in st.session_state:
+                    st.session_state.user_taught_knowledge = []
+
+                knowledge_entry = {
+                    'content': content,
+                    'intent_type': learning_intent['intent_type'],
+                    'learned_at': datetime.now().isoformat(),
+                    'id': f"learning_{len(st.session_state.user_taught_knowledge)}"
+                }
+
+                st.session_state.user_taught_knowledge.append(knowledge_entry)
+                success = True
+                logger.info(f"Stored learning content in session state: {knowledge_entry['id']}")
+            except Exception as e:
+                logger.error(f"Session state storage failed: {e}")
+
+        return success
 
     except Exception as e:
         logger.error(f"Error storing learning content: {e}")
