@@ -123,7 +123,12 @@ class TPVTrigger:
             
             # Problem-solving indicators
             "solve", "problem", "issue", "challenge", "difficulty", "solution",
-            "answer", "explain", "clarify", "understand", "figure out"
+            "answer", "explain", "clarify", "understand", "figure out",
+
+            # Paradox and contradiction indicators
+            "paradox", "contradiction", "conflict", "inconsistent", "impossible",
+            "logical", "causality", "time travel", "grandfather", "bootstrap",
+            "circular", "self-referential", "recursive", "loop"
         ]
     
     def _initialize_complexity_patterns(self) -> List[str]:

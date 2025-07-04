@@ -120,12 +120,12 @@ class TPVConfig:
             },
             # Trigger system configuration
             'trigger_params': {
-                'complexity_threshold': 0.7,
-                'confidence_threshold': 0.6,
+                'complexity_threshold': 0.5,  # Lowered from 0.7 for easier activation
+                'confidence_threshold': 0.4,  # Lowered from 0.6 for easier activation
                 'enable_keyword_triggers': True,
                 'enable_complexity_analysis': True,
                 'enable_domain_detection': True,
-                'default_activation_rate': 0.3
+                'default_activation_rate': 0.5  # Increased from 0.3 for more frequent activation
             }
         }
         
