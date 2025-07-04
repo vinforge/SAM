@@ -70,29 +70,48 @@
 - 4GB+ RAM recommended
 - 2GB+ free disk space
 
-### Installation
+### 🎯 **New Users Quick Install Guide**
 
-#### Option 1: Automated Installation (Recommended)
+**Complete installation in 5 simple steps:**
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
-# Run the setup launcher (recommended for new users)
+# 2. Run setup wizard
 python setup.py
+
+# 3. Select Option 1 (Interactive Script - Recommended)
+# Follow the guided installation process
+
+# 4. When prompted for encryption setup, choose Option 2 (Reset Encryption)
+# Type: RESET
+# Create your master password when prompted
+
+# 5. Start SAM
+python start_sam_secure.py --mode full
+
+# 6. Open browser to: http://localhost:8502
 ```
 
-#### Option 2: Quick Setup
+**That's it! SAM is now running with full security and all features enabled.**
+
+---
+
+### Alternative Installation Methods
+
+#### Option A: Quick Setup (5 minutes)
 ```bash
 # Clone and setup
 git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
-# Install dependencies and initialize
+# Fast installation with defaults
 python install_sam.py
 ```
 
-#### Option 3: Manual Installation
+#### Option B: Manual Installation (Advanced)
 ```bash
 # Clone the repository
 git clone https://github.com/forge-1825/SAM.git
@@ -101,34 +120,47 @@ cd SAM
 # Install dependencies
 pip install -r requirements.txt
 
-# Initialize SAM
-python start_sam.py --setup
+# Setup encryption
+python setup_encryption.py
+
+# Start SAM
+python start_sam_secure.py --mode full
 ```
 
-### First Run
+### 🎉 **After Installation**
 
-1. **Start SAM (Secure Mode)**:
-   ```bash
-   # Start with enterprise-grade security
-   python start_sam_secure.py --mode full
-
-   # Or start individual components
-   python start_sam_secure.py --mode secure-chat    # Secure chat only
-   python start_sam_secure.py --mode memory-center  # Memory center only
-   ```
+1. **SAM is now running!** If you followed the Quick Install Guide above, SAM should already be started.
 
 2. **Access SAM**:
-   - **🔒 Secure Chat Interface**: http://localhost:8502 (Recommended)
-   - **🧠 Memory Control Center**: http://localhost:8501
-   - **🎨 Dream Canvas**: http://localhost:8501/dream-canvas
-   - **📊 Security Dashboard**: http://localhost:8502/security
+   - **🔒 Secure Chat Interface**: http://localhost:8502 (Main Interface)
+   - **🧠 Memory Control Center**: Access via secure chat interface
+   - **🎨 Dream Canvas**: Available in Memory Control Center
+   - **📊 Security Dashboard**: Built into secure interface
 
-3. **First-Time Setup**:
-   - **Create Master Password**: Set up enterprise-grade encryption
-   - **Upload Documents**: Add knowledge to SAM's memory
-   - **Explore Dream Canvas**: Visualize SAM's cognitive processes
-   - **Try Automated Research**: Experience Task 27's research discovery
-   - **Important**: Store your password safely - it cannot be recovered!
+3. **First-Time Usage**:
+   - **Enter Master Password**: Use the password you created during setup
+   - **Upload Documents**: Drag & drop files directly in chat interface
+   - **Ask Questions**: Start chatting with SAM immediately
+   - **Explore Features**: Try Dream Canvas, automated research, and cognitive synthesis
+   - **Important**: Your master password encrypts all data - keep it safe!
+
+4. **Starting SAM Later**:
+   ```bash
+   # To start SAM again after closing
+   cd SAM
+   python start_sam_secure.py --mode full
+
+   # Then open: http://localhost:8502
+   ```
+
+5. **Troubleshooting**:
+   ```bash
+   # Test your installation
+   python test_encryption_setup.py
+
+   # Reset encryption if needed
+   python setup_encryption.py
+   ```
 
 ## 📖 Usage Guide
 
@@ -322,6 +354,66 @@ SAM established the **FIRST zero-knowledge AI architecture**:
 - **🧠 100% Local Operation** (Complete Privacy)
 - **🔬 Automated Research Discovery** (Task 27 Pipeline)
 - **🎯 Multi-Domain Expertise** (4 Specialized Reasoning Modes)
+
+## 🔧 Troubleshooting
+
+### Common Installation Issues
+
+#### "Interactive setup script not found"
+```bash
+# Make sure you're in the SAM directory
+cd SAM
+ls setup_sam.py  # Should exist
+
+# If missing, re-clone the repository
+git clone https://github.com/forge-1825/SAM.git
+```
+
+#### "Module not found" errors
+```bash
+# Install dependencies manually
+pip install -r requirements.txt
+
+# Or upgrade pip first
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+#### Encryption setup issues
+```bash
+# Test encryption system
+python test_encryption_setup.py
+
+# Reset encryption if needed
+python setup_encryption.py
+# Choose Option 2 (Reset Encryption)
+```
+
+#### "Port already in use" errors
+```bash
+# Kill existing processes
+pkill -f streamlit
+pkill -f start_sam
+
+# Or use different ports
+python start_sam_secure.py --mode full --port 8503
+```
+
+#### Forgot master password
+```bash
+# Reset encryption (will delete encrypted data)
+python setup_encryption.py
+# Choose Option 2 (Reset Encryption)
+# Type: RESET
+# Create new master password
+```
+
+### Getting Help
+
+- **📖 Documentation**: Check the `docs/` folder for detailed guides
+- **🐛 Issues**: Report bugs on [GitHub Issues](https://github.com/forge-1825/SAM/issues)
+- **💬 Discussions**: Join [GitHub Discussions](https://github.com/forge-1825/SAM/discussions)
+- **📧 Contact**: For enterprise support and custom deployments
 
 ## 📄 License
 
