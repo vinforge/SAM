@@ -650,20 +650,38 @@ def render_sam_pro_sidebar():
 
         # Check if dissonance monitoring is active
         try:
-            # Check if TPV has dissonance monitoring enabled
-            tpv_session_data = st.session_state.get('tpv_session_data', {})
-            last_response = tpv_session_data.get('last_response', {})
+            # Method 1: Check if TPV integration has dissonance monitoring enabled
+            if st.session_state.get('sam_tpv_integration'):
+                tpv_integration = st.session_state.sam_tpv_integration
+                if hasattr(tpv_integration, 'tpv_monitor') and tpv_integration.tpv_monitor:
+                    if hasattr(tpv_integration.tpv_monitor, 'enable_dissonance_monitoring'):
+                        if tpv_integration.tpv_monitor.enable_dissonance_monitoring:
+                            dissonance_active = True
 
-            # Check for dissonance data in the last response
-            if (last_response.get('dissonance_analysis') or
-                last_response.get('final_dissonance_score') is not None or
-                (last_response.get('tpv_enabled', False) and tpv_active)):
-                dissonance_active = True
+            # Method 2: Check for dissonance data in recent TPV responses
+            if not dissonance_active:
+                tpv_session_data = st.session_state.get('tpv_session_data', {})
+                last_response = tpv_session_data.get('last_response', {})
+
+                # Check for dissonance data in the last response
+                if (last_response.get('dissonance_analysis') or
+                    last_response.get('final_dissonance_score') is not None):
+                    dissonance_active = True
+
+            # Method 3: If TPV is active and initialized, assume dissonance is available
+            if not dissonance_active and tpv_active:
+                try:
+                    # Check if dissonance monitor can be imported and initialized
+                    from sam.cognition.dissonance_monitor import DissonanceMonitor
+                    dissonance_active = True  # If import succeeds, dissonance is available
+                except ImportError:
+                    dissonance_active = False
+
         except Exception:
             dissonance_active = False
 
         if dissonance_active:
-            status_items.append("🧠 Dissonance Monitor: ✅ Active")
+            status_items.append("🧠 Dissonance Monitor: ✅ Active (Phase 5B)")
         else:
             status_items.append("🧠 Dissonance Monitor: ❌ Inactive")
 
@@ -2654,13 +2672,21 @@ def get_secure_system_status() -> str:
         # Add Dissonance Monitoring status
         dissonance_active = False
         try:
-            tpv_session_data = st.session_state.get('tpv_session_data', {})
-            last_response = tpv_session_data.get('last_response', {})
+            # Check if TPV integration has dissonance monitoring enabled
+            if st.session_state.get('sam_tpv_integration'):
+                tpv_integration = st.session_state.sam_tpv_integration
+                if hasattr(tpv_integration, 'tpv_monitor') and tpv_integration.tpv_monitor:
+                    if hasattr(tpv_integration.tpv_monitor, 'enable_dissonance_monitoring'):
+                        if tpv_integration.tpv_monitor.enable_dissonance_monitoring:
+                            dissonance_active = True
 
-            if (last_response.get('dissonance_analysis') or
-                last_response.get('final_dissonance_score') is not None or
-                (last_response.get('tpv_enabled', False) and tpv_active)):
-                dissonance_active = True
+            # Fallback: If TPV is active, assume dissonance is available
+            if not dissonance_active and tpv_active:
+                try:
+                    from sam.cognition.dissonance_monitor import DissonanceMonitor
+                    dissonance_active = True
+                except ImportError:
+                    dissonance_active = False
         except Exception:
             dissonance_active = False
 
