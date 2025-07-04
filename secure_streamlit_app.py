@@ -26,8 +26,10 @@ import sys
 import logging
 import time
 import json
+import re
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Any, Optional
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -7110,6 +7112,15 @@ def generate_secure_response(prompt: str, force_local: bool = False) -> str:
         except Exception as e:
             logger.warning(f"Correction detection failed, continuing with standard flow: {e}")
 
+        # Phase -0.5: Learning Intent Detection (NEW - for MEMOIR activation)
+        learning_intent = detect_learning_intent(prompt)
+        if learning_intent['is_learning_request']:
+            logger.info(f"🧠 Learning intent detected: {learning_intent['intent_type']}")
+            # Handle learning request directly
+            learning_response = handle_learning_request(prompt, learning_intent)
+            if learning_response:
+                return learning_response
+
         # Phase -0.25: MEMOIR Knowledge Retrieval (ENABLED BY DEFAULT for lifelong learning)
         memoir_context = {}
         try:
@@ -10311,6 +10322,203 @@ def render_vetting_queue_integrated():
         st.error(f"❌ Error loading vetting queue: {e}")
         import traceback
         st.error(f"Details: {traceback.format_exc()}")
+
+def detect_learning_intent(query: str) -> Dict[str, Any]:
+    """
+    Detect if the user is trying to teach SAM new information.
+
+    Args:
+        query: User's query
+
+    Returns:
+        Dictionary with learning intent analysis
+    """
+    query_lower = query.lower()
+
+    # Learning intent patterns
+    learning_patterns = {
+        'teach': [
+            r'\bi want to teach you\b',
+            r'\blet me teach you\b',
+            r'\bteach you something\b',
+            r'\blearn this\b',
+            r'\bremember this\b',
+            r'\bsave this information\b',
+            r'\bstore this\b'
+        ],
+        'correction': [
+            r'\bactually,?\s*',
+            r'\bthat\'?s not right\b',
+            r'\bincorrect\b',
+            r'\bwrong\b',
+            r'\bthe correct answer is\b',
+            r'\bit should be\b',
+            r'\bcorrection:?\s*'
+        ],
+        'new_fact': [
+            r'\bthe capital of .* will be\b',
+            r'\bthe new .* is\b',
+            r'\bfrom now on\b',
+            r'\bplease note that\b',
+            r'\bfor future reference\b',
+            r'\bupdate:?\s*'
+        ],
+        'personal_info': [
+            r'\bmy name is\b',
+            r'\bi prefer\b',
+            r'\bi like\b',
+            r'\bi work\b',
+            r'\bremember that i\b',
+            r'\babout me:?\s*'
+        ]
+    }
+
+    # Check for learning patterns
+    intent_scores = {}
+    for intent_type, patterns in learning_patterns.items():
+        score = 0
+        for pattern in patterns:
+            if re.search(pattern, query_lower):
+                score += 1
+        intent_scores[intent_type] = score
+
+    # Determine if this is a learning request
+    total_score = sum(intent_scores.values())
+    is_learning_request = total_score > 0
+
+    # Find primary intent type
+    primary_intent = 'unknown'
+    if intent_scores:
+        primary_intent = max(intent_scores.items(), key=lambda x: x[1])[0]
+
+    return {
+        'is_learning_request': is_learning_request,
+        'intent_type': primary_intent,
+        'confidence': min(1.0, total_score * 0.3),
+        'intent_scores': intent_scores,
+        'detected_patterns': [pattern for patterns in learning_patterns.values() for pattern in patterns if re.search(pattern, query_lower)]
+    }
+
+def handle_learning_request(query: str, learning_intent: Dict[str, Any]) -> Optional[str]:
+    """
+    Handle a learning request by storing information in MEMOIR.
+
+    Args:
+        query: User's query
+        learning_intent: Learning intent analysis
+
+    Returns:
+        Response string if handled, None otherwise
+    """
+    try:
+        # Extract the information to learn
+        info_to_learn = extract_learning_content(query, learning_intent['intent_type'])
+
+        if not info_to_learn:
+            return None
+
+        # Store in memory
+        success = store_learning_content(info_to_learn, learning_intent)
+
+        if success:
+            # Activate MEMOIR status
+            st.session_state.memoir_enabled = True
+            st.session_state.memoir_last_learning = datetime.now().isoformat()
+
+            logger.info(f"🧠 MEMOIR activated: Learned new information")
+
+            return f"""✅ **Learning Complete!**
+
+I've successfully learned and stored this information:
+
+**📚 New Knowledge:** {info_to_learn}
+
+**🧠 MEMOIR Status:** ✅ Active (Learning mode engaged)
+
+This information has been added to my knowledge base and I'll remember it for future conversations. You can see that MEMOIR is now showing as Active in the System Status.
+
+Is there anything else you'd like to teach me?"""
+        else:
+            return "❌ I had trouble storing that information. Please try rephrasing your request."
+
+    except Exception as e:
+        logger.error(f"Error handling learning request: {e}")
+        return None
+
+def extract_learning_content(query: str, intent_type: str) -> Optional[str]:
+    """Extract the actual content to learn from the query."""
+    query_lower = query.lower()
+
+    if intent_type == 'teach':
+        # Extract content after teaching phrases
+        patterns = [
+            r'i want to teach you something new:?\s*(.*)',
+            r'let me teach you:?\s*(.*)',
+            r'learn this:?\s*(.*)',
+            r'remember this:?\s*(.*)',
+            r'save this information:?\s*(.*)'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+
+    elif intent_type == 'new_fact':
+        # For factual statements, use the whole query
+        return query.strip()
+
+    elif intent_type == 'personal_info':
+        # Extract personal information
+        patterns = [
+            r'my name is\s*(.*)',
+            r'i prefer\s*(.*)',
+            r'i like\s*(.*)',
+            r'i work\s*(.*)',
+            r'remember that i\s*(.*)'
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                return f"User {match.group(0).strip()}"
+
+    # Fallback: return the whole query
+    return query.strip()
+
+def store_learning_content(content: str, learning_intent: Dict[str, Any]) -> bool:
+    """Store learning content in memory."""
+    try:
+        # Get memory store
+        if hasattr(st.session_state, 'secure_memory_store'):
+            memory_store = st.session_state.secure_memory_store
+        else:
+            from memory.secure_memory_vectorstore import get_secure_memory_store, VectorStoreType
+            memory_store = get_secure_memory_store(
+                store_type=VectorStoreType.CHROMA,
+                storage_directory="memory_store",
+                embedding_dimension=384,
+                enable_encryption=True
+            )
+
+        # Store the learning content
+        chunk_id = memory_store.add_memory(
+            content=content,
+            memory_type="learning",
+            source="user_teaching",
+            tags=["user_taught", "learning", learning_intent['intent_type']],
+            importance_score=0.9,  # High importance for user-taught information
+            metadata={
+                'learning_intent': learning_intent,
+                'learned_at': datetime.now().isoformat(),
+                'user_taught': True
+            }
+        )
+
+        logger.info(f"Stored learning content: {chunk_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error storing learning content: {e}")
+        return False
 
 if __name__ == "__main__":
     main()
