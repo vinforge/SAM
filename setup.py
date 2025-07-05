@@ -266,10 +266,16 @@ def main():
             print("   • Secure Chat: http://localhost:8502")
             print("   • Memory Center: http://localhost:8501")
             print("   • Standard Chat: http://localhost:5001")
-            
+
             print("\n🔑 **Start SAM:**")
             print("   python start_sam_secure.py --mode full")
-            
+
+            print("\n🎯 **SAM Pro Activation:**")
+            print("   • Navigate to http://localhost:8502 after starting SAM")
+            print("   • Look for '🔑 SAM Pro Activation' in the sidebar")
+            print("   • Enter your activation key to unlock premium features")
+            print("   • Contact your administrator if you need an activation key")
+
             print("\n📖 **Documentation:**")
             print("   • SETUP_OPTIONS.md - All setup options")
             print("   • docs/ - Complete documentation")

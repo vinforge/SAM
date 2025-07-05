@@ -14,6 +14,8 @@ import os
 import sys
 import subprocess
 import platform
+import time
+import webbrowser
 from pathlib import Path
 
 def print_banner():
@@ -243,6 +245,62 @@ def run_final_tests():
     print("✅ System tests completed!")
     return True
 
+def open_registration_page():
+    """Open the SAM Pro registration/activation page automatically."""
+    try:
+        print("\n🌐 **Opening SAM Pro Activation Page...**")
+        print("   Starting SAM and opening activation interface...")
+
+        # Ask user if they want to auto-open
+        try:
+            response = input("\n❓ Would you like to automatically start SAM and open the activation page? (y/n) [y]: ").strip().lower()
+            if response and response not in ['y', 'yes']:
+                print("   ⏭️ Skipping auto-start. You can manually start SAM later.")
+                return False
+        except KeyboardInterrupt:
+            print("\n   ⏭️ Skipping auto-start.")
+            return False
+
+        # Start SAM in the background
+        print("   🚀 Starting SAM services...")
+
+        # Launch SAM secure mode in background
+        try:
+            subprocess.Popen([
+                sys.executable, "start_sam_secure.py", "--mode", "full"
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            print("   ✅ SAM services starting in background...")
+
+            # Wait for services to start
+            print("   ⏳ Waiting for services to initialize (30 seconds)...")
+            time.sleep(30)
+
+            # Open the activation page
+            activation_url = "http://localhost:8502"
+            print(f"   🌐 Opening activation page: {activation_url}")
+
+            webbrowser.open(activation_url)
+
+            print("   ✅ Activation page opened in your default browser!")
+            print("\n💡 **What to do next:**")
+            print("   1. Enter your master password to unlock SAM")
+            print("   2. Look for the '🔑 SAM Pro Activation' section in the sidebar")
+            print("   3. Enter your activation key to unlock premium features")
+            print("   4. If you don't have an activation key, contact your administrator")
+
+            return True
+
+        except Exception as e:
+            print(f"   ⚠️ Could not auto-start SAM: {e}")
+            print("   💡 Please manually start SAM with: python start_sam_secure.py --mode full")
+            return False
+
+    except Exception as e:
+        print(f"   ❌ Failed to open registration page: {e}")
+        print("   💡 Please manually navigate to http://localhost:8502 after starting SAM")
+        return False
+
 def show_completion_summary():
     """Show setup completion summary and next steps."""
     print("\n" + "="*80)
@@ -261,7 +319,8 @@ def show_completion_summary():
     print("   1. Start SAM: python start_sam_secure.py --mode full")
     print("   2. Open browser: http://localhost:8502")
     print("   3. Enter your master password when prompted")
-    print("   4. Begin using SAM's AI capabilities!")
+    print("   4. Activate SAM Pro for premium features")
+    print("   5. Begin using SAM's AI capabilities!")
     
     print("\n📚 **Useful Commands:**")
     print("   • Start SAM: python start_sam_secure.py --mode full")
@@ -316,7 +375,14 @@ def main():
     
     # Completion summary
     show_completion_summary()
-    
+
+    # Open registration page automatically
+    try:
+        open_registration_page()
+    except Exception as e:
+        print(f"\n⚠️ Could not auto-open activation page: {e}")
+        print("💡 Please manually navigate to http://localhost:8502 after starting SAM")
+
     return True
 
 if __name__ == "__main__":
