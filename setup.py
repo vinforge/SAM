@@ -162,39 +162,18 @@ def show_manual_instructions():
 def run_encryption_setup():
     """Run encryption-only setup."""
     print("\n🔐 Starting Encryption Setup...")
-    print("This will configure enterprise-grade encryption for your SAM installation.")
-    print("\n📋 **What this setup does:**")
-    print("   • Detects existing encryption configuration")
-    print("   • Allows testing existing master passwords")
-    print("   • Provides option to reset encryption if needed")
-    print("   • Creates new master password for first-time users")
-    print("   • Generates secure encryption keys")
-
-    print("\n⚠️  **Important Notes:**")
-    print("   • If encryption is already set up, you can test your existing password")
-    print("   • Reset option will delete existing encrypted data (creates backup)")
-    print("   • Master passwords cannot be recovered if lost")
-    print("   • Choose a strong password you'll remember")
-
+    print("This will add enterprise-grade encryption to your SAM installation.")
+    
     if not Path("setup_encryption.py").exists():
-        print("\n❌ Encryption setup script not found")
+        print("❌ Encryption setup script not found")
         print("Please ensure you're in the SAM directory")
         return False
-
-    response = input("\n🤔 Continue with encryption setup? (Y/n): ").strip().lower()
-    if response == 'n':
-        print("👋 Encryption setup cancelled")
-        return False
-
+    
     try:
         subprocess.run([sys.executable, "setup_encryption.py"], check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Encryption setup failed: {e}")
-        print("\n💡 **Troubleshooting:**")
-        print("   • Ensure you're in the SAM directory")
-        print("   • Check that dependencies are installed: pip install -r requirements.txt")
-        print("   • Try running directly: python setup_encryption.py")
         return False
     except KeyboardInterrupt:
         print("\n👋 Setup cancelled by user")
