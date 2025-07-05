@@ -7322,8 +7322,13 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
                         'force_local': force_local,
                         'has_tpv': sam_tpv_integration is not None,
                         'user_profile': getattr(st.session_state, 'user_profile', 'general'),
-                        'feedback_context': response_context
+                        'feedback_context': response_context,
+                        'conversation_history': st.session_state.get('conversation_history', '')  # Task 30 Phase 1
                     }
+
+                    # Debug conversation history in SLP context
+                    conv_history = slp_context.get('conversation_history', '')
+                    logger.info(f"🔍 DEBUG: SLP conversation history ({len(conv_history)} chars): '{conv_history}'")
 
                     # Create a fallback generator that uses the standard SAM pipeline
                     def sam_fallback_generator(query, context):
@@ -7331,8 +7336,20 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
                         try:
                             import requests
 
-                            # Build context-aware prompt with MEMOIR integration
-                            prompt_parts = [f"User question: {query}"]
+                            # Build context-aware prompt with conversation history and MEMOIR integration
+                            prompt_parts = []
+
+                            # Add conversation history if available (Task 30 Phase 1)
+                            conversation_history = context.get('conversation_history', '') if context else ''
+                            if conversation_history and conversation_history != "No recent conversation history.":
+                                prompt_parts.append("--- RECENT CONVERSATION HISTORY (Most recent first) ---")
+                                prompt_parts.append(conversation_history)
+                                prompt_parts.append("--- END OF CONVERSATION HISTORY ---\n")
+                                logger.info(f"✅ DEBUG: Added conversation history to SLP fallback prompt ({len(conversation_history)} chars)")
+                            else:
+                                logger.warning(f"⚠️ DEBUG: No conversation history in SLP fallback - history: '{conversation_history}'")
+
+                            prompt_parts.append(f"Question: {query}")
 
                             # Add MEMOIR knowledge if available
                             if memoir_context.get('relevant_edits'):

@@ -268,8 +268,20 @@ class SAMSLPIntegration:
             import requests
             import json
 
-            # Build context-aware prompt
-            prompt_parts = [f"User question: {query}"]
+            # Build context-aware prompt with conversation history
+            prompt_parts = []
+
+            # Add conversation history if available (Task 30 Phase 1)
+            conversation_history = context.get('conversation_history', '')
+            if conversation_history and conversation_history != "No recent conversation history.":
+                prompt_parts.append("--- RECENT CONVERSATION HISTORY (Most recent first) ---")
+                prompt_parts.append(conversation_history)
+                prompt_parts.append("--- END OF CONVERSATION HISTORY ---\n")
+                logger.info(f"✅ DEBUG: Added conversation history to SLP Ollama prompt ({len(conversation_history)} chars)")
+            else:
+                logger.warning(f"⚠️ DEBUG: No conversation history in SLP Ollama - history: '{conversation_history}'")
+
+            prompt_parts.append(f"Question: {query}")
 
             # Add context if available
             if context.get('sources'):
