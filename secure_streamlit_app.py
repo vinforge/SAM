@@ -1033,9 +1033,125 @@ def generate_secure_chat_response(prompt: str) -> str:
         logger.error(f"Error generating secure chat response: {e}")
         return f"I apologize, but I encountered an error while processing your request. Please try again or rephrase your question."
 
+def render_conversation_history_sidebar():
+    """Render the conversation history sidebar (Task 31 Phase 1)."""
+    try:
+        with st.sidebar:
+            st.markdown("### 📚 Conversation History")
+
+            # New Chat button
+            if st.button("➕ New Chat", use_container_width=True, type="primary"):
+                try:
+                    from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+                    from sam.session.state_manager import get_session_manager
+
+                    # Get current conversation buffer
+                    session_manager = get_session_manager()
+                    session_id = st.session_state.get('session_id', 'default_session')
+                    conversation_buffer = session_manager.get_conversation_history(session_id)
+
+                    if conversation_buffer:
+                        # Archive current conversation
+                        relevance_engine = get_contextual_relevance_engine()
+                        archived_thread = relevance_engine.archive_conversation_thread(
+                            conversation_buffer,
+                            force_title="Manual New Chat"
+                        )
+
+                        # Clear conversation buffer
+                        session_manager.clear_session(session_id)
+
+                        # Update UI state
+                        if 'archived_threads' not in st.session_state:
+                            st.session_state['archived_threads'] = []
+
+                        st.session_state['archived_threads'].insert(0, archived_thread.to_dict())
+
+                        # Clear chat history
+                        st.session_state.chat_history = []
+
+                        st.success(f"✅ Started new chat! Previous conversation archived as: '{archived_thread.title}'")
+                        st.rerun()
+                    else:
+                        st.info("No active conversation to archive.")
+
+                except Exception as e:
+                    st.error(f"Failed to start new chat: {e}")
+
+            st.markdown("---")
+
+            # Show archived conversations
+            archived_threads = st.session_state.get('archived_threads', [])
+
+            if archived_threads:
+                st.markdown("**Recent Conversations:**")
+
+                for i, thread_data in enumerate(archived_threads[:10]):  # Show last 10
+                    thread_title = thread_data.get('title', 'Untitled')
+                    message_count = thread_data.get('message_count', 0)
+                    last_updated = thread_data.get('last_updated', '')
+
+                    # Format timestamp
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+                        time_str = dt.strftime('%m/%d %H:%M')
+                    except:
+                        time_str = 'Recent'
+
+                    # Create expandable thread entry
+                    with st.expander(f"💬 {thread_title}", expanded=False):
+                        st.caption(f"📅 {time_str} • {message_count} messages")
+
+                        # Show first few messages as preview
+                        messages = thread_data.get('messages', [])
+                        if messages:
+                            st.markdown("**Preview:**")
+                            for msg in messages[:2]:  # Show first 2 messages
+                                role = msg.get('role', 'unknown')
+                                content = msg.get('content', '')[:100]
+                                if len(msg.get('content', '')) > 100:
+                                    content += "..."
+
+                                if role == 'user':
+                                    st.markdown(f"👤 **You:** {content}")
+                                elif role == 'assistant':
+                                    st.markdown(f"🤖 **SAM:** {content}")
+
+                            if len(messages) > 2:
+                                st.caption(f"... and {len(messages) - 2} more messages")
+
+                        # Future: Resume conversation button (Phase 2)
+                        if st.button(f"🔄 Resume", key=f"resume_{i}", disabled=True):
+                            st.info("Resume feature coming in Phase 2!")
+            else:
+                st.markdown("*No archived conversations yet.*")
+                st.caption("Conversations will appear here automatically when you change topics.")
+
+            # Show current conversation status
+            if st.session_state.get('conversation_archived'):
+                archived_info = st.session_state['conversation_archived']
+                st.success(f"✅ Archived: '{archived_info['title']}'")
+                # Clear the notification after showing it
+                del st.session_state['conversation_archived']
+
+            # Debug info (can be removed in production)
+            if st.checkbox("🔍 Show Debug Info", value=False):
+                relevance_check = st.session_state.get('last_relevance_check')
+                if relevance_check:
+                    st.json(relevance_check)
+
+    except Exception as e:
+        logger.error(f"Error rendering conversation history sidebar: {e}")
+        with st.sidebar:
+            st.error("Conversation history temporarily unavailable")
+
 def render_chat_interface():
     """Render the chat interface."""
     st.header("💬 Secure Chat")
+
+    # Task 31 Phase 1: Render conversation history sidebar
+    render_conversation_history_sidebar()
 
     # Render TPV status if available
     render_tpv_status()
@@ -8182,10 +8298,88 @@ def generate_final_response(user_question: str, force_local: bool = False) -> st
 
 def generate_response_with_conversation_buffer(prompt: str, force_local: bool = False) -> str:
     """
-    Wrapper for generate_secure_response that handles conversation buffer updates.
-    This implements Task 30 Phase 1: Short-Term Conversational Buffer.
+    Enhanced conversation buffer wrapper with contextual relevance (Task 31 Phase 1).
+
+    This implements:
+    - Task 30 Phase 1: Short-Term Conversational Buffer
+    - Task 31 Phase 1: Contextual Relevance Engine with Automatic Threading
     """
     try:
+        # Task 31 Phase 1: Contextual Relevance Check
+        conversation_archived = False
+
+        try:
+            from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+            from sam.session.state_manager import get_session_manager
+
+            # Load configuration
+            try:
+                import json
+                with open('config/sam_config.json', 'r') as f:
+                    config = json.load(f)
+                    auto_threading_enabled = config.get('enable_auto_threading', True)
+                    relevance_threshold = config.get('relevance_threshold', 0.6)
+            except:
+                auto_threading_enabled = True
+                relevance_threshold = 0.6
+
+            if auto_threading_enabled:
+                # Get current conversation buffer
+                session_manager = get_session_manager()
+                session_id = st.session_state.get('session_id', 'default_session')
+
+                # Ensure session exists
+                if not session_manager.get_session(session_id):
+                    user_id = st.session_state.get('user_id', 'anonymous')
+                    session_manager.create_session(session_id, user_id)
+
+                # Get current conversation buffer
+                conversation_buffer = session_manager.get_conversation_history(session_id)
+
+                # Calculate contextual relevance
+                relevance_engine = get_contextual_relevance_engine({
+                    'relevance_threshold': relevance_threshold
+                })
+
+                relevance_result = relevance_engine.calculate_relevance(prompt, conversation_buffer)
+
+                logger.info(f"🧠 Contextual relevance: {relevance_result.similarity_score:.3f} "
+                           f"(threshold: {relevance_result.threshold_used}, method: {relevance_result.calculation_method})")
+
+                # Check if we need to archive current conversation
+                if not relevance_result.is_relevant and conversation_buffer:
+                    logger.info(f"🗂️ Topic change detected! Archiving current conversation ({len(conversation_buffer)} messages)")
+
+                    # Archive current conversation
+                    archived_thread = relevance_engine.archive_conversation_thread(conversation_buffer)
+
+                    # Clear conversation buffer for new topic
+                    session_manager.clear_session(session_id)
+
+                    # Update UI state to show new archived thread
+                    if 'archived_threads' not in st.session_state:
+                        st.session_state['archived_threads'] = []
+
+                    st.session_state['archived_threads'].insert(0, archived_thread.to_dict())
+
+                    # Set flag for UI notification
+                    st.session_state['conversation_archived'] = {
+                        'title': archived_thread.title,
+                        'message_count': archived_thread.message_count,
+                        'timestamp': archived_thread.last_updated
+                    }
+
+                    conversation_archived = True
+
+                    logger.info(f"✅ Archived conversation: '{archived_thread.title}' - Starting fresh conversation")
+
+                # Store relevance metadata for debugging
+                st.session_state['last_relevance_check'] = relevance_result.to_dict()
+
+        except Exception as e:
+            logger.warning(f"Contextual relevance check failed: {e}")
+            # Continue with normal flow if relevance check fails
+
         # Generate the response using two-stage pipeline
         response = generate_final_response(prompt, force_local)
 
