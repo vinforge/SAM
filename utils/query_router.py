@@ -42,17 +42,29 @@ class QueryRouter:
         """Initialize the query router."""
         self.document_patterns = [
             # Direct document references
-            r'\b(?:document|file|pdf|upload|uploaded)\b',
+            r'\b(?:document|file|pdf|upload|uploaded|attachment)\b',
             r'\b(?:according to|based on|from the|in the)\b.*\b(?:document|file|paper)\b',
-            
+
             # Content-specific patterns
             r'\b(?:table|chart|graph|figure|image)\b.*\b(?:shows|contains|displays)\b',
             r'\b(?:section|chapter|page|paragraph)\b.*\b(?:says|mentions|states)\b',
-            
+
             # Question patterns about documents
             r'\b(?:what does|what is|how does)\b.*\b(?:document|file|paper)\b',
             r'\b(?:summarize|summary of|explain)\b.*\b(?:document|content|file)\b',
-            
+
+            # Enhanced document analysis patterns
+            r'\b(?:give me a|can you give|provide a)\b.*\b(?:summary|overview|brief)\b',
+            r'\b(?:what.*contains|what.*document.*contains|document.*content)\b',
+            r'\b(?:brief summary|summary of what|what this.*contains)\b',
+            r'\b(?:analyze|tell me about|explain)\b.*\b(?:this|the)\b',
+            r'\b(?:uploaded.*file|just uploaded|i.*uploaded)\b',
+
+            # Specific document reference patterns
+            r'\b(?:this document|the document|the file|the pdf|the paper)\b',
+            r'\b(?:what i uploaded|what i shared|the attachment)\b',
+            r'\b(?:document analysis|file analysis|content analysis)\b',
+
             # Code and technical content
             r'\b(?:code|function|class|method|variable)\b.*\b(?:in the|from the)\b',
             r'\b(?:implementation|algorithm|approach)\b.*\b(?:shown|described|used)\b'

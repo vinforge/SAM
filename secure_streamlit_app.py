@@ -7441,7 +7441,20 @@ def detect_document_query(query: str) -> bool:
             r'local.*file.*about',
             r'whitepaper.*about',
             r'paper.*titled',
-            r'document.*titled'
+            r'document.*titled',
+            # Enhanced patterns for the user's specific query
+            r'give me a.*summary.*document',
+            r'brief summary.*document',
+            r'what.*document.*contains',
+            r'summary of what.*document',
+            r'what this document',
+            r'document contains',
+            r'just uploaded.*\.pdf',
+            r'i.*uploaded.*\.pdf',
+            r'can you.*summary.*document',
+            r'tell me about.*document',
+            r'analyze.*document',
+            r'explain.*document'
         ]
 
         # PRIORITY 4: Knowledge base queries about imported content

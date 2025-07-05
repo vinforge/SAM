@@ -161,8 +161,20 @@ class SecureMemoryVectorStore:
         if memory_type:
             filtered_results = []
             for result in results:
-                if result.get('metadata', {}).get('memory_type') == memory_type.value:
-                    filtered_results.append(result)
+                try:
+                    # Handle both dict and object formats
+                    if hasattr(result, 'get'):
+                        metadata = result.get('metadata', {})
+                    elif hasattr(result, 'metadata'):
+                        metadata = result.metadata if result.metadata else {}
+                    else:
+                        metadata = {}
+
+                    if isinstance(metadata, dict) and metadata.get('memory_type') == memory_type.value:
+                        filtered_results.append(result)
+                except Exception as e:
+                    logger.warning(f"Error filtering result by memory type: {e}")
+                    continue
             results = filtered_results
         
         return results
@@ -212,8 +224,20 @@ class SecureMemoryVectorStore:
         try:
             if hasattr(self.base_store, 'memory_chunks'):
                 for chunk in self.base_store.memory_chunks.values():
-                    if chunk.get('metadata', {}).get('encrypted', False):
-                        encrypted_count += 1
+                    try:
+                        # Handle both dict and object formats
+                        if hasattr(chunk, 'get'):
+                            metadata = chunk.get('metadata', {})
+                        elif hasattr(chunk, 'metadata'):
+                            metadata = chunk.metadata if chunk.metadata else {}
+                        else:
+                            metadata = {}
+
+                        if isinstance(metadata, dict) and metadata.get('encrypted', False):
+                            encrypted_count += 1
+                    except Exception as chunk_error:
+                        logger.debug(f"Error processing chunk for encryption count: {chunk_error}")
+                        continue
         except Exception as e:
             logger.warning(f"Error counting encrypted chunks: {e}")
 
