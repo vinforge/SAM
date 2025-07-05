@@ -1027,8 +1027,8 @@ def generate_document_suggestions(filename: str, file_type: str) -> str:
 def generate_secure_chat_response(prompt: str) -> str:
     """Generate a secure chat response for document analysis and general queries."""
     try:
-        # Use existing secure response generation with local knowledge preference
-        return generate_secure_response(prompt, force_local=True)
+        # Use conversation buffer wrapper for enhanced context awareness (Task 30 Phase 1)
+        return generate_response_with_conversation_buffer(prompt, force_local=True)
     except Exception as e:
         logger.error(f"Error generating secure chat response: {e}")
         return f"I apologize, but I encountered an error while processing your request. Please try again or rephrase your question."
@@ -1156,7 +1156,7 @@ def render_chat_interface():
             elif st.session_state.get(f"force_local_{escalation_id}"):
                 with st.chat_message("assistant"):
                     with st.spinner("🤔 Answering with current knowledge..."):
-                        local_response = generate_secure_response(escalation_data['original_query'], force_local=True)
+                        local_response = generate_response_with_conversation_buffer(escalation_data['original_query'], force_local=True)
                         if isinstance(local_response, tuple):
                             local_response = local_response[0]  # Extract just the response text
                         st.markdown(local_response)
@@ -1329,7 +1329,7 @@ def render_chat_interface():
                                     st.error(f"❌ Web search failed: {search_result['error']}")
                                     # Fall back to normal response generation
 
-                        response_result = generate_secure_response(prompt, force_local=force_local)
+                        response_result = generate_response_with_conversation_buffer(prompt, force_local=force_local)
 
                         # Debug logging for escalation detection (preserving 100% of functionality)
                         logger.info(f"🔍 Response result type: {type(response_result)}")
@@ -7094,6 +7094,37 @@ def diagnose_memory_retrieval(query: str) -> dict:
 def generate_secure_response(prompt: str, force_local: bool = False) -> str:
     """Generate a secure response using SAM's capabilities with Phase 8 confidence assessment, TPV monitoring, intelligent tool selection, and feedback-driven learning."""
     try:
+        # Phase -2: Conversational Buffer Management (Task 30 Phase 1)
+        conversation_history = ""
+        try:
+            from sam.session.state_manager import get_session_manager
+
+            # Get or create session
+            session_manager = get_session_manager()
+            session_id = st.session_state.get('session_id', 'default_session')
+
+            # Create session if it doesn't exist
+            if not session_manager.get_session(session_id):
+                user_id = st.session_state.get('user_id', 'anonymous')
+                session_manager.create_session(session_id, user_id)
+                st.session_state['session_id'] = session_id
+                logger.info(f"🗣️ Created new conversation session: {session_id}")
+
+            # Add user turn to conversation buffer
+            session_manager.add_turn(session_id, 'user', prompt)
+
+            # Get formatted conversation history
+            conversation_history = session_manager.format_conversation_history(session_id, max_turns=8)
+
+            # Store in session state for use in prompt template
+            st.session_state['conversation_history'] = conversation_history
+
+            logger.info(f"🗣️ Conversational buffer updated for session: {session_id}")
+
+        except Exception as e:
+            logger.warning(f"Conversational buffer failed, continuing without history: {e}")
+            conversation_history = ""
+
         # Phase -1: Feedback-Driven Response Enhancement (preserving 100% of functionality)
         try:
             response_context = enhance_response_with_feedback_learning(prompt)
@@ -7633,8 +7664,17 @@ When thinking through complex questions, you can use <think>...</think> tags to 
 Be helpful and informative. Extract relevant information from the provided sources to answer the question directly.
 If the information isn't sufficient, say so clearly. Always be concise but thorough."""
 
-                # Build user prompt with MEMOIR integration
-                user_prompt_parts = [f"Question: {prompt}"]
+                # Build user prompt with conversation history and MEMOIR integration
+                user_prompt_parts = []
+
+                # Add conversation history if available (Task 30 Phase 1)
+                conversation_history = st.session_state.get('conversation_history', '')
+                if conversation_history and conversation_history != "No recent conversation history.":
+                    user_prompt_parts.append("--- RECENT CONVERSATION HISTORY (Most recent first) ---")
+                    user_prompt_parts.append(conversation_history)
+                    user_prompt_parts.append("--- END OF CONVERSATION HISTORY ---\n")
+
+                user_prompt_parts.append(f"Question: {prompt}")
 
                 # Add MEMOIR knowledge if available
                 if memoir_context.get('relevant_edits'):
@@ -7648,8 +7688,8 @@ If the information isn't sufficient, say so clearly. Always be concise but thoro
                                 correction_part = content.split('User Correction:')[-1].strip()
                                 user_prompt_parts.append(f"• {correction_part}")
 
-                user_prompt_parts.append(f"\nAvailable Information:\n{context}")
-                user_prompt_parts.append("\nPlease provide a helpful answer based on the available information and learned knowledge.")
+                user_prompt_parts.append(f"\n--- KNOWLEDGE BASE CONTEXT ---\n{context}\n--- END OF KNOWLEDGE BASE CONTEXT ---")
+                user_prompt_parts.append("\nPlease provide a helpful answer based on the conversation history, available information, and learned knowledge.")
 
                 user_prompt = "\n".join(user_prompt_parts)
 
@@ -7931,6 +7971,36 @@ Try rephrasing your question or uploading more relevant documents."""
 
     except Exception as e:
         logger.error(f"Response generation failed: {e}")
+        return f"I apologize, but I encountered an error while processing your request: {e}"
+
+def generate_response_with_conversation_buffer(prompt: str, force_local: bool = False) -> str:
+    """
+    Wrapper for generate_secure_response that handles conversation buffer updates.
+    This implements Task 30 Phase 1: Short-Term Conversational Buffer.
+    """
+    try:
+        # Generate the response
+        response = generate_secure_response(prompt, force_local)
+
+        # Add assistant response to conversation buffer
+        try:
+            from sam.session.state_manager import get_session_manager
+
+            session_manager = get_session_manager()
+            session_id = st.session_state.get('session_id', 'default_session')
+
+            # Add assistant turn to conversation buffer
+            session_manager.add_turn(session_id, 'assistant', response)
+
+            logger.info(f"🗣️ Added assistant response to conversation buffer for session: {session_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to update conversation buffer with assistant response: {e}")
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Response generation with conversation buffer failed: {e}")
         return f"I apologize, but I encountered an error while processing your request: {e}"
 
 def detect_user_correction(prompt: str) -> dict:
