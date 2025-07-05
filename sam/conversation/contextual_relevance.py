@@ -355,22 +355,22 @@ class ContextualRelevanceEngine:
     def search_archived_threads(self, query: str, limit: int = 10) -> List[Tuple[ConversationThread, float]]:
         """
         Search archived threads by relevance to query.
-        
+
         Args:
             query: Search query
             limit: Maximum number of results
-            
+
         Returns:
             List of (ConversationThread, relevance_score) tuples
         """
         try:
             threads = self.get_archived_threads()
             scored_threads = []
-            
+
             for thread in threads:
                 # Calculate relevance to search query
                 thread_text = f"{thread.title} {' '.join(thread.topic_keywords)}"
-                
+
                 try:
                     score = self._calculate_vector_similarity(query, thread_text)
                     scored_threads.append((thread, score))
@@ -378,15 +378,422 @@ class ContextualRelevanceEngine:
                     # Fallback to keyword matching
                     score = self._keyword_similarity(query, thread_text)
                     scored_threads.append((thread, score))
-            
+
             # Sort by relevance score
             scored_threads.sort(key=lambda x: x[1], reverse=True)
-            
+
             # Return top results
             return scored_threads[:limit]
-            
+
         except Exception as e:
             self.logger.error(f"Failed to search archived threads: {e}")
+            return []
+
+    def resume_conversation_thread(self, thread_id: str) -> bool:
+        """
+        Resume an archived conversation thread by loading it back into active buffer.
+
+        Args:
+            thread_id: ID of the thread to resume
+
+        Returns:
+            True if conversation was resumed successfully
+        """
+        try:
+            # Find the thread
+            threads = self.get_archived_threads()
+            target_thread = None
+
+            for thread in threads:
+                if thread.thread_id == thread_id:
+                    target_thread = thread
+                    break
+
+            if not target_thread:
+                self.logger.error(f"Thread not found: {thread_id}")
+                return False
+
+            # Load conversation back into session manager
+            try:
+                import streamlit as st
+                from sam.session.state_manager import get_session_manager
+
+                session_manager = get_session_manager()
+                session_id = st.session_state.get('session_id', 'default_session')
+                user_id = st.session_state.get('user_id', 'anonymous')
+
+                # Archive current conversation if it exists
+                current_buffer = session_manager.get_conversation_history(session_id)
+                if current_buffer:
+                    self.logger.info("Archiving current conversation before resuming")
+                    self.archive_conversation_thread(current_buffer, force_title="Auto-archived before resume")
+
+                # Clear current session
+                session_manager.clear_session(session_id)
+
+                # Ensure session exists
+                if not session_manager.get_session(session_id):
+                    session_manager.create_session(session_id, user_id)
+
+                # Load archived messages back into conversation buffer
+                for message in target_thread.messages:
+                    session_manager.add_turn(
+                        session_id=session_id,
+                        role=message.get('role', 'user'),
+                        content=message.get('content', ''),
+                        metadata=message.get('metadata', {})
+                    )
+
+                # Update conversation history in session state
+                conversation_history = session_manager.format_conversation_history(session_id, max_turns=8)
+                st.session_state['conversation_history'] = conversation_history
+
+                # Load chat history for UI
+                if 'chat_history' not in st.session_state:
+                    st.session_state['chat_history'] = []
+
+                # Convert messages to chat history format
+                st.session_state['chat_history'] = []
+                for message in target_thread.messages:
+                    role = message.get('role', 'user')
+                    content = message.get('content', '')
+
+                    if role == 'user':
+                        st.session_state['chat_history'].append({"role": "user", "content": content})
+                    elif role == 'assistant':
+                        st.session_state['chat_history'].append({"role": "assistant", "content": content})
+
+                # Remove thread from archived list (it's now active)
+                if 'archived_threads' in st.session_state:
+                    st.session_state['archived_threads'] = [
+                        t for t in st.session_state['archived_threads']
+                        if t.get('thread_id') != thread_id
+                    ]
+
+                # Set resume notification
+                st.session_state['conversation_resumed'] = {
+                    'title': target_thread.title,
+                    'message_count': target_thread.message_count,
+                    'timestamp': target_thread.last_updated
+                }
+
+                # Delete the archived thread file
+                try:
+                    thread_file = self.storage_dir / f"{thread_id}.json"
+                    if thread_file.exists():
+                        thread_file.unlink()
+                        self.logger.debug(f"Deleted archived thread file: {thread_file}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to delete archived thread file: {e}")
+
+                self.logger.info(f"Successfully resumed conversation: '{target_thread.title}' ({target_thread.message_count} messages)")
+                return True
+
+            except Exception as e:
+                self.logger.error(f"Failed to load conversation into session: {e}")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Failed to resume conversation thread: {e}")
+            return False
+
+    def search_within_threads(self, query: str, thread_ids: Optional[List[str]] = None,
+                             limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Advanced search within conversation content.
+
+        Args:
+            query: Search query
+            thread_ids: Optional list of specific thread IDs to search
+            limit: Maximum number of results
+
+        Returns:
+            List of search results with context
+        """
+        try:
+            threads = self.get_archived_threads()
+
+            # Filter threads if specific IDs provided
+            if thread_ids:
+                threads = [t for t in threads if t.thread_id in thread_ids]
+
+            search_results = []
+
+            for thread in threads:
+                # Search within thread messages
+                for i, message in enumerate(thread.messages):
+                    content = message.get('content', '').lower()
+                    role = message.get('role', 'unknown')
+
+                    # Simple text search (could be enhanced with fuzzy matching)
+                    if query.lower() in content:
+                        # Get context (surrounding messages)
+                        context_start = max(0, i - 2)
+                        context_end = min(len(thread.messages), i + 3)
+                        context_messages = thread.messages[context_start:context_end]
+
+                        # Calculate relevance score
+                        relevance_score = self._calculate_search_relevance(query, content)
+
+                        search_result = {
+                            'thread_id': thread.thread_id,
+                            'thread_title': thread.title,
+                            'message_index': i,
+                            'message_role': role,
+                            'message_content': message.get('content', ''),
+                            'relevance_score': relevance_score,
+                            'context_messages': context_messages,
+                            'timestamp': message.get('timestamp', thread.created_at)
+                        }
+
+                        search_results.append(search_result)
+
+            # Sort by relevance score
+            search_results.sort(key=lambda x: x['relevance_score'], reverse=True)
+
+            return search_results[:limit]
+
+        except Exception as e:
+            self.logger.error(f"Failed to search within threads: {e}")
+            return []
+
+    def get_conversation_analytics(self) -> Dict[str, Any]:
+        """
+        Generate conversation analytics and insights.
+
+        Returns:
+            Dictionary with analytics data
+        """
+        try:
+            threads = self.get_archived_threads()
+
+            if not threads:
+                return {
+                    'total_conversations': 0,
+                    'total_messages': 0,
+                    'average_conversation_length': 0,
+                    'most_common_topics': [],
+                    'conversation_frequency': {},
+                    'recent_activity': []
+                }
+
+            # Basic statistics
+            total_conversations = len(threads)
+            total_messages = sum(thread.message_count for thread in threads)
+            average_length = total_messages / total_conversations if total_conversations > 0 else 0
+
+            # Topic analysis
+            all_keywords = []
+            for thread in threads:
+                all_keywords.extend(thread.topic_keywords)
+
+            # Count keyword frequency
+            keyword_counts = {}
+            for keyword in all_keywords:
+                keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+
+            # Get most common topics
+            most_common_topics = sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+            # Conversation frequency by date
+            conversation_frequency = {}
+            for thread in threads:
+                try:
+                    date = datetime.fromisoformat(thread.created_at.replace('Z', '+00:00')).date()
+                    date_str = date.strftime('%Y-%m-%d')
+                    conversation_frequency[date_str] = conversation_frequency.get(date_str, 0) + 1
+                except:
+                    pass
+
+            # Recent activity (last 7 days)
+            recent_activity = []
+            for thread in threads[:20]:  # Last 20 conversations
+                try:
+                    dt = datetime.fromisoformat(thread.created_at.replace('Z', '+00:00'))
+                    recent_activity.append({
+                        'title': thread.title,
+                        'date': dt.strftime('%Y-%m-%d'),
+                        'time': dt.strftime('%H:%M'),
+                        'message_count': thread.message_count,
+                        'topics': thread.topic_keywords[:3]  # Top 3 topics
+                    })
+                except:
+                    pass
+
+            # Conversation length distribution
+            length_distribution = {
+                'short (1-5 messages)': len([t for t in threads if 1 <= t.message_count <= 5]),
+                'medium (6-15 messages)': len([t for t in threads if 6 <= t.message_count <= 15]),
+                'long (16+ messages)': len([t for t in threads if t.message_count >= 16])
+            }
+
+            return {
+                'total_conversations': total_conversations,
+                'total_messages': total_messages,
+                'average_conversation_length': round(average_length, 1),
+                'most_common_topics': most_common_topics,
+                'conversation_frequency': conversation_frequency,
+                'recent_activity': recent_activity,
+                'length_distribution': length_distribution,
+                'analytics_generated_at': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate conversation analytics: {e}")
+            return {'error': str(e)}
+
+    def add_tags_to_thread(self, thread_id: str, tags: List[str]) -> bool:
+        """
+        Add tags to a conversation thread.
+
+        Args:
+            thread_id: ID of the thread to tag
+            tags: List of tags to add
+
+        Returns:
+            True if tags were added successfully
+        """
+        try:
+            # Load thread
+            thread_file = self.storage_dir / f"{thread_id}.json"
+            if not thread_file.exists():
+                self.logger.error(f"Thread file not found: {thread_file}")
+                return False
+
+            with open(thread_file, 'r') as f:
+                thread_data = json.load(f)
+
+            # Add tags to metadata
+            if 'user_tags' not in thread_data['metadata']:
+                thread_data['metadata']['user_tags'] = []
+
+            # Add new tags (avoid duplicates)
+            existing_tags = set(thread_data['metadata']['user_tags'])
+            new_tags = [tag for tag in tags if tag not in existing_tags]
+            thread_data['metadata']['user_tags'].extend(new_tags)
+
+            # Update timestamp
+            thread_data['last_updated'] = datetime.now().isoformat()
+
+            # Save updated thread
+            with open(thread_file, 'w') as f:
+                json.dump(thread_data, f, indent=2)
+
+            self.logger.info(f"Added tags {new_tags} to thread {thread_id}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to add tags to thread: {e}")
+            return False
+
+    def generate_auto_tags(self, thread: ConversationThread) -> List[str]:
+        """
+        Generate automatic tags for a conversation thread.
+
+        Args:
+            thread: ConversationThread to analyze
+
+        Returns:
+            List of automatically generated tags
+        """
+        try:
+            auto_tags = []
+
+            # Length-based tags
+            if thread.message_count <= 5:
+                auto_tags.append('short-conversation')
+            elif thread.message_count <= 15:
+                auto_tags.append('medium-conversation')
+            else:
+                auto_tags.append('long-conversation')
+
+            # Content-based tags
+            content_text = ' '.join([msg.get('content', '') for msg in thread.messages]).lower()
+
+            # Technical topics
+            if any(word in content_text for word in ['code', 'programming', 'function', 'variable', 'debug']):
+                auto_tags.append('technical')
+
+            # Learning/teaching
+            if any(phrase in content_text for phrase in ['teach', 'learn', 'explain', 'how to']):
+                auto_tags.append('educational')
+
+            # Problem solving
+            if any(word in content_text for word in ['problem', 'issue', 'error', 'fix', 'solve']):
+                auto_tags.append('troubleshooting')
+
+            # Questions
+            question_count = content_text.count('?')
+            if question_count >= 3:
+                auto_tags.append('q-and-a')
+
+            # Time-based tags
+            try:
+                created_date = datetime.fromisoformat(thread.created_at.replace('Z', '+00:00'))
+                auto_tags.append(f"created-{created_date.strftime('%Y-%m')}")
+
+                # Recent conversations
+                if (datetime.now() - created_date).days <= 1:
+                    auto_tags.append('recent')
+                elif (datetime.now() - created_date).days <= 7:
+                    auto_tags.append('this-week')
+            except:
+                pass
+
+            # Topic-based tags from keywords
+            for keyword in thread.topic_keywords[:3]:  # Top 3 keywords
+                if len(keyword) > 3:  # Avoid short words
+                    auto_tags.append(f"topic-{keyword}")
+
+            return auto_tags
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate auto tags: {e}")
+            return []
+
+    def get_threads_by_tags(self, tags: List[str], match_all: bool = False) -> List[ConversationThread]:
+        """
+        Get threads that match specified tags.
+
+        Args:
+            tags: List of tags to search for
+            match_all: If True, thread must have all tags; if False, any tag matches
+
+        Returns:
+            List of matching ConversationThread objects
+        """
+        try:
+            threads = self.get_archived_threads()
+            matching_threads = []
+
+            for thread in threads:
+                # Get all tags for this thread
+                thread_tags = set(thread.topic_keywords)  # Topic keywords as tags
+
+                # Add user tags if they exist
+                user_tags = thread.metadata.get('user_tags', [])
+                thread_tags.update(user_tags)
+
+                # Add auto tags
+                auto_tags = self.generate_auto_tags(thread)
+                thread_tags.update(auto_tags)
+
+                # Check tag matching
+                search_tags = set(tags)
+
+                if match_all:
+                    # All tags must be present
+                    if search_tags.issubset(thread_tags):
+                        matching_threads.append(thread)
+                else:
+                    # Any tag matches
+                    if search_tags.intersection(thread_tags):
+                        matching_threads.append(thread)
+
+            return matching_threads
+
+        except Exception as e:
+            self.logger.error(f"Failed to get threads by tags: {e}")
             return []
 
     def _initialize_embedding_system(self) -> None:
@@ -740,6 +1147,30 @@ Title:"""
         except Exception as e:
             self.logger.warning(f"MEMOIR integration failed: {e}")
             # Non-critical failure - continue without MEMOIR storage
+
+    def _calculate_search_relevance(self, query: str, content: str) -> float:
+        """Calculate relevance score for search results."""
+        try:
+            query_lower = query.lower()
+            content_lower = content.lower()
+
+            # Exact match gets highest score
+            if query_lower in content_lower:
+                # Calculate position bonus (earlier matches score higher)
+                position = content_lower.find(query_lower)
+                position_bonus = max(0, 1 - (position / len(content_lower)))
+
+                # Calculate coverage (how much of content matches)
+                coverage = len(query_lower) / len(content_lower)
+
+                return min(1.0, 0.8 + (position_bonus * 0.1) + (coverage * 0.1))
+
+            # Fallback to keyword similarity
+            return self._keyword_similarity(query, content)
+
+        except Exception as e:
+            self.logger.warning(f"Search relevance calculation failed: {e}")
+            return 0.0
 
 
 # Global instance

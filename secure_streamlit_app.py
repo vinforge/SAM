@@ -1080,6 +1080,82 @@ def render_conversation_history_sidebar():
 
             st.markdown("---")
 
+            # Phase 2: Advanced Search
+            with st.expander("🔍 Search Conversations", expanded=False):
+                search_query = st.text_input(
+                    "Search in conversation history:",
+                    placeholder="Enter keywords to search...",
+                    key="conversation_search"
+                )
+
+                if search_query and st.button("🔍 Search", key="search_button"):
+                    try:
+                        from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+
+                        relevance_engine = get_contextual_relevance_engine()
+                        search_results = relevance_engine.search_within_threads(search_query, limit=10)
+
+                        if search_results:
+                            st.markdown(f"**Found {len(search_results)} results:**")
+
+                            for result in search_results:
+                                with st.container():
+                                    st.markdown(f"**📄 {result['thread_title']}**")
+                                    st.markdown(f"*{result['message_role'].title()}:* {result['message_content'][:150]}...")
+                                    st.caption(f"Relevance: {result['relevance_score']:.2f} | {result['timestamp']}")
+                                    st.markdown("---")
+                        else:
+                            st.info("No results found for your search.")
+
+                    except Exception as e:
+                        st.error(f"Search failed: {e}")
+
+            # Phase 2: Conversation Analytics
+            with st.expander("📊 Conversation Analytics", expanded=False):
+                try:
+                    from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+
+                    relevance_engine = get_contextual_relevance_engine()
+                    analytics = relevance_engine.get_conversation_analytics()
+
+                    if 'error' not in analytics:
+                        # Basic stats
+                        col1, col2, col3 = st.columns(3)
+
+                        with col1:
+                            st.metric("Total Conversations", analytics['total_conversations'])
+
+                        with col2:
+                            st.metric("Total Messages", analytics['total_messages'])
+
+                        with col3:
+                            st.metric("Avg Length", f"{analytics['average_conversation_length']} msgs")
+
+                        # Most common topics
+                        if analytics['most_common_topics']:
+                            st.markdown("**🏷️ Most Common Topics:**")
+                            for topic, count in analytics['most_common_topics'][:5]:
+                                st.markdown(f"• {topic} ({count} times)")
+
+                        # Conversation length distribution
+                        if analytics['length_distribution']:
+                            st.markdown("**📏 Conversation Lengths:**")
+                            for length_type, count in analytics['length_distribution'].items():
+                                st.markdown(f"• {length_type}: {count}")
+
+                        # Recent activity
+                        if analytics['recent_activity']:
+                            st.markdown("**🕒 Recent Activity:**")
+                            for activity in analytics['recent_activity'][:3]:
+                                st.markdown(f"• {activity['date']} {activity['time']}: {activity['title']}")
+                    else:
+                        st.error(f"Analytics error: {analytics['error']}")
+
+                except Exception as e:
+                    st.error(f"Analytics failed: {e}")
+
+            st.markdown("---")
+
             # Show archived conversations
             archived_threads = st.session_state.get('archived_threads', [])
 
@@ -1121,9 +1197,68 @@ def render_conversation_history_sidebar():
                             if len(messages) > 2:
                                 st.caption(f"... and {len(messages) - 2} more messages")
 
-                        # Future: Resume conversation button (Phase 2)
-                        if st.button(f"🔄 Resume", key=f"resume_{i}", disabled=True):
-                            st.info("Resume feature coming in Phase 2!")
+                        # Phase 2: Resume conversation button
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            if st.button(f"🔄 Resume", key=f"resume_{i}"):
+                                try:
+                                    from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+
+                                    relevance_engine = get_contextual_relevance_engine()
+                                    thread_id = thread_data.get('thread_id')
+
+                                    if relevance_engine.resume_conversation_thread(thread_id):
+                                        st.success(f"✅ Resumed: '{thread_title}'")
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to resume conversation")
+
+                                except Exception as e:
+                                    st.error(f"Resume failed: {e}")
+
+                        with col2:
+                            # Add tags functionality
+                            if st.button(f"🏷️ Tag", key=f"tag_{i}"):
+                                st.session_state[f'show_tag_input_{i}'] = True
+
+                        # Tag input interface
+                        if st.session_state.get(f'show_tag_input_{i}', False):
+                            tag_input = st.text_input(
+                                "Add tags (comma-separated):",
+                                key=f"tag_input_{i}",
+                                placeholder="e.g., important, technical, follow-up"
+                            )
+
+                            col_save, col_cancel = st.columns(2)
+                            with col_save:
+                                if st.button("💾 Save Tags", key=f"save_tags_{i}"):
+                                    if tag_input.strip():
+                                        try:
+                                            from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+
+                                            tags = [tag.strip() for tag in tag_input.split(',') if tag.strip()]
+                                            relevance_engine = get_contextual_relevance_engine()
+                                            thread_id = thread_data.get('thread_id')
+
+                                            if relevance_engine.add_tags_to_thread(thread_id, tags):
+                                                st.success(f"✅ Added tags: {', '.join(tags)}")
+                                                st.session_state[f'show_tag_input_{i}'] = False
+                                                st.rerun()
+                                            else:
+                                                st.error("Failed to add tags")
+                                        except Exception as e:
+                                            st.error(f"Tagging failed: {e}")
+
+                            with col_cancel:
+                                if st.button("❌ Cancel", key=f"cancel_tags_{i}"):
+                                    st.session_state[f'show_tag_input_{i}'] = False
+                                    st.rerun()
+
+                        # Show existing tags
+                        user_tags = thread_data.get('metadata', {}).get('user_tags', [])
+                        if user_tags:
+                            st.caption(f"🏷️ Tags: {', '.join(user_tags)}")
             else:
                 st.markdown("*No archived conversations yet.*")
                 st.caption("Conversations will appear here automatically when you change topics.")
@@ -1134,6 +1269,14 @@ def render_conversation_history_sidebar():
                 st.success(f"✅ Archived: '{archived_info['title']}'")
                 # Clear the notification after showing it
                 del st.session_state['conversation_archived']
+
+            # Phase 2: Show resume notification
+            if st.session_state.get('conversation_resumed'):
+                resumed_info = st.session_state['conversation_resumed']
+                st.success(f"🔄 Resumed: '{resumed_info['title']}'")
+                st.caption(f"Loaded {resumed_info['message_count']} messages from {resumed_info['timestamp']}")
+                # Clear the notification after showing it
+                del st.session_state['conversation_resumed']
 
             # Debug info (can be removed in production)
             if st.checkbox("🔍 Show Debug Info", value=False):
