@@ -7115,9 +7115,11 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
 
             # Get formatted conversation history
             conversation_history = session_manager.format_conversation_history(session_id, max_turns=8)
+            logger.info(f"🔍 DEBUG: Formatted conversation history ({len(conversation_history)} chars): '{conversation_history}'")
 
             # Store in session state for use in prompt template
             st.session_state['conversation_history'] = conversation_history
+            logger.info(f"🔍 DEBUG: Stored conversation history in session state")
 
             logger.info(f"🗣️ Conversational buffer updated for session: {session_id}")
 
@@ -7669,10 +7671,15 @@ If the information isn't sufficient, say so clearly. Always be concise but thoro
 
                 # Add conversation history if available (Task 30 Phase 1)
                 conversation_history = st.session_state.get('conversation_history', '')
+                logger.info(f"🔍 DEBUG: Conversation history from session state: '{conversation_history}'")
+
                 if conversation_history and conversation_history != "No recent conversation history.":
                     user_prompt_parts.append("--- RECENT CONVERSATION HISTORY (Most recent first) ---")
                     user_prompt_parts.append(conversation_history)
                     user_prompt_parts.append("--- END OF CONVERSATION HISTORY ---\n")
+                    logger.info(f"✅ DEBUG: Added conversation history to prompt ({len(conversation_history)} chars)")
+                else:
+                    logger.warning(f"⚠️ DEBUG: No conversation history available - history: '{conversation_history}'")
 
                 user_prompt_parts.append(f"Question: {prompt}")
 
