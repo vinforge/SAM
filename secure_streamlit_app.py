@@ -7975,10 +7975,11 @@ Try rephrasing your question or uploading more relevant documents."""
 
 def generate_final_response(user_question: str, force_local: bool = False) -> str:
     """
-    Two-stage response generation orchestrator (Task 30 Phase 2).
+    Optimized two-stage response generation with A/B testing and caching (Task 30 Phase 3).
 
     Stage 1: Generate factually-grounded draft response
     Stage 2: Refine draft with persona alignment
+    Phase 3: A/B testing, caching, and performance optimization
 
     Args:
         user_question: The user's question
@@ -7994,47 +7995,162 @@ def generate_final_response(user_question: str, force_local: bool = False) -> st
             with open('config/sam_config.json', 'r') as f:
                 config = json.load(f)
                 enable_persona_refinement = config.get('enable_persona_refinement', True)
+                enable_ab_testing = config.get('enable_ab_testing', True)
+                enable_response_caching = config.get('enable_response_caching', True)
         except:
             enable_persona_refinement = True
+            enable_ab_testing = False
+            enable_response_caching = False
 
-        # Stage 1: Generate a factually-grounded draft
-        logger.info("🎯 Stage 1: Generating draft response...")
-        draft_response = generate_draft_response(user_question, force_local)
-
-        # Calculate draft confidence (simple heuristic)
-        draft_confidence = min(0.8, len(draft_response.split()) / 100.0) if draft_response else 0.1
-
-        # Stage 2: Refine the draft with persona (if enabled)
-        if enable_persona_refinement:
+        # Phase 3: Check response cache first
+        cached_response = None
+        if enable_response_caching:
             try:
-                logger.info("🎯 Stage 2: Refining with persona alignment...")
-                from sam.persona.persona_refinement import generate_final_response as persona_generate_final
+                from sam.optimization.response_cache import get_response_cache
 
-                # Get user ID from session state
-                user_id = st.session_state.get('user_id', 'anonymous')
+                cache = get_response_cache()
+                conversation_history = st.session_state.get('conversation_history', '')
+                persona_context = st.session_state.get('last_persona_context', '')
 
-                # Perform persona refinement
-                final_response, refinement_metadata = persona_generate_final(
-                    user_question, draft_response, user_id, draft_confidence
-                )
-
-                # Log refinement results
-                if refinement_metadata.get('refinement_applied', False):
-                    logger.info(f"✅ Persona refinement applied: {refinement_metadata.get('refinement_metadata', {}).get('persona_memories_used', 0)} memories used")
-                else:
-                    logger.info(f"⏭️ Persona refinement skipped: {refinement_metadata.get('refinement_metadata', {}).get('reason', 'unknown')}")
-
-                # Store refinement metadata in session state for debugging
-                st.session_state['last_refinement_metadata'] = refinement_metadata
-
-                return final_response
+                cached_result = cache.get_cached_response(user_question, conversation_history, persona_context)
+                if cached_result:
+                    cached_response, cache_metadata = cached_result
+                    logger.info(f"🚀 Cache hit! Saved {cache_metadata['original_generation_time_ms']:.0f}ms")
+                    return cached_response
 
             except Exception as e:
-                logger.warning(f"Persona refinement failed, using draft: {e}")
-                return draft_response
+                logger.warning(f"Response cache failed: {e}")
+
+        # Phase 3: A/B Testing - Determine pipeline to use
+        pipeline_to_use = 'two_stage'  # Default
+        ab_test_metadata = {}
+
+        if enable_ab_testing:
+            try:
+                from sam.evaluation.ab_testing import get_ab_testing_framework
+
+                ab_framework = get_ab_testing_framework()
+                user_id = st.session_state.get('user_id', 'anonymous')
+
+                # Check for active A/B tests
+                active_tests = [test_id for test_id, test_config in ab_framework.active_tests.items()
+                               if ab_framework._is_test_active(test_config)]
+
+                if active_tests:
+                    # Use first active test (could be enhanced to support multiple tests)
+                    test_id = active_tests[0]
+                    use_treatment = ab_framework.should_use_treatment(user_id, test_id)
+
+                    test_config = ab_framework.active_tests[test_id]
+                    pipeline_to_use = test_config.treatment_pipeline if use_treatment else test_config.control_pipeline
+
+                    ab_test_metadata = {
+                        'test_id': test_id,
+                        'pipeline_used': 'treatment' if use_treatment else 'control',
+                        'pipeline_name': pipeline_to_use
+                    }
+
+                    logger.info(f"🧪 A/B Test {test_id}: Using {pipeline_to_use} pipeline")
+
+            except Exception as e:
+                logger.warning(f"A/B testing failed: {e}")
+
+        # Record start time for performance tracking
+        start_time = time.time()
+
+        # Execute pipeline based on A/B test or configuration
+        final_response = None
+        generation_time_ms = 0.0
+
+        if pipeline_to_use == 'single_stage':
+            # Single-stage pipeline (control)
+            logger.info("🎯 Single-stage pipeline: Generating response...")
+            final_response = generate_draft_response(user_question, force_local)
+
         else:
-            logger.info("⏭️ Persona refinement disabled, using draft response")
-            return draft_response
+            # Two-stage pipeline (treatment or default)
+            # Stage 1: Generate a factually-grounded draft
+            logger.info("🎯 Stage 1: Generating draft response...")
+            draft_response = generate_draft_response(user_question, force_local)
+
+            # Calculate draft confidence (simple heuristic)
+            draft_confidence = min(0.8, len(draft_response.split()) / 100.0) if draft_response else 0.1
+
+            # Stage 2: Refine the draft with persona (if enabled)
+            if enable_persona_refinement and pipeline_to_use == 'two_stage':
+                try:
+                    logger.info("🎯 Stage 2: Refining with persona alignment...")
+                    from sam.persona.persona_refinement import generate_final_response as persona_generate_final
+
+                    # Get user ID from session state
+                    user_id = st.session_state.get('user_id', 'anonymous')
+
+                    # Perform persona refinement
+                    final_response, refinement_metadata = persona_generate_final(
+                        user_question, draft_response, user_id, draft_confidence
+                    )
+
+                    # Log refinement results
+                    if refinement_metadata.get('refinement_applied', False):
+                        logger.info(f"✅ Persona refinement applied: {refinement_metadata.get('refinement_metadata', {}).get('persona_memories_used', 0)} memories used")
+                    else:
+                        logger.info(f"⏭️ Persona refinement skipped: {refinement_metadata.get('refinement_metadata', {}).get('reason', 'unknown')}")
+
+                    # Store refinement metadata in session state for debugging
+                    st.session_state['last_refinement_metadata'] = refinement_metadata
+
+                except Exception as e:
+                    logger.warning(f"Persona refinement failed, using draft: {e}")
+                    final_response = draft_response
+            else:
+                logger.info("⏭️ Persona refinement disabled, using draft response")
+                final_response = draft_response
+
+        # Calculate generation time
+        generation_time_ms = (time.time() - start_time) * 1000
+
+        # Phase 3: Record A/B test result
+        if ab_test_metadata and enable_ab_testing:
+            try:
+                ab_framework.record_result(
+                    test_id=ab_test_metadata['test_id'],
+                    user_id=st.session_state.get('user_id', 'anonymous'),
+                    session_id=st.session_state.get('session_id', 'default_session'),
+                    pipeline_used=ab_test_metadata['pipeline_used'],
+                    user_question=user_question,
+                    response_generated=final_response,
+                    response_time_ms=generation_time_ms,
+                    metadata={
+                        'pipeline_name': ab_test_metadata['pipeline_name'],
+                        'force_local': force_local
+                    }
+                )
+                logger.info(f"📊 Recorded A/B test result for {ab_test_metadata['test_id']}")
+
+            except Exception as e:
+                logger.warning(f"Failed to record A/B test result: {e}")
+
+        # Phase 3: Cache the response
+        if enable_response_caching and final_response:
+            try:
+                cache.cache_response(
+                    user_question=user_question,
+                    response=final_response,
+                    pipeline_used=pipeline_to_use,
+                    generation_time_ms=generation_time_ms,
+                    conversation_context=st.session_state.get('conversation_history', ''),
+                    persona_context=st.session_state.get('last_persona_context', ''),
+                    metadata={
+                        'ab_test': ab_test_metadata,
+                        'force_local': force_local
+                    }
+                )
+                logger.debug(f"💾 Cached response (took {generation_time_ms:.0f}ms to generate)")
+
+            except Exception as e:
+                logger.warning(f"Failed to cache response: {e}")
+
+        return final_response
 
     except Exception as e:
         logger.error(f"Two-stage response generation failed: {e}")
