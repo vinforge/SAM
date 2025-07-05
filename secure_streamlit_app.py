@@ -1154,6 +1154,212 @@ def render_conversation_history_sidebar():
                 except Exception as e:
                     st.error(f"Analytics failed: {e}")
 
+            # Phase 3: AI-Powered Insights
+            with st.expander("🤖 AI Insights & Recommendations", expanded=False):
+                try:
+                    from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+
+                    relevance_engine = get_contextual_relevance_engine()
+                    archived_threads = relevance_engine.get_archived_threads()
+
+                    if archived_threads:
+                        ai_insights = relevance_engine.generate_ai_insights(archived_threads)
+
+                        if 'error' not in ai_insights:
+                            # Display insights
+                            if ai_insights.get('insights'):
+                                st.markdown("**🧠 AI Insights:**")
+                                for insight in ai_insights['insights']:
+                                    st.markdown(f"• {insight}")
+
+                            # Display recommendations
+                            if ai_insights.get('recommendations'):
+                                st.markdown("**💡 Recommendations:**")
+                                for rec in ai_insights['recommendations']:
+                                    st.markdown(f"• {rec}")
+
+                            # Display emerging topics
+                            if ai_insights.get('emerging_topics'):
+                                st.markdown("**📈 Emerging Topics:**")
+                                for topic in ai_insights['emerging_topics']:
+                                    st.markdown(f"• {topic['topic']} (↑{topic['emergence_score']}x)")
+
+                            # Display health metrics
+                            if ai_insights.get('health_metrics'):
+                                st.markdown("**📊 Conversation Health:**")
+                                health = ai_insights['health_metrics']
+
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    diversity = health.get('topic_diversity', 0)
+                                    st.metric("Topic Diversity", f"{diversity:.2f}")
+
+                                with col2:
+                                    engagement = health.get('engagement_level', 0)
+                                    st.metric("Engagement", f"{engagement:.2f}")
+
+                                with col3:
+                                    overall = health.get('overall_health', 0)
+                                    st.metric("Overall Health", f"{overall:.2f}")
+                        else:
+                            st.error(f"AI insights error: {ai_insights['error']}")
+                    else:
+                        st.info("No conversation history available for AI analysis.")
+
+                except Exception as e:
+                    st.error(f"AI insights failed: {e}")
+
+            # Phase 3: Cross-Conversation Context
+            with st.expander("🌉 Related Conversations", expanded=False):
+                try:
+                    from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+                    from sam.session.state_manager import get_session_manager
+
+                    # Get current conversation context
+                    session_manager = get_session_manager()
+                    session_id = st.session_state.get('session_id', 'default_session')
+                    current_buffer = session_manager.get_conversation_history(session_id)
+
+                    if current_buffer:
+                        # Get last user message as query
+                        user_messages = [msg for msg in current_buffer if msg.get('role') == 'user']
+                        if user_messages:
+                            last_query = user_messages[-1].get('content', '')
+
+                            relevance_engine = get_contextual_relevance_engine()
+                            related_conversations = relevance_engine.find_related_conversations(
+                                last_query, current_buffer, limit=3
+                            )
+
+                            if related_conversations:
+                                st.markdown("**🔗 Conversations related to current topic:**")
+
+                                for related in related_conversations:
+                                    with st.container():
+                                        st.markdown(f"**📄 {related['title']}**")
+                                        st.caption(f"Relevance: {related['relevance_score']:.2f} | {related['connection_type'].replace('_', ' ').title()}")
+                                        st.markdown(f"*{related['bridge_summary']}*")
+
+                                        # Quick resume button
+                                        if st.button(f"🔄 Resume", key=f"related_resume_{related['thread_id']}"):
+                                            try:
+                                                if relevance_engine.resume_conversation_thread(related['thread_id']):
+                                                    st.success(f"✅ Resumed: '{related['title']}'")
+                                                    st.rerun()
+                                                else:
+                                                    st.error("Failed to resume conversation")
+                                            except Exception as e:
+                                                st.error(f"Resume failed: {e}")
+
+                                        st.markdown("---")
+                            else:
+                                st.info("No related conversations found for current topic.")
+                    else:
+                        st.info("Start a conversation to see related discussions.")
+
+                except Exception as e:
+                    st.error(f"Related conversations failed: {e}")
+
+            # Phase 3: Export & Optimization
+            with st.expander("📤 Export & Optimization", expanded=False):
+                try:
+                    from sam.conversation.contextual_relevance import get_contextual_relevance_engine
+
+                    relevance_engine = get_contextual_relevance_engine()
+
+                    # Export section
+                    st.markdown("**📤 Export Conversations:**")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        export_format = st.selectbox(
+                            "Export Format:",
+                            ["JSON", "Markdown", "CSV"],
+                            key="export_format"
+                        )
+
+                    with col2:
+                        include_metadata = st.checkbox(
+                            "Include Metadata",
+                            value=True,
+                            key="include_metadata"
+                        )
+
+                    if st.button("📥 Export All Conversations", key="export_all"):
+                        try:
+                            export_result = relevance_engine.export_conversation_data(
+                                export_format=export_format.lower(),
+                                include_metadata=include_metadata
+                            )
+
+                            if export_result.get('success'):
+                                st.success("✅ Export completed!")
+
+                                # Display export metadata
+                                metadata = export_result['metadata']
+                                st.json({
+                                    'total_conversations': metadata['total_conversations'],
+                                    'total_messages': metadata['total_messages'],
+                                    'export_format': metadata['export_format'],
+                                    'export_timestamp': metadata['export_timestamp']
+                                })
+
+                                # Provide download (simplified - in production would use st.download_button)
+                                st.text_area(
+                                    "Export Data (copy to save):",
+                                    value=export_result['export_data'][:1000] + "..." if len(export_result['export_data']) > 1000 else export_result['export_data'],
+                                    height=200,
+                                    key="export_data_display"
+                                )
+                            else:
+                                st.error(f"Export failed: {export_result.get('error', 'Unknown error')}")
+
+                        except Exception as e:
+                            st.error(f"Export failed: {e}")
+
+                    st.markdown("---")
+
+                    # Optimization section
+                    st.markdown("**⚡ Performance Optimization:**")
+
+                    if st.button("🚀 Optimize Storage", key="optimize_storage"):
+                        try:
+                            optimization_result = relevance_engine.optimize_conversation_storage()
+
+                            if optimization_result.get('success', True):
+                                st.success("✅ Storage optimization completed!")
+
+                                # Display optimization results
+                                col1, col2, col3 = st.columns(3)
+
+                                with col1:
+                                    st.metric(
+                                        "Indexed Conversations",
+                                        optimization_result.get('indexed_conversations', 0)
+                                    )
+
+                                with col2:
+                                    st.metric(
+                                        "Cache Entries",
+                                        optimization_result.get('cache_entries_created', 0)
+                                    )
+
+                                with col3:
+                                    improvement = optimization_result.get('performance_improvement', 0)
+                                    st.metric(
+                                        "Performance Boost",
+                                        f"+{improvement*100:.0f}%"
+                                    )
+                            else:
+                                st.error(f"Optimization failed: {optimization_result.get('error', 'Unknown error')}")
+
+                        except Exception as e:
+                            st.error(f"Optimization failed: {e}")
+
+                except Exception as e:
+                    st.error(f"Export & optimization failed: {e}")
+
             st.markdown("---")
 
             # Show archived conversations
