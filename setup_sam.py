@@ -287,7 +287,9 @@ def open_registration_page():
             print("   1. Enter your master password to unlock SAM")
             print("   2. Look for the '🔑 SAM Pro Activation' section in the sidebar")
             print("   3. Enter your activation key to unlock premium features")
-            print("   4. If you don't have an activation key, contact your administrator")
+            print("   4. If you don't have an activation key:")
+            print("      • Visit: http://localhost:8503 to register for a free key")
+            print("      • Or run: streamlit run sam_pro_registration.py --server.port 8503")
 
             return True
 
@@ -299,6 +301,59 @@ def open_registration_page():
     except Exception as e:
         print(f"   ❌ Failed to open registration page: {e}")
         print("   💡 Please manually navigate to http://localhost:8502 after starting SAM")
+        return False
+
+def start_registration_interface():
+    """Start the SAM Pro registration interface for new users."""
+    try:
+        print("\n🌐 **Starting SAM Pro Registration Interface...**")
+        print("   This will allow new users to register for activation keys")
+
+        # Check if registration system is available
+        if not Path("sam_pro_registration.py").exists():
+            print("   ❌ Registration interface not found (sam_pro_registration.py)")
+            print("   💡 This is normal for basic installations")
+            return False
+
+        # Check if key distribution system is configured
+        config_path = Path("config/key_distribution.json")
+        if not config_path.exists():
+            print("   ⚠️ Key distribution not configured")
+            print("   💡 Copy config/key_distribution.json.template to config/key_distribution.json")
+            print("   💡 Then edit with your email settings")
+            return False
+
+        # Start the registration interface
+        print("   🚀 Starting registration interface on port 8503...")
+
+        try:
+            subprocess.Popen([
+                sys.executable, "-m", "streamlit", "run",
+                "sam_pro_registration.py",
+                "--server.port=8503",
+                "--server.address=localhost",
+                "--browser.gatherUsageStats=false"
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            print("   ✅ Registration interface starting...")
+            print("   🌐 New users can register at: http://localhost:8503")
+            print("   📧 Activation keys will be sent via email automatically")
+
+            # Wait a moment then open browser
+            time.sleep(3)
+            webbrowser.open("http://localhost:8503")
+
+            print("   ✅ Registration interface opened in browser!")
+            return True
+
+        except Exception as e:
+            print(f"   ❌ Failed to start registration interface: {e}")
+            print("   💡 You can start it manually with:")
+            print("   💡 streamlit run sam_pro_registration.py --server.port 8503")
+            return False
+
+    except Exception as e:
+        print(f"   ❌ Registration interface startup failed: {e}")
         return False
 
 def show_completion_summary():
@@ -382,6 +437,14 @@ def main():
     except Exception as e:
         print(f"\n⚠️ Could not auto-open activation page: {e}")
         print("💡 Please manually navigate to http://localhost:8502 after starting SAM")
+
+    # Offer to start registration interface
+    try:
+        start_registration = input("\n❓ Would you like to start the SAM Pro registration interface for new users? (y/n) [n]: ").strip().lower()
+        if start_registration in ['y', 'yes']:
+            start_registration_interface()
+    except KeyboardInterrupt:
+        print("\n   ⏭️ Skipping registration interface startup.")
 
     return True
 

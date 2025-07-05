@@ -535,12 +535,18 @@ def render_sam_pro_sidebar():
                                         if result.get('invalid_format'):
                                             st.info("💡 **Key Format:** Keys should be in UUID format (e.g., 12345678-1234-1234-1234-123456789abc)")
                                         elif result.get('invalid_key'):
-                                            st.info("💡 **Need a key?** Contact your administrator or check your purchase confirmation.")
+                                            st.info("💡 **Need a key?** Register at [localhost:8503](http://localhost:8503) for free activation key delivery via email.")
 
                                 except Exception as e:
                                     st.error(f"❌ Activation failed: {e}")
                         else:
                             st.warning("⚠️ Please enter an activation key")
+
+                # Registration link for new users
+                st.markdown("---")
+                st.markdown("🔑 **Need an Activation Key?**")
+                st.markdown("Register for free at: [localhost:8503](http://localhost:8503)")
+                st.caption("Keys are delivered automatically via email")
 
                 # Show what SAM Pro unlocks
                 with st.expander("🎯 What SAM Pro Unlocks", expanded=False):
