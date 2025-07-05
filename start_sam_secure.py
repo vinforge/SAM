@@ -109,15 +109,29 @@ def check_security_setup():
     """Check if security is already set up."""
     try:
         from security import SecureStateManager
+        from pathlib import Path
+
+        # Check if keystore exists (primary indicator)
+        keystore_path = Path("security/keystore.json")
+        if not keystore_path.exists():
+            print("🔧 Security setup required (keystore not found)")
+            return False
+
+        # Check if keystore is valid and get current state
         security_manager = SecureStateManager()
-        
+        current_state = security_manager.get_state()
+
+        # Only require setup if state is SETUP_REQUIRED
+        # LOCKED state means setup is complete, just needs authentication
         if security_manager.is_setup_required():
-            print("🔧 Security setup required (first run)")
+            print("🔧 Security setup required (keystore invalid)")
             return False
         else:
-            print("✅ Security already configured")
+            print(f"✅ Security already configured (state: {current_state.value})")
+            if current_state.value == 'locked':
+                print("💡 System is ready - will prompt for password authentication in web interface")
             return True
-            
+
     except ImportError:
         print("❌ Security module not available")
         return False
@@ -214,7 +228,7 @@ def launch_secure_streamlit():
             sys.executable, "-m", "streamlit", "run",
             "secure_streamlit_app.py",
             f"--server.port={port}",
-            "--server.address=0.0.0.0",
+            "--server.address=localhost",
             "--browser.gatherUsageStats=false"
         ])
 
@@ -252,7 +266,7 @@ def launch_memory_ui():
             sys.executable, "-m", "streamlit", "run",
             "secure_streamlit_app.py",
             "--server.port=8502",
-            "--server.address=0.0.0.0",
+            "--server.address=localhost",
             "--browser.gatherUsageStats=false"
         ])
 
@@ -278,7 +292,7 @@ def launch_full_suite():
             sys.executable, "-m", "streamlit", "run",
             "secure_streamlit_app.py",
             "--server.port=8502",
-            "--server.address=0.0.0.0",
+            "--server.address=localhost",
             "--browser.gatherUsageStats=false"
         ])
         processes.append(("Secure Streamlit", streamlit_process))
@@ -374,6 +388,22 @@ def main():
         print("\n🔧 Security setup required.")
         print("This is your first time running SAM. Let's set up your master password.")
 
+        # Ask user if they want to run setup now or if they already did it
+        try:
+            response = input("\n❓ Have you already run the setup process (setup.py)? (y/n) [n]: ").strip().lower()
+            if response in ['y', 'yes']:
+                print("💡 If you've already run setup.py, the keystore might not be properly created.")
+                print("💡 You can try running: python setup_encryption.py")
+                print("💡 Or continue with automatic setup below.")
+
+                continue_setup = input("❓ Continue with automatic setup? (y/n) [y]: ").strip().lower()
+                if continue_setup in ['n', 'no']:
+                    print("⏭️ Skipping automatic setup. Please run setup_encryption.py manually.")
+                    return
+        except KeyboardInterrupt:
+            print("\n👋 Setup cancelled by user")
+            return
+
         # Automatically run encryption setup for new users
         print("\n🔐 Starting encryption setup...")
         success = run_encryption_setup()
@@ -382,6 +412,7 @@ def main():
             print("❌ Encryption setup failed. You can also try:")
             print("  1. Run migration: python start_sam_secure.py --mode migrate")
             print("  2. Manual setup: python setup_encryption.py")
+            print("  3. Re-run setup: python setup.py")
             return
 
         print("✅ Encryption setup completed! Continuing with SAM launch...")

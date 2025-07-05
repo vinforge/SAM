@@ -12,17 +12,37 @@ Author: SAM Development Team
 Version: 2.0.0
 """
 
+# Core security components (always available)
 from .secure_state_manager import SecureStateManager, SecurityState
-from .security_ui import create_security_ui
 from .crypto_utils import CryptoManager
 from .keystore_manager import KeystoreManager
-from .encrypted_chroma_store import EncryptedChromaStore
 
+# Conditionally import components that require external dependencies
+try:
+    from .encrypted_chroma_store import EncryptedChromaStore
+    _CHROMA_AVAILABLE = True
+except ImportError:
+    _CHROMA_AVAILABLE = False
+    EncryptedChromaStore = None
+
+try:
+    from .security_ui import create_security_ui
+    _UI_AVAILABLE = True
+except ImportError:
+    _UI_AVAILABLE = False
+    create_security_ui = None
+
+# Base exports (always available)
 __all__ = [
     'SecureStateManager',
     'SecurityState',
-    'create_security_ui',
     'CryptoManager',
-    'KeystoreManager',
-    'EncryptedChromaStore'
+    'KeystoreManager'
 ]
+
+# Add optional components if available
+if _CHROMA_AVAILABLE:
+    __all__.append('EncryptedChromaStore')
+
+if _UI_AVAILABLE:
+    __all__.append('create_security_ui')
