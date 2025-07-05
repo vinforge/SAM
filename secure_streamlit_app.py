@@ -7091,8 +7091,8 @@ def diagnose_memory_retrieval(query: str) -> dict:
     except Exception as e:
         return {'error': str(e), 'query': query}
 
-def generate_secure_response(prompt: str, force_local: bool = False) -> str:
-    """Generate a secure response using SAM's capabilities with Phase 8 confidence assessment, TPV monitoring, intelligent tool selection, and feedback-driven learning."""
+def generate_draft_response(prompt: str, force_local: bool = False) -> str:
+    """Generate a draft response using SAM's capabilities (Stage 1 of two-stage pipeline - Task 30 Phase 2)."""
     try:
         # Phase -2: Conversational Buffer Management (Task 30 Phase 1)
         conversation_history = ""
@@ -7973,14 +7973,81 @@ Try rephrasing your question or uploading more relevant documents."""
         logger.error(f"Response generation failed: {e}")
         return f"I apologize, but I encountered an error while processing your request: {e}"
 
+def generate_final_response(user_question: str, force_local: bool = False) -> str:
+    """
+    Two-stage response generation orchestrator (Task 30 Phase 2).
+
+    Stage 1: Generate factually-grounded draft response
+    Stage 2: Refine draft with persona alignment
+
+    Args:
+        user_question: The user's question
+        force_local: Whether to force local knowledge only
+
+    Returns:
+        Final refined response
+    """
+    try:
+        # Load configuration
+        try:
+            import json
+            with open('config/sam_config.json', 'r') as f:
+                config = json.load(f)
+                enable_persona_refinement = config.get('enable_persona_refinement', True)
+        except:
+            enable_persona_refinement = True
+
+        # Stage 1: Generate a factually-grounded draft
+        logger.info("🎯 Stage 1: Generating draft response...")
+        draft_response = generate_draft_response(user_question, force_local)
+
+        # Calculate draft confidence (simple heuristic)
+        draft_confidence = min(0.8, len(draft_response.split()) / 100.0) if draft_response else 0.1
+
+        # Stage 2: Refine the draft with persona (if enabled)
+        if enable_persona_refinement:
+            try:
+                logger.info("🎯 Stage 2: Refining with persona alignment...")
+                from sam.persona.persona_refinement import generate_final_response as persona_generate_final
+
+                # Get user ID from session state
+                user_id = st.session_state.get('user_id', 'anonymous')
+
+                # Perform persona refinement
+                final_response, refinement_metadata = persona_generate_final(
+                    user_question, draft_response, user_id, draft_confidence
+                )
+
+                # Log refinement results
+                if refinement_metadata.get('refinement_applied', False):
+                    logger.info(f"✅ Persona refinement applied: {refinement_metadata.get('refinement_metadata', {}).get('persona_memories_used', 0)} memories used")
+                else:
+                    logger.info(f"⏭️ Persona refinement skipped: {refinement_metadata.get('refinement_metadata', {}).get('reason', 'unknown')}")
+
+                # Store refinement metadata in session state for debugging
+                st.session_state['last_refinement_metadata'] = refinement_metadata
+
+                return final_response
+
+            except Exception as e:
+                logger.warning(f"Persona refinement failed, using draft: {e}")
+                return draft_response
+        else:
+            logger.info("⏭️ Persona refinement disabled, using draft response")
+            return draft_response
+
+    except Exception as e:
+        logger.error(f"Two-stage response generation failed: {e}")
+        return f"I apologize, but I encountered an error while processing your request: {e}"
+
 def generate_response_with_conversation_buffer(prompt: str, force_local: bool = False) -> str:
     """
     Wrapper for generate_secure_response that handles conversation buffer updates.
     This implements Task 30 Phase 1: Short-Term Conversational Buffer.
     """
     try:
-        # Generate the response
-        response = generate_secure_response(prompt, force_local)
+        # Generate the response using two-stage pipeline
+        response = generate_final_response(prompt, force_local)
 
         # Add assistant response to conversation buffer
         try:
