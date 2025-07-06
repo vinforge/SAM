@@ -15,6 +15,8 @@ Version: 1.0.0
 import os
 import sys
 import subprocess
+import time
+import webbrowser
 from pathlib import Path
 
 def print_banner():
@@ -211,6 +213,64 @@ def show_documentation():
     
     input("\nPress Enter to continue...")
 
+def open_activation_page():
+    """Open the SAM Pro activation page automatically after setup completion."""
+    try:
+        print("\n🌐 **Opening SAM Pro Activation Page...**")
+        print("   Starting SAM and opening activation interface...")
+
+        # Ask user if they want to auto-open
+        try:
+            response = input("\n❓ Would you like to automatically start SAM and open the activation page? (y/n) [y]: ").strip().lower()
+            if response and response not in ['y', 'yes']:
+                print("   ⏭️ Skipping auto-start. You can manually start SAM later.")
+                return False
+        except KeyboardInterrupt:
+            print("\n   ⏭️ Skipping auto-start.")
+            return False
+
+        # Start SAM in the background
+        print("   🚀 Starting SAM services...")
+
+        # Launch SAM secure mode in background
+        try:
+            subprocess.Popen([
+                sys.executable, "start_sam_secure.py", "--mode", "full"
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            print("   ✅ SAM services starting in background...")
+
+            # Wait for services to start
+            print("   ⏳ Waiting for services to initialize (30 seconds)...")
+            time.sleep(30)
+
+            # Open the activation page
+            activation_url = "http://localhost:8502"
+            print(f"   🌐 Opening activation page: {activation_url}")
+
+            webbrowser.open(activation_url)
+
+            print("   ✅ Activation page opened in your default browser!")
+            print("\n💡 **What to do next:**")
+            print("   1. Enter your master password to unlock SAM")
+            print("   2. Look for the '🔑 SAM Pro Activation' section in the sidebar")
+            print("   3. Enter your activation key to unlock premium features")
+            print("   4. If you don't have an activation key:")
+            print("      • Visit: http://localhost:8503 to register for a free key")
+            print("      • Or run: streamlit run sam_pro_registration.py --server.port 8503")
+
+            return True
+
+        except Exception as e:
+            print(f"   ⚠️ Could not auto-start SAM: {e}")
+            print("   💡 Please manually start SAM with: python start_sam_secure.py --mode full")
+            return False
+
+    except Exception as e:
+        print(f"   ❌ Failed to open activation page: {e}")
+        print("   💡 Please manually navigate to http://localhost:8502 after starting SAM")
+        return False
+
 def main():
     """Main setup launcher."""
     try:
@@ -283,7 +343,14 @@ def main():
             print("\n📖 **Documentation:**")
             print("   • SETUP_OPTIONS.md - All setup options")
             print("   • docs/ - Complete documentation")
-    
+
+            # Open activation page automatically
+            try:
+                open_activation_page()
+            except Exception as e:
+                print(f"\n⚠️ Could not auto-open activation page: {e}")
+                print("💡 Please manually navigate to http://localhost:8502 after starting SAM")
+
     except KeyboardInterrupt:
         print("\n\n👋 Setup cancelled by user")
     except Exception as e:
