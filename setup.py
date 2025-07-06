@@ -15,8 +15,6 @@ Version: 1.0.0
 import os
 import sys
 import subprocess
-import time
-import webbrowser
 from pathlib import Path
 
 def print_banner():
@@ -213,6 +211,49 @@ def show_documentation():
     
     input("\nPress Enter to continue...")
 
+def check_and_install_dependencies():
+    """Check and install required dependencies for SAM services."""
+    print("\n🔍 **Checking SAM Dependencies...**")
+
+    required_packages = [
+        'streamlit',
+        'chromadb',
+        'flask',
+        'argon2-cffi',
+        'cryptography'
+    ]
+
+    missing_packages = []
+
+    for package in required_packages:
+        try:
+            __import__(package.replace('-', '_'))
+            print(f"   ✅ {package}")
+        except ImportError:
+            print(f"   ❌ {package} (missing)")
+            missing_packages.append(package)
+
+    if missing_packages:
+        print(f"\n📦 **Installing Missing Dependencies...**")
+        print(f"   Installing: {', '.join(missing_packages)}")
+
+        try:
+            # Install missing packages
+            subprocess.run([
+                sys.executable, "-m", "pip", "install"
+            ] + missing_packages, check=True, capture_output=True)
+
+            print("   ✅ Dependencies installed successfully!")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            print(f"   ❌ Failed to install dependencies: {e}")
+            print("   💡 Please run manually: pip install streamlit chromadb")
+            return False
+    else:
+        print("   ✅ All dependencies satisfied!")
+        return True
+
 def open_activation_page():
     """Open the SAM Pro activation page automatically after setup completion."""
     try:
@@ -227,6 +268,12 @@ def open_activation_page():
                 return False
         except KeyboardInterrupt:
             print("\n   ⏭️ Skipping auto-start.")
+            return False
+
+        # Check dependencies before starting services
+        if not check_and_install_dependencies():
+            print("   ❌ Cannot start SAM due to missing dependencies")
+            print("   💡 Please install dependencies and run: python start_sam_secure.py --mode full")
             return False
 
         # Start SAM in the background
@@ -350,7 +397,7 @@ def main():
             except Exception as e:
                 print(f"\n⚠️ Could not auto-open activation page: {e}")
                 print("💡 Please manually navigate to http://localhost:8502 after starting SAM")
-
+    
     except KeyboardInterrupt:
         print("\n\n👋 Setup cancelled by user")
     except Exception as e:
