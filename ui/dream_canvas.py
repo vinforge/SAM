@@ -652,10 +652,16 @@ def render_synthesis_controls():
     st.markdown("### 🌙 Cognitive Synthesis Controls")
     st.markdown("*Generate emergent insights and discover new understanding from memory patterns*")
 
-    col1, col2 = st.columns(2)
+    # Auto-synthesis controls
+    render_auto_synthesis_controls()
+
+    st.markdown("---")
+
+    # Manual synthesis controls
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("🧠 Run Dream State Synthesis", type="primary", help="Generate new insights from memory clusters"):
+        if st.button("🔄 Run Synthesis", type="primary", help="Generate new insights from memory clusters"):
             with st.spinner("🌙 SAM entering dream state..."):
                 try:
                     # Import synthesis engine
@@ -669,7 +675,7 @@ def render_synthesis_controls():
                     result = synthesis_engine.run_synthesis(memory_store, visualize=True)
 
                     # Store results in session state
-                    st.session_state.synthesis_results = {
+                    synthesis_results = {
                         'insights': [insight.__dict__ for insight in result.insights],
                         'clusters_found': result.clusters_found,
                         'insights_generated': result.insights_generated,
@@ -677,6 +683,11 @@ def render_synthesis_controls():
                         'timestamp': result.timestamp,
                         'synthesis_log': result.synthesis_log
                     }
+
+                    st.session_state.synthesis_results = synthesis_results
+
+                    # Update synthesis history
+                    update_synthesis_history(synthesis_results)
 
                     st.success(f"✨ Synthesis complete! Generated {result.insights_generated} insights from {result.clusters_found} clusters.")
                     st.rerun()
@@ -686,7 +697,7 @@ def render_synthesis_controls():
                     st.error(f"❌ Synthesis failed: {e}")
 
     with col2:
-        if st.button("📊 Load Recent Synthesis", help="Load the most recent synthesis results"):
+        if st.button("📊 Load Recent", help="Load the most recent synthesis results"):
             try:
                 # Load most recent synthesis results
                 synthesis_dir = Path("synthesis_output")
@@ -712,6 +723,188 @@ def render_synthesis_controls():
             except Exception as e:
                 logger.error(f"Failed to load synthesis results: {e}")
                 st.error(f"❌ Failed to load synthesis results: {e}")
+
+    with col3:
+        if st.button("📚 View History", help="Browse synthesis history and load previous runs"):
+            st.session_state.show_synthesis_history = True
+            st.rerun()
+
+    # Show synthesis history if requested
+    if st.session_state.get('show_synthesis_history', False):
+        render_synthesis_history()
+
+def render_auto_synthesis_controls():
+    """Render auto-synthesis configuration controls."""
+    st.markdown("#### ⚙️ Auto-Synthesis Settings")
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+
+    with col1:
+        # Auto-synthesis toggle
+        auto_synthesis_enabled = st.session_state.get('auto_synthesis_enabled', False)
+        new_auto_synthesis = st.toggle(
+            "🤖 Auto-Synthesis",
+            value=auto_synthesis_enabled,
+            help="Automatically run synthesis when new insights are detected"
+        )
+
+        if new_auto_synthesis != auto_synthesis_enabled:
+            st.session_state.auto_synthesis_enabled = new_auto_synthesis
+            if new_auto_synthesis:
+                st.success("✅ Auto-synthesis enabled")
+            else:
+                st.info("⏸️ Auto-synthesis disabled")
+            st.rerun()
+
+    with col2:
+        if st.session_state.get('auto_synthesis_enabled', False):
+            # Auto-synthesis frequency
+            frequency_options = {
+                "Every 10 minutes": 600,
+                "Every 30 minutes": 1800,
+                "Every hour": 3600,
+                "Every 6 hours": 21600,
+                "Daily": 86400
+            }
+
+            current_frequency = st.session_state.get('auto_synthesis_frequency', 3600)
+            frequency_label = next((k for k, v in frequency_options.items() if v == current_frequency), "Every hour")
+
+            selected_frequency = st.selectbox(
+                "Frequency",
+                options=list(frequency_options.keys()),
+                index=list(frequency_options.keys()).index(frequency_label),
+                help="How often to run auto-synthesis"
+            )
+
+            st.session_state.auto_synthesis_frequency = frequency_options[selected_frequency]
+        else:
+            st.markdown("*Enable auto-synthesis to configure frequency*")
+
+    with col3:
+        if st.session_state.get('auto_synthesis_enabled', False):
+            # Auto-research toggle
+            auto_research_enabled = st.session_state.get('auto_research_enabled', False)
+            new_auto_research = st.checkbox(
+                "🔬 Auto-Research",
+                value=auto_research_enabled,
+                help="Automatically research promising insights"
+            )
+
+            if new_auto_research != auto_research_enabled:
+                st.session_state.auto_research_enabled = new_auto_research
+
+def render_synthesis_history():
+    """Display synthesis history with ability to load previous runs."""
+    st.markdown("---")
+    st.markdown("### 📚 Synthesis History")
+
+    col1, col2 = st.columns([3, 1])
+
+    with col2:
+        if st.button("❌ Close History", help="Close synthesis history view"):
+            st.session_state.show_synthesis_history = False
+            st.rerun()
+
+    with col1:
+        st.markdown("*Browse and load previous synthesis runs*")
+
+    try:
+        # Get synthesis history from engine
+        from memory.synthesis.synthesis_engine import SynthesisEngine
+        synthesis_engine = SynthesisEngine()
+        history = synthesis_engine.get_synthesis_history()
+
+        if not history:
+            st.info("📭 No synthesis history found. Run synthesis to create your first entry.")
+            return
+
+        # Display history in a table-like format
+        st.markdown(f"**Found {len(history)} synthesis runs:**")
+
+        for i, run in enumerate(history[:10]):  # Show last 10 runs
+            with st.container():
+                col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
+
+                with col1:
+                    timestamp = run.get('timestamp', 'Unknown')
+                    if timestamp != 'Unknown':
+                        try:
+                            # Format timestamp nicely
+                            from datetime import datetime
+                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            formatted_time = dt.strftime('%Y-%m-%d %H:%M')
+                        except:
+                            formatted_time = timestamp[:16]
+                    else:
+                        formatted_time = 'Unknown'
+
+                    st.markdown(f"**{formatted_time}**")
+
+                with col2:
+                    insights_count = run.get('insights_generated', 0)
+                    clusters_count = run.get('clusters_analyzed', 0)
+                    st.markdown(f"🧠 {insights_count} insights, 🔗 {clusters_count} clusters")
+
+                with col3:
+                    run_id = run.get('run_id', f'run_{i}')
+                    if st.button(f"📂 Load", key=f"load_history_{i}", help=f"Load synthesis run {run_id}"):
+                        try:
+                            # Load the specific synthesis run
+                            file_path = run.get('file_path')
+                            if file_path and Path(file_path).exists():
+                                with open(file_path, 'r') as f:
+                                    data = json.load(f)
+
+                                st.session_state.synthesis_results = data
+                                st.success(f"✅ Loaded synthesis run from {formatted_time}")
+                                st.session_state.show_synthesis_history = False
+                                st.rerun()
+                            else:
+                                st.error("❌ Synthesis file not found")
+                        except Exception as e:
+                            st.error(f"❌ Failed to load synthesis: {e}")
+
+                with col4:
+                    if st.button(f"🗑️", key=f"delete_history_{i}", help=f"Delete synthesis run {run_id}"):
+                        try:
+                            file_path = run.get('file_path')
+                            if file_path and Path(file_path).exists():
+                                Path(file_path).unlink()
+                                st.success(f"🗑️ Deleted synthesis run")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Failed to delete: {e}")
+
+                st.markdown("---")
+
+        if len(history) > 10:
+            st.info(f"📋 Showing 10 most recent runs. Total: {len(history)} runs available.")
+
+    except Exception as e:
+        logger.error(f"Failed to load synthesis history: {e}")
+        st.error(f"❌ Failed to load synthesis history: {e}")
+
+def update_synthesis_history(synthesis_results):
+    """Update synthesis history in session state."""
+    if 'synthesis_history' not in st.session_state:
+        st.session_state.synthesis_history = []
+
+    # Add new synthesis result to history
+    history_entry = {
+        'run_id': synthesis_results.get('run_id'),
+        'timestamp': synthesis_results.get('timestamp'),
+        'insights': synthesis_results.get('insights', []),
+        'clusters_found': synthesis_results.get('clusters_found', 0),
+        'insights_generated': synthesis_results.get('insights_generated', 0),
+        'status': 'success'
+    }
+
+    st.session_state.synthesis_history.append(history_entry)
+
+    # Keep only last 50 entries to prevent memory bloat
+    if len(st.session_state.synthesis_history) > 50:
+        st.session_state.synthesis_history = st.session_state.synthesis_history[-50:]
 
     # NEW: Add the missing "Synthesis" button that appears after dream state completion
     if hasattr(st.session_state, 'synthesis_results') and st.session_state.synthesis_results:
@@ -748,13 +941,143 @@ def render_synthesis_controls():
                     st.error(f"❌ Failed to load into Dream Canvas: {e}")
 
         with col3:
-            if st.button("🔄 Clear Results", help="Clear current synthesis results"):
-                if hasattr(st.session_state, 'synthesis_results'):
-                    del st.session_state.synthesis_results
-                if hasattr(st.session_state, 'show_synthesis_details'):
-                    del st.session_state.show_synthesis_details
-                st.success("🧹 Synthesis results cleared")
-                st.rerun()
+            col3a, col3b = st.columns(2)
+
+            with col3a:
+                if st.button("⚙️ Settings", help="Configure synthesis settings"):
+                    st.session_state.show_synthesis_settings = not st.session_state.get('show_synthesis_settings', False)
+                    st.rerun()
+
+            with col3b:
+                if st.button("🔄 Clear", help="Clear current synthesis results"):
+                    if hasattr(st.session_state, 'synthesis_results'):
+                        del st.session_state.synthesis_results
+                    if hasattr(st.session_state, 'show_synthesis_details'):
+                        del st.session_state.show_synthesis_details
+                    st.success("🧹 Synthesis results cleared")
+                    st.rerun()
+
+        # Show synthesis settings if requested
+        if st.session_state.get('show_synthesis_settings', False):
+            render_synthesis_settings()
+
+def render_synthesis_settings():
+    """Display advanced synthesis configuration settings."""
+    st.markdown("---")
+    st.markdown("#### ⚙️ Advanced Synthesis Settings")
+
+    col1, col2 = st.columns([3, 1])
+
+    with col2:
+        if st.button("❌ Close Settings", help="Close synthesis settings"):
+            st.session_state.show_synthesis_settings = False
+            st.rerun()
+
+    with col1:
+        st.markdown("*Configure synthesis parameters and behavior*")
+
+    # Synthesis parameters
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("**🔗 Clustering Parameters**")
+
+        min_cluster_size = st.slider(
+            "Min Cluster Size",
+            min_value=2,
+            max_value=20,
+            value=st.session_state.get('synthesis_min_cluster_size', 5),
+            help="Minimum number of memories required to form a cluster"
+        )
+        st.session_state.synthesis_min_cluster_size = min_cluster_size
+
+        cluster_threshold = st.slider(
+            "Cluster Threshold",
+            min_value=0.1,
+            max_value=0.9,
+            value=st.session_state.get('synthesis_cluster_threshold', 0.3),
+            step=0.05,
+            help="Similarity threshold for clustering memories"
+        )
+        st.session_state.synthesis_cluster_threshold = cluster_threshold
+
+    with col2:
+        st.markdown("**🧠 Insight Generation**")
+
+        max_insights = st.slider(
+            "Max Insights per Run",
+            min_value=5,
+            max_value=100,
+            value=st.session_state.get('synthesis_max_insights', 20),
+            help="Maximum number of insights to generate per synthesis run"
+        )
+        st.session_state.synthesis_max_insights = max_insights
+
+        insight_quality_threshold = st.slider(
+            "Quality Threshold",
+            min_value=0.1,
+            max_value=1.0,
+            value=st.session_state.get('synthesis_quality_threshold', 0.6),
+            step=0.05,
+            help="Minimum quality score for insights to be included"
+        )
+        st.session_state.synthesis_quality_threshold = insight_quality_threshold
+
+    with col3:
+        st.markdown("**📊 Output Preferences**")
+
+        include_visualization = st.checkbox(
+            "Include Visualization",
+            value=st.session_state.get('synthesis_include_viz', True),
+            help="Generate visualization data during synthesis"
+        )
+        st.session_state.synthesis_include_viz = include_visualization
+
+        save_detailed_logs = st.checkbox(
+            "Detailed Logging",
+            value=st.session_state.get('synthesis_detailed_logs', True),
+            help="Save detailed synthesis logs for debugging"
+        )
+        st.session_state.synthesis_detailed_logs = save_detailed_logs
+
+        auto_cleanup = st.checkbox(
+            "Auto-cleanup Old Runs",
+            value=st.session_state.get('synthesis_auto_cleanup', False),
+            help="Automatically delete synthesis runs older than 30 days"
+        )
+        st.session_state.synthesis_auto_cleanup = auto_cleanup
+
+    # Performance settings
+    st.markdown("---")
+    st.markdown("**⚡ Performance Settings**")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        parallel_processing = st.checkbox(
+            "🚀 Parallel Processing",
+            value=st.session_state.get('synthesis_parallel', True),
+            help="Use multiple CPU cores for faster synthesis"
+        )
+        st.session_state.synthesis_parallel = parallel_processing
+
+    with col2:
+        memory_limit = st.selectbox(
+            "Memory Limit",
+            options=["1GB", "2GB", "4GB", "8GB", "Unlimited"],
+            index=2,  # Default to 4GB
+            help="Maximum memory usage for synthesis operations"
+        )
+        st.session_state.synthesis_memory_limit = memory_limit
+
+    with col3:
+        if st.button("🔄 Reset to Defaults", help="Reset all settings to default values"):
+            # Clear all synthesis settings from session state
+            settings_keys = [k for k in st.session_state.keys() if k.startswith('synthesis_')]
+            for key in settings_keys:
+                del st.session_state[key]
+            st.success("✅ Settings reset to defaults")
+            st.rerun()
 
 def render_research_integration_controls(synthesis_results):
     """Render research integration controls for Dream Canvas insights."""
