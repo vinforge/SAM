@@ -305,15 +305,6 @@ def open_registration_page():
         print("   💡 Please manually navigate to http://localhost:8502 after starting SAM")
         return False
 
-def check_registration_dependencies():
-    """Check if registration interface dependencies are available."""
-    try:
-        import streamlit
-        return True
-    except ImportError:
-        print("   ⚠️ Streamlit not available for registration interface")
-        return False
-
 def start_registration_interface():
     """Start the SAM Pro registration interface for key registration."""
     try:
@@ -326,9 +317,12 @@ def start_registration_interface():
             print("   💡 You can register later or contact support for a key")
             return False, None
 
-        # Check dependencies
-        if not check_registration_dependencies():
-            print("   ❌ Registration interface dependencies not available")
+        # Check if streamlit is available
+        try:
+            import streamlit
+            print("   ✅ Registration interface dependencies available")
+        except ImportError:
+            print("   ❌ Streamlit not available for registration interface")
             print("   💡 You can register later after installing streamlit")
             return False, None
 
@@ -613,11 +607,17 @@ def main():
         print(f"\n⚠️ SAM Pro activation setup failed: {e}")
         print("💡 You can activate SAM Pro later through the interface")
 
-    # Open SAM automatically
+    # Now start SAM and open activation page
     try:
-        open_registration_page()
+        print("\n🚀 **Starting SAM...**")
+        response = input("❓ Would you like to start SAM now? (y/n) [y]: ").strip().lower()
+        if not response or response in ['y', 'yes']:
+            open_registration_page()
+        else:
+            print("⏭️ You can start SAM later with: python start_sam_secure.py --mode full")
+            print("💡 Then navigate to: http://localhost:8502")
     except Exception as e:
-        print(f"\n⚠️ Could not auto-open SAM: {e}")
+        print(f"\n⚠️ Could not auto-start SAM: {e}")
         print("💡 Please manually start SAM with: python start_sam_secure.py --mode full")
         print("💡 Then navigate to: http://localhost:8502")
 
