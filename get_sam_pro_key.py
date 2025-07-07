@@ -37,14 +37,12 @@ def main():
     try:
         from scripts.key_distribution_system import KeyDistributionManager
         print("✅ Key distribution system available")
+        use_advanced_system = True
     except ImportError:
-        print("❌ Key distribution system not available")
-        print("💡 Please ensure all SAM components are properly installed")
+        print("⚠️  Advanced key distribution system not available")
+        print("💡 Using simple key generation instead")
         print()
-        print("🔧 Alternative options:")
-        print("1. Run the web interface: streamlit run sam_pro_registration.py")
-        print("2. Generate a key manually: python scripts/generate_pro_activation_key.py")
-        return 1
+        use_advanced_system = False
     
     print()
     print("🎯 Get your free SAM Pro activation key!")
@@ -72,28 +70,77 @@ def main():
         
         print()
         print("🔄 Processing your registration...")
-        
-        # Initialize key distribution manager
-        manager = KeyDistributionManager()
-        
-        # Register user
-        success, message, registration_id = manager.register_user(
-            email=email,
-            name=name,
-            organization=organization or "Personal",
-            use_case=use_case or "General AI assistance"
-        )
-        
-        if not success:
-            print(f"❌ Registration failed: {message}")
-            return 1
-        
-        print(f"✅ Registration successful! ID: {registration_id}")
-        
-        # Assign and send key
-        key_success, key_message, activation_key = manager.assign_and_send_key(registration_id)
-        
-        if key_success and activation_key:
+
+        if use_advanced_system:
+            # Use advanced key distribution manager
+            manager = KeyDistributionManager()
+
+            # Register user
+            success, message, registration_id = manager.register_user(
+                email=email,
+                name=name,
+                organization=organization or "Personal",
+                use_case=use_case or "General AI assistance"
+            )
+
+            if not success:
+                print(f"❌ Registration failed: {message}")
+                return 1
+
+            print(f"✅ Registration successful! ID: {registration_id}")
+
+            # Assign and send key
+            key_success, key_message, activation_key = manager.assign_and_send_key(registration_id)
+
+            if key_success and activation_key:
+                email_sent = True
+            else:
+                print(f"⚠️ Advanced key generation failed: {key_message}")
+                print("🔄 Falling back to simple key generation...")
+                use_advanced_system = False
+
+        if not use_advanced_system:
+            # Use simple key generation
+            import uuid
+            import json
+            import hashlib
+            from datetime import datetime
+            from pathlib import Path
+
+            # Generate key
+            activation_key = str(uuid.uuid4())
+            email_sent = False
+
+            # Add to keystore
+            try:
+                security_dir = Path("security")
+                security_dir.mkdir(exist_ok=True)
+                keystore_file = security_dir / "keystore.json"
+
+                keystore = {}
+                if keystore_file.exists():
+                    try:
+                        with open(keystore_file, 'r') as f:
+                            keystore = json.load(f)
+                    except:
+                        keystore = {}
+
+                keystore[activation_key] = {
+                    'email': email,
+                    'created_date': datetime.now().isoformat(),
+                    'key_type': 'sam_pro_free',
+                    'status': 'active'
+                }
+
+                with open(keystore_file, 'w') as f:
+                    json.dump(keystore, f, indent=2)
+
+                print("✅ Key generated and added to keystore")
+
+            except Exception as e:
+                print(f"⚠️ Could not update keystore: {e}")
+
+        if activation_key:
             print("🎉 SAM Pro activation key generated and sent!")
             print()
             print("🔑 Your SAM Pro Activation Key:")
@@ -101,7 +148,10 @@ def main():
             print(f"   {activation_key}")
             print("=" * 50)
             print()
-            print("📧 Key also sent to:", email)
+            if email_sent:
+                print("📧 Key also sent to:", email)
+            else:
+                print("📧 Email delivery not available - key displayed above as backup")
             print()
             print("🚀 Next Steps:")
             print("1. Start SAM: python secure_streamlit_app.py")
@@ -120,9 +170,9 @@ def main():
             print("• Enhanced Web Retrieval - Premium search capabilities")
             
         else:
-            print(f"⚠️ Key generation failed: {key_message}")
-            print("💡 You can try again later or use the web interface:")
-            print("   streamlit run sam_pro_registration.py")
+            print(f"⚠️ Key generation failed")
+            print("💡 You can try the simple key generator:")
+            print("   python simple_sam_pro_key.py")
             return 1
         
         print()
