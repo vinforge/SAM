@@ -9,6 +9,7 @@ Version: 2.0.0
 """
 
 import logging
+import time
 import streamlit as st
 from typing import Optional, Tuple
 from datetime import datetime
@@ -46,7 +47,13 @@ class SecurityUI:
             if current_state == SecurityState.SETUP_REQUIRED:
                 return self._render_setup_interface()
             elif current_state == SecurityState.LOCKED:
-                return self._render_login_interface()
+                # Check if we should show lockout interface or login with error
+                if self.security_manager.is_locked_out():
+                    return self._render_lockout_interface()
+                else:
+                    # Show login interface with error if there were failed attempts
+                    show_error = self.security_manager.get_failed_attempts() > 0
+                    return self._render_login_interface(show_error=show_error)
             elif current_state == SecurityState.AUTHENTICATED:
                 return self._render_authenticated_interface()
             elif current_state == SecurityState.ERROR:
@@ -131,11 +138,11 @@ class SecurityUI:
 
         if show_error:
             failed_attempts = self.security_manager.get_failed_attempts()
-            max_attempts = 5  # From security settings
+            max_attempts = self.security_manager.max_attempts
             remaining = max_attempts - failed_attempts
 
             if remaining > 0:
-                st.error(f"❌ **Authentication failed.** {remaining} attempts remaining.")
+                st.error(f"❌ **Authentication failed.** Attempt {failed_attempts} of {max_attempts}. {remaining} attempts remaining.")
             else:
                 st.error("❌ **Too many failed attempts.** Account locked.")
 
@@ -177,18 +184,28 @@ class SecurityUI:
         st.markdown("### 🚫 Account Locked")
         st.markdown("---")
 
-        st.error("🔒 **Account temporarily locked due to too many failed attempts.**")
+        failed_attempts = self.security_manager.get_failed_attempts()
+        max_attempts = self.security_manager.max_attempts
 
-        if remaining_seconds:
+        st.error(f"🔒 **Account temporarily locked due to {failed_attempts} failed authentication attempts.**")
+
+        if remaining_seconds > 0:
             minutes = remaining_seconds // 60
             seconds = remaining_seconds % 60
             st.warning(f"⏰ **Time remaining:** {minutes}m {seconds}s")
 
-            # Auto-refresh every 30 seconds
-            if remaining_seconds > 0:
-                st.rerun()
+            # Auto-refresh every 10 seconds for better user experience
+            time.sleep(1)  # Small delay to prevent excessive refreshing
+            st.rerun()
+        else:
+            # Lockout has expired, redirect to login
+            st.success("🔓 **Lockout period has expired.** You may now try logging in again.")
+            st.info("🔄 **Refreshing to login screen...**")
+            time.sleep(2)
+            st.rerun()
 
         st.info("💡 **Tip:** Use a password manager to securely store your master password.")
+        st.info(f"🔢 **Security:** Account locks after {max_attempts} failed attempts for security.")
 
         return False
 

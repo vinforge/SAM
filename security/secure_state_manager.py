@@ -42,7 +42,13 @@ class SecureStateManager:
         self.session_start_time = None
         self.session_timeout = 3600  # 1 hour default
         self.last_activity = None
-        
+
+        # Failed attempt tracking
+        self.failed_attempts = 0
+        self.max_attempts = 5
+        self.lockout_start_time = None
+        self.lockout_duration = 1800  # 30 minutes in seconds
+
         # Initialize state
         self._initialize_state()
     
@@ -99,10 +105,26 @@ class SecureStateManager:
             bool: True if authentication successful
         """
         try:
+            # Check if account is locked out
+            if self.is_locked_out():
+                return False
+
             # Verify password with keystore
             is_valid, session_key = self.keystore_manager.verify_password(password)
             if not is_valid:
+                # Increment failed attempts
+                self.failed_attempts += 1
+
+                # Lock account if max attempts reached
+                if self.failed_attempts >= self.max_attempts:
+                    self.lockout_start_time = time.time()
+                    self.current_state = SecurityState.LOCKED
+
                 return False
+
+            # Reset failed attempts on successful authentication
+            self.failed_attempts = 0
+            self.lockout_start_time = None
 
             # Initialize crypto manager
             self.crypto_manager = CryptoManager()
@@ -161,20 +183,55 @@ class SecureStateManager:
         Get number of failed authentication attempts.
 
         Returns:
-            int: Number of failed attempts (placeholder implementation)
+            int: Number of failed attempts
         """
-        # TODO: Implement proper failed attempt tracking
-        return 0
+        return self.failed_attempts
 
     def get_lockout_remaining(self) -> int:
         """
         Get remaining lockout time in seconds.
 
         Returns:
-            int: Remaining lockout time (placeholder implementation)
+            int: Remaining lockout time in seconds, 0 if not locked
         """
-        # TODO: Implement proper lockout tracking
-        return 0
+        if not self.lockout_start_time:
+            return 0
+
+        elapsed = time.time() - self.lockout_start_time
+        remaining = max(0, self.lockout_duration - elapsed)
+
+        # Clear lockout if time has expired
+        if remaining == 0:
+            self.lockout_start_time = None
+            self.failed_attempts = 0
+
+        return int(remaining)
+
+    def is_locked_out(self) -> bool:
+        """
+        Check if account is currently locked out.
+
+        Returns:
+            bool: True if account is locked out
+        """
+        return self.get_lockout_remaining() > 0
+
+    def reset_failed_attempts(self):
+        """Reset failed attempt counter and clear lockout."""
+        self.failed_attempts = 0
+        self.lockout_start_time = None
+        if self.current_state == SecurityState.LOCKED and not self.is_locked_out():
+            # If we were locked but lockout expired, return to normal locked state
+            pass
+
+    def get_max_attempts(self) -> int:
+        """
+        Get maximum allowed failed attempts.
+
+        Returns:
+            int: Maximum attempts before lockout
+        """
+        return self.max_attempts
     
     def update_activity(self):
         """Update last activity timestamp."""
