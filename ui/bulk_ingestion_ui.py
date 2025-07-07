@@ -389,145 +389,135 @@ class BulkIngestionUI:
         
         # Add new source section
         with st.expander("➕ Add New Source", expanded=len(sources) == 0):
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                # Enhanced path input with platform-specific examples
-                import platform
-                system = platform.system()
+            # Use a form to ensure proper handling of inputs and button
+            with st.form("add_source_form", clear_on_submit=True):
+                col1, col2 = st.columns([2, 1])
 
-                if system == "Windows":
-                    placeholder = "C:\\Users\\username\\Documents"
-                    help_text = "Enter the full Windows path (e.g., C:\\Users\\username\\Documents)"
-                elif system == "Darwin":  # macOS
-                    placeholder = "/Users/username/Documents"
-                    help_text = "Enter the full macOS path (e.g., /Users/username/Documents or ~/Documents)"
-                else:  # Linux and others
-                    placeholder = "/home/username/documents"
-                    help_text = "Enter the full Linux path (e.g., /home/username/documents or ~/documents)"
+                with col1:
+                    # Enhanced path input with platform-specific examples
+                    import platform
+                    system = platform.system()
 
-                source_path = st.text_input(
-                    "Folder Path",
-                    placeholder=placeholder,
-                    help=help_text
-                )
-
-                # Add common path suggestions
-                if st.button("📁 Common Paths", help="Show common document folder paths"):
-                    st.session_state.show_common_paths = not st.session_state.get("show_common_paths", False)
-
-                if st.session_state.get("show_common_paths", False):
-                    st.markdown("**Common Document Paths:**")
                     if system == "Windows":
-                        common_paths = [
-                            "C:\\Users\\%USERNAME%\\Documents",
-                            "C:\\Users\\%USERNAME%\\Desktop",
-                            "C:\\Users\\%USERNAME%\\Downloads"
-                        ]
+                        placeholder = "C:\\Users\\username\\Documents"
+                        help_text = "Enter the full Windows path (e.g., C:\\Users\\username\\Documents)"
                     elif system == "Darwin":  # macOS
-                        common_paths = [
-                            "~/Documents",
-                            "~/Desktop",
-                            "~/Downloads",
-                            "/Users/$USER/Documents"
-                        ]
-                    else:  # Linux
-                        common_paths = [
-                            "~/Documents",
-                            "~/Desktop",
-                            "~/Downloads",
-                            "/home/$USER/documents"
-                        ]
+                        placeholder = "/Users/username/Documents"
+                        help_text = "Enter the full macOS path (e.g., /Users/username/Documents or ~/Documents)"
+                    else:  # Linux and others
+                        placeholder = "/home/username/documents"
+                        help_text = "Enter the full Linux path (e.g., /home/username/documents or ~/documents)"
 
-                    for path in common_paths:
-                        if st.button(f"📂 {path}", key=f"path_{path}"):
-                            st.session_state.selected_path = path
-                            st.rerun()
+                    source_path = st.text_input(
+                        "Folder Path",
+                        placeholder=placeholder,
+                        help=help_text,
+                        key="new_source_path"
+                    )
 
-                # Use selected path if available
-                if st.session_state.get("selected_path"):
-                    source_path = st.session_state.selected_path
-                    st.session_state.selected_path = None  # Clear after use
-
-                source_name = st.text_input(
-                    "Source Name",
-                    placeholder="Research Papers",
-                    help="A friendly name for this source"
-                )
+                    source_name = st.text_input(
+                        "Source Name",
+                        placeholder="Research Papers",
+                        help="A friendly name for this source",
+                        key="new_source_name"
+                    )
             
-            with col2:
-                default_types = config.get("settings", {}).get("default_file_types", ["pdf", "txt", "md"])
-                file_types = st.multiselect(
-                    "File Types",
-                    options=["pdf", "txt", "md", "docx", "doc", "py", "js", "html", "json", "csv"],
-                    default=default_types,
-                    help="Select which file types to process"
-                )
-                
-                enabled = st.checkbox("Enable Source", value=True)
-            
-            # Processing options
-            col1, col2 = st.columns(2)
-            with col1:
-                auto_scan = st.checkbox(
-                    "🚀 Scan immediately after adding",
-                    value=True,
-                    help="Automatically scan the source after adding it"
-                )
-            with col2:
-                dry_run_new = st.checkbox(
-                    "🔍 Dry run first",
-                    value=False,
-                    help="Preview what will be processed before actual scanning"
-                )
+                with col2:
+                    default_types = config.get("settings", {}).get("default_file_types", ["pdf", "txt", "md"])
+                    file_types = st.multiselect(
+                        "File Types",
+                        options=["pdf", "txt", "md", "docx", "doc", "py", "js", "html", "json", "csv"],
+                        default=default_types,
+                        help="Select which file types to process",
+                        key="new_source_file_types"
+                    )
 
-            if st.button("➕ Add Source", type="primary", key="add_source_button"):
-                if source_path and source_name:
+                    enabled = st.checkbox("Enable Source", value=True, key="new_source_enabled")
+
+                # Processing options
+                col1, col2 = st.columns(2)
+                with col1:
+                    auto_scan = st.checkbox(
+                        "🚀 Scan immediately after adding",
+                        value=True,
+                        help="Automatically scan the source after adding it",
+                        key="new_source_auto_scan"
+                    )
+                with col2:
+                    dry_run_new = st.checkbox(
+                        "🔍 Dry run first",
+                        value=False,
+                        help="Preview what will be processed before actual scanning",
+                        key="new_source_dry_run"
+                    )
+
+                # Submit button for the form
+                submitted = st.form_submit_button("➕ Add Source", type="primary")
+
+            # Handle form submission outside the form
+            if submitted:
+                # Validate required fields
+                if not source_path or not source_path.strip():
+                    st.error("❌ Please enter a folder path")
+                elif not source_name or not source_name.strip():
+                    st.error("❌ Please enter a source name")
+                elif not file_types:
+                    st.error("❌ Please select at least one file type")
+                else:
                     # Enhanced cross-platform path validation
-                    path_validation = self._validate_path(source_path)
+                    path_validation = self._validate_path(source_path.strip())
 
                     if path_validation["valid"]:
                         # Use the normalized path
                         normalized_path = path_validation["normalized_path"]
 
-                        if self.manager.add_source(normalized_path, source_name, file_types, enabled):
-                            st.success(f"✅ Added source: {source_name}")
-                            st.info(f"📁 Normalized path: `{normalized_path}`")
-
-                            # Auto-scan if requested
-                            if auto_scan and enabled:
-                                st.info(f"🚀 {'Previewing' if dry_run_new else 'Processing'} files in {source_name}...")
-
-                                with st.spinner(f"{'Scanning' if dry_run_new else 'Processing'} {source_name}..."):
-                                    result = self.manager.run_bulk_ingestion(
-                                        normalized_path,
-                                        file_types,
-                                        dry_run=dry_run_new
-                                    )
-
-                                # Display immediate results
-                                if result["success"]:
-                                    st.success(f"✅ {source_name}: {'Preview' if dry_run_new else 'Processing'} completed!")
-
-                                    # Show summary
-                                    stdout = result["stdout"]
-                                    if "Bulk Ingestion Summary:" in stdout:
-                                        summary_start = stdout.find("Bulk Ingestion Summary:")
-                                        summary_section = stdout[summary_start:summary_start+300]
-                                        st.code(summary_section)
-
-                                        if dry_run_new:
-                                            st.info("🔍 This was a preview. Go to 'Manual Scan' tab to process files.")
-                                        else:
-                                            st.success("🎉 Files have been processed and added to SAM's knowledge base!")
-                                else:
-                                    st.error(f"❌ {source_name}: {'Preview' if dry_run_new else 'Processing'} failed")
-                                    if result["stderr"]:
-                                        st.error(result["stderr"])
-
-                            st.rerun()
+                        # Check if source already exists
+                        existing_sources = config.get("sources", [])
+                        if any(s["path"] == normalized_path for s in existing_sources):
+                            st.error(f"❌ Source with path '{normalized_path}' already exists")
+                        elif any(s["name"] == source_name.strip() for s in existing_sources):
+                            st.error(f"❌ Source with name '{source_name.strip()}' already exists")
                         else:
-                            st.error("❌ Source already exists or failed to add")
+                            if self.manager.add_source(normalized_path, source_name.strip(), file_types, enabled):
+                                st.success(f"✅ Successfully added source: {source_name.strip()}")
+                                st.info(f"📁 Normalized path: `{normalized_path}`")
+                                st.info(f"📄 File types: {', '.join(file_types)}")
+
+                                # Auto-scan if requested
+                                if auto_scan and enabled:
+                                    st.info(f"🚀 {'Previewing' if dry_run_new else 'Processing'} files in {source_name.strip()}...")
+
+                                    with st.spinner(f"{'Scanning' if dry_run_new else 'Processing'} {source_name.strip()}..."):
+                                        result = self.manager.run_bulk_ingestion(
+                                            normalized_path,
+                                            file_types,
+                                            dry_run=dry_run_new
+                                        )
+
+                                    # Display immediate results
+                                    if result["success"]:
+                                        st.success(f"✅ {source_name.strip()}: {'Preview' if dry_run_new else 'Processing'} completed!")
+
+                                        # Show summary
+                                        stdout = result["stdout"]
+                                        if "Bulk Ingestion Summary:" in stdout:
+                                            summary_start = stdout.find("Bulk Ingestion Summary:")
+                                            summary_section = stdout[summary_start:summary_start+300]
+                                            st.code(summary_section)
+
+                                            if dry_run_new:
+                                                st.info("🔍 This was a preview. Go to 'Manual Scan' tab to process files.")
+                                            else:
+                                                st.success("🎉 Files have been processed and added to SAM's knowledge base!")
+                                    else:
+                                        st.error(f"❌ {source_name.strip()}: {'Preview' if dry_run_new else 'Processing'} failed")
+                                        if result["stderr"]:
+                                            st.error(result["stderr"])
+
+                                # Force refresh to show the new source
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to add source. Please check the logs for details.")
                     else:
                         # Show detailed path validation error
                         st.error(f"❌ Path validation failed: {path_validation['error']}")
@@ -542,9 +532,45 @@ Is directory: {path_validation.get('is_directory', False)}
 Platform: {path_validation.get('platform', 'Unknown')}
 Error details: {path_validation.get('error_details', 'None')}
                             """)
-                else:
-                    st.error("❌ Please fill in all required fields")
-        
+
+            # Add helpful path suggestions outside the form
+            with st.expander("💡 Need help finding folder paths?", expanded=False):
+                import platform
+                system = platform.system()
+
+                st.markdown("**Common Document Folder Paths:**")
+
+                if system == "Windows":
+                    common_paths = [
+                        ("Documents", "C:\\Users\\%USERNAME%\\Documents"),
+                        ("Desktop", "C:\\Users\\%USERNAME%\\Desktop"),
+                        ("Downloads", "C:\\Users\\%USERNAME%\\Downloads"),
+                        ("OneDrive", "C:\\Users\\%USERNAME%\\OneDrive\\Documents")
+                    ]
+                elif system == "Darwin":  # macOS
+                    common_paths = [
+                        ("Documents", "~/Documents"),
+                        ("Desktop", "~/Desktop"),
+                        ("Downloads", "~/Downloads"),
+                        ("iCloud Drive", "~/Library/Mobile Documents/com~apple~CloudDocs")
+                    ]
+                else:  # Linux
+                    common_paths = [
+                        ("Documents", "~/Documents"),
+                        ("Desktop", "~/Desktop"),
+                        ("Downloads", "~/Downloads"),
+                        ("Home", "~")
+                    ]
+
+                for name, path in common_paths:
+                    st.code(f"{name}: {path}")
+
+                st.markdown("**Tips:**")
+                st.markdown("• Use the full path to the folder containing your documents")
+                st.markdown("• Make sure the folder exists and you have read permissions")
+                st.markdown("• On Windows, use backslashes (\\) or forward slashes (/)")
+                st.markdown("• On macOS/Linux, use ~ for your home directory")
+
         # Display existing sources
         if sources:
             # Quick actions for all sources
