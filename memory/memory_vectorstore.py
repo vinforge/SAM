@@ -1424,12 +1424,63 @@ def get_memory_store(store_type: VectorStoreType = VectorStoreType.SIMPLE,
                     embedding_dimension: int = 384) -> MemoryVectorStore:
     """Get or create a global memory vector store instance."""
     global _memory_store
-    
+
     if _memory_store is None:
         _memory_store = MemoryVectorStore(
             store_type=store_type,
             storage_directory=storage_directory,
             embedding_dimension=embedding_dimension
         )
-    
+
     return _memory_store
+
+# Backend abstraction integration (Task 33, Phase 3)
+def get_memory_backend():
+    """
+    Get the configured memory backend (abstraction layer).
+
+    This function provides access to the new backend abstraction system
+    while maintaining compatibility with existing code.
+
+    Returns:
+        Configured memory backend instance
+    """
+    try:
+        from .backends import get_configured_backend
+        return get_configured_backend()
+    except ImportError:
+        # Fallback to native store if backends not available
+        return get_memory_store()
+
+def switch_memory_backend(backend_type: str):
+    """
+    Switch to a different memory backend.
+
+    Args:
+        backend_type: 'sam_native' or 'mem0'
+    """
+    try:
+        from .backends import switch_backend, BackendType
+
+        if backend_type.lower() == 'mem0':
+            switch_backend(BackendType.MEM0)
+        else:
+            switch_backend(BackendType.SAM_NATIVE)
+
+        logger.info(f"Switched to {backend_type} memory backend")
+
+    except ImportError:
+        logger.warning("Backend abstraction not available, using native store")
+    except Exception as e:
+        logger.error(f"Failed to switch backend: {e}")
+
+def get_backend_info():
+    """Get information about the current memory backend."""
+    try:
+        from .backends import get_backend_info
+        return get_backend_info()
+    except ImportError:
+        return {
+            'backend_type': 'sam_native_legacy',
+            'note': 'Using legacy native implementation'
+        }

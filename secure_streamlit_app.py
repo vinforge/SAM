@@ -2280,8 +2280,8 @@ def render_document_interface():
 def render_memory_interface():
     """Render the memory management interface."""
 
-    # Check if Memory Control Center should be shown
-    if st.session_state.get('show_memory_control_center', False):
+    # Show Memory Control Center by default (users expect the dropdown menu)
+    if st.session_state.get('show_memory_control_center', True):  # Changed default to True
         render_integrated_memory_control_center()
     else:
         render_basic_memory_interface()
@@ -2311,7 +2311,15 @@ def render_integrated_memory_control_center():
 
         # Navigation menu moved to main content area (preserving 100% of functionality)
         st.markdown("---")
-        st.subheader("🎛️ Navigation")
+
+        # Add toggle for basic interface
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.subheader("🎛️ Navigation")
+        with col2:
+            if st.button("📋 Basic View", help="Switch to basic memory interface"):
+                st.session_state.show_memory_control_center = False
+                st.rerun()
 
         # Navigation menu with override support for Messages from SAM
         default_options = [
@@ -2436,7 +2444,7 @@ def render_basic_memory_interface():
         """)
 
     with col2:
-        if st.button("🎛️ Open Memory Control Center", use_container_width=True, help="Switch to integrated Memory Control Center"):
+        if st.button("🎛️ Advanced View", use_container_width=True, help="Switch to Memory Control Center with dropdown menu"):
             st.session_state.show_memory_control_center = True
             st.success("🎛️ **Switching to Memory Control Center...**")
             st.rerun()

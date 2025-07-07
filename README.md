@@ -97,6 +97,27 @@ python start_sam_secure.py --mode full
 
 **That's it! SAM is now running with full security and all features enabled.**
 
+### 🎯 **Unlock SAM Pro Features (Optional)**
+
+After installation, register for premium features:
+
+```bash
+# Register for SAM Pro activation key
+python register_sam_pro.py
+
+# This will:
+# 1. Start registration interface at localhost:8503
+# 2. Guide you through the registration process
+# 3. Send activation key via email
+# 4. Unlock premium features like Dream Canvas and TPV Active Reasoning
+```
+
+**SAM Pro Features:**
+- 🎨 **Dream Canvas** - Interactive memory visualization
+- 🧠 **TPV Active Reasoning Control** - Advanced reasoning monitoring
+- 📁 **Cognitive Automation** - Bulk document processing
+- 🔬 **Advanced Analytics** - Comprehensive insights and monitoring
+
 ---
 
 ### Alternative Installation Methods

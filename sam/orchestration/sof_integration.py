@@ -24,6 +24,7 @@ from .skills.reasoning.implicit_knowledge import ImplicitKnowledgeSkill
 from .skills.financial_data_tool import FinancialDataTool
 from .skills.news_api_tool import NewsApiTool
 from .skills.table_to_code_expert import TableToCodeExpert
+from .skills.memory_tool import MemoryTool
 from .config import get_sof_config, is_sof_enabled
 
 logger = logging.getLogger(__name__)
@@ -202,6 +203,14 @@ class SOFIntegration:
             self.logger.debug("TableToCodeExpert registered")
         except Exception as e:
             self.logger.warning(f"Failed to register TableToCodeExpert: {e}")
+
+        # Memory Tool (Task 33, Phase 1)
+        try:
+            memory_tool = MemoryTool()
+            core_skills.append(memory_tool)
+            self.logger.debug("MemoryTool registered")
+        except Exception as e:
+            self.logger.warning(f"Failed to register MemoryTool: {e}")
 
         # Register all successfully created skills
         if core_skills:

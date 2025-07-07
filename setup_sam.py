@@ -246,233 +246,59 @@ def run_final_tests():
     return True
 
 def open_registration_page():
-    """Open the SAM Pro key registration page first, then activation page."""
+    """Open the SAM Pro registration/activation page automatically."""
     try:
-        print("\n🔑 **SAM Pro Key Registration Setup**")
-        print("   Choose how you want to get your SAM Pro activation key:")
+        print("\n🌐 **Opening SAM Pro Activation Page...**")
+        print("   Starting SAM and opening activation interface...")
 
-        while True:
-            print("\n🎯 **Activation Options:**")
-            print("1. 🔑 Register for FREE activation key now (opens localhost:8503)")
-            print("2. 📧 I already have an activation key")
-            print("3. ⏭️  Skip activation and start SAM without Pro features")
-
-            try:
-                choice = input("\nEnter your choice (1-3) [1]: ").strip()
-                if not choice:
-                    choice = "1"
-
-                if choice in ['1', 'register', 'r']:
-                    return handle_key_registration()
-
-                elif choice in ['2', 'key', 'k']:
-                    return handle_existing_key()
-
-                elif choice in ['3', 'skip', 's']:
-                    return start_sam_without_registration()
-
-                else:
-                    print("❌ Please enter 1, 2, or 3")
-                    continue
-
-            except KeyboardInterrupt:
-                print("\n⏭️ Starting SAM without Pro activation")
-                return start_sam_without_registration()
-
-    except Exception as e:
-        print(f"   ❌ Registration setup failed: {e}")
-        print("   💡 Starting SAM without Pro activation")
-        return start_sam_without_registration()
-
-def handle_key_registration():
-    """Handle new key registration - opens localhost:8503 first."""
-    try:
-        print("\n🔑 **Starting Key Registration Interface...**")
-
-        # Check if registration interface exists
-        if not Path("sam_pro_registration.py").exists():
-            print("   ❌ Registration interface not found")
-            print("   💡 Starting SAM without Pro activation")
-            return start_sam_without_registration()
-
-        # Start registration interface on localhost:8503
-        print("   🚀 Starting registration interface on localhost:8503...")
-
+        # Ask user if they want to auto-open
         try:
-            # Start registration interface
-            reg_process = subprocess.Popen([
-                sys.executable, "-m", "streamlit", "run",
-                "sam_pro_registration.py",
-                "--server.port=8503",
-                "--server.address=localhost",
-                "--browser.gatherUsageStats=false"
+            response = input("\n❓ Would you like to automatically start SAM and open the activation page? (y/n) [y]: ").strip().lower()
+            if response and response not in ['y', 'yes']:
+                print("   ⏭️ Skipping auto-start. You can manually start SAM later.")
+                return False
+        except KeyboardInterrupt:
+            print("\n   ⏭️ Skipping auto-start.")
+            return False
+
+        # Start SAM in the background
+        print("   🚀 Starting SAM services...")
+
+        # Launch SAM secure mode in background
+        try:
+            subprocess.Popen([
+                sys.executable, "start_sam_secure.py", "--mode", "full"
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            print("   ✅ Registration interface starting...")
-            print("   ⏳ Waiting for interface to initialize (10 seconds)...")
-            time.sleep(10)
+            print("   ✅ SAM services starting in background...")
 
-            # Open browser to registration interface (localhost:8503)
-            registration_url = "http://localhost:8503"
-            print(f"   🌐 Opening registration interface: {registration_url}")
+            # Wait for services to start
+            print("   ⏳ Waiting for services to initialize (30 seconds)...")
+            time.sleep(30)
 
-            webbrowser.open(registration_url)
+            # Open the activation page
+            activation_url = "http://localhost:8502"
+            print(f"   🌐 Opening activation page: {activation_url}")
 
-            print("   ✅ Registration interface opened in browser!")
-            print("\n💡 **Registration Instructions:**")
-            print("   1. Fill out the registration form with your details")
-            print("   2. Submit the form")
-            print("   3. Your activation key will be sent via email")
-            print("   4. Return here when you have your key")
+            webbrowser.open(activation_url)
 
-            # Wait for user to complete registration
-            while True:
-                try:
-                    user_input = input("\n❓ Have you received your activation key? (y/n/skip) [skip]: ").strip().lower()
+            print("   ✅ Activation page opened in your default browser!")
+            print("\n💡 **What to do next:**")
+            print("   1. Enter your master password to unlock SAM")
+            print("   2. Start using SAM's core features")
+            print("   3. To unlock Pro features: run 'python register_sam_pro.py'")
+            print("   4. Enter your activation key in the '🔑 SAM Pro Activation' sidebar")
 
-                    if user_input in ['y', 'yes']:
-                        key = input("🔑 Enter your activation key: ").strip()
-                        if key:
-                            print(f"✅ Key received: {key[:8]}...")
-                            print("💡 Key will be available for activation when SAM starts")
-
-                            # Stop registration interface
-                            try:
-                                reg_process.terminate()
-                                print("   🔄 Registration interface stopped")
-                            except:
-                                pass
-
-                            # Now start SAM and open activation page (localhost:8502)
-                            return start_sam_with_activation()
-                        else:
-                            print("⚠️ No key entered")
-                            continue
-
-                    elif user_input in ['skip', 's', '']:
-                        print("⏭️ Continuing without activation key")
-                        print("💡 You can register later at: http://localhost:8503")
-                        return start_sam_without_registration()
-
-                    elif user_input in ['n', 'no']:
-                        print("⏳ Take your time. Registration interface is still open.")
-                        continue
-
-                    else:
-                        print("❌ Please enter 'y', 'n', or 'skip'")
-                        continue
-
-                except KeyboardInterrupt:
-                    print("\n⏭️ Continuing without activation")
-                    return start_sam_without_registration()
+            return True
 
         except Exception as e:
-            print(f"   ❌ Could not start registration interface: {e}")
-            print("   💡 You can start it manually: streamlit run sam_pro_registration.py --server.port 8503")
-            return start_sam_without_registration()
+            print(f"   ⚠️ Could not auto-start SAM: {e}")
+            print("   💡 Please manually start SAM with: python start_sam_secure.py --mode full")
+            return False
 
     except Exception as e:
-        print(f"   ❌ Registration failed: {e}")
-        return start_sam_without_registration()
-
-def handle_existing_key():
-    """Handle existing activation key entry."""
-    print("\n📧 **Enter Your Existing Activation Key**")
-
-    try:
-        key = input("🔑 Enter your activation key: ").strip()
-        if key:
-            print(f"✅ Key received: {key[:8]}...")
-            print("💡 Key will be available for activation when SAM starts")
-            return start_sam_with_activation()
-        else:
-            print("⚠️ No key entered. Starting SAM without Pro activation.")
-            return start_sam_without_registration()
-    except KeyboardInterrupt:
-        print("\n⏭️ Starting SAM without Pro activation")
-        return start_sam_without_registration()
-
-def start_sam_with_activation():
-    """Start SAM and open activation page (localhost:8502)."""
-    try:
-        print("\n🚀 **Starting SAM with Pro Activation Ready...**")
-
-        response = input("❓ Start SAM now? (y/n) [y]: ").strip().lower()
-        if response and response not in ['y', 'yes']:
-            print("   ⏭️ You can start SAM later with: python start_sam_secure.py --mode full")
-            return True
-
-        print("   🚀 Starting SAM services...")
-
-        # Start SAM
-        subprocess.Popen([
-            sys.executable, "start_sam_secure.py", "--mode", "full"
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        print("   ✅ SAM services starting...")
-        print("   ⏳ Waiting for services to initialize (30 seconds)...")
-        time.sleep(30)
-
-        # Open activation page (localhost:8502)
-        activation_url = "http://localhost:8502"
-        print(f"   🌐 Opening SAM activation page: {activation_url}")
-
-        webbrowser.open(activation_url)
-
-        print("   ✅ SAM activation page opened!")
-        print("\n💡 **What to do next:**")
-        print("   1. Enter your master password to unlock SAM")
-        print("   2. Look for '🔑 SAM Pro Activation' in the sidebar")
-        print("   3. Enter your activation key to unlock Pro features")
-
-        return True
-
-    except Exception as e:
-        print(f"   ❌ Could not start SAM: {e}")
-        print("   💡 Please manually start: python start_sam_secure.py --mode full")
-        return False
-
-def start_sam_without_registration():
-    """Start SAM without Pro activation."""
-    try:
-        print("\n🚀 **Starting SAM (Standard Mode)...**")
-
-        response = input("❓ Start SAM now? (y/n) [y]: ").strip().lower()
-        if response and response not in ['y', 'yes']:
-            print("   ⏭️ You can start SAM later with: python start_sam_secure.py --mode full")
-            print("   💡 Register for Pro features at: http://localhost:8503")
-            return True
-
-        print("   🚀 Starting SAM services...")
-
-        # Start SAM
-        subprocess.Popen([
-            sys.executable, "start_sam_secure.py", "--mode", "full"
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        print("   ✅ SAM services starting...")
-        print("   ⏳ Waiting for services to initialize (30 seconds)...")
-        time.sleep(30)
-
-        # Open main SAM interface (localhost:8502)
-        sam_url = "http://localhost:8502"
-        print(f"   🌐 Opening SAM interface: {sam_url}")
-
-        webbrowser.open(sam_url)
-
-        print("   ✅ SAM interface opened!")
-        print("\n💡 **What to do next:**")
-        print("   1. Enter your master password to unlock SAM")
-        print("   2. Start using SAM's AI capabilities")
-        print("   3. To activate Pro features later:")
-        print("      • Visit: http://localhost:8503 to register")
-        print("      • Use '🔑 SAM Pro Activation' sidebar in SAM")
-
-        return True
-
-    except Exception as e:
-        print(f"   ❌ Could not start SAM: {e}")
-        print("   💡 Please manually start: python start_sam_secure.py --mode full")
+        print(f"   ❌ Failed to open registration page: {e}")
+        print("   💡 Please manually navigate to http://localhost:8502 after starting SAM")
         return False
 
 def show_completion_summary():
@@ -493,7 +319,7 @@ def show_completion_summary():
     print("   1. Start SAM: python start_sam_secure.py --mode full")
     print("   2. Open browser: http://localhost:8502")
     print("   3. Enter your master password when prompted")
-    print("   4. Activate SAM Pro for premium features")
+    print("   4. Register for Pro features: python register_sam_pro.py")
     print("   5. Begin using SAM's AI capabilities!")
     
     print("\n📚 **Useful Commands:**")

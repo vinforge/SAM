@@ -35,6 +35,7 @@ from .skills.reasoning.implicit_knowledge import ImplicitKnowledgeSkill
 from .skills.financial_data_tool import FinancialDataTool
 from .skills.news_api_tool import NewsApiTool
 from .skills.table_to_code_expert import TableToCodeExpert
+from .skills.memory_tool import MemoryTool
 from .validator import PlanValidationEngine, PlanValidationReport, ValidationResult
 from .coordinator import CoordinatorEngine, ExecutionReport, ExecutionResult
 from .planner import DynamicPlanner, PlanGenerationResult, PlanCacheEntry
@@ -73,6 +74,7 @@ __all__ = [
     'ContentVettingSkill',
     'FinancialDataTool',
     'NewsApiTool',
+    'MemoryTool',
 
     # Reasoning skills
     'ImplicitKnowledgeSkill',

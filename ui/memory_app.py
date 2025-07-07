@@ -2378,6 +2378,9 @@ def render_dream_canvas():
         # Dream Canvas Controls Section
         st.markdown("### 🎛️ Dream Canvas Controls")
 
+        # NEW: Workflow Automation Controls
+        render_workflow_automation_controls()
+
         # Clustering Parameter Controls
         with st.expander("🔧 Advanced Clustering Parameters", expanded=False):
             # Smart parameter suggestion
@@ -2468,25 +2471,29 @@ def render_dream_canvas():
                 if st.button("✨ Apply Suggested Parameters", use_container_width=True):
                     apply_suggested_parameters(suggestions)
 
-        # Main Action Buttons
-        col1, col2, col3, col4 = st.columns(4)
+        # Main Action Buttons - Enhanced with Run Synthesis
+        col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
             if st.button("🌙 Enter Dream State", type="primary", use_container_width=True, help="Trigger cognitive synthesis"):
                 trigger_synthesis_with_params(cluster_radius, min_samples, min_cluster_size, max_clusters)
 
         with col2:
+            if st.button("🔄 Run Synthesis", type="secondary", use_container_width=True, help="Generate new insights from memory clusters"):
+                trigger_direct_synthesis()
+
+        with col3:
             if st.button("🎨 Generate Visualization", use_container_width=True, help="Create interactive memory map"):
                 trigger_visualization_with_params(cluster_radius, min_samples, min_cluster_size, max_clusters)
 
-        with col3:
+        with col4:
             if st.button("🔄 Refresh Memory", use_container_width=True, help="Refresh memory store data"):
                 # Clear any cached memory store data
                 if hasattr(st.session_state, 'memory_store'):
                     del st.session_state.memory_store
                 st.rerun()
 
-        with col4:
+        with col5:
             if st.button("📚 Refresh History", use_container_width=True, help="Update synthesis statistics"):
                 refresh_synthesis_history()
 
@@ -2663,6 +2670,9 @@ def render_dream_canvas():
             </div>
             """, unsafe_allow_html=True)
 
+        # NEW: Research Integration Section for Memory Control Center
+        render_memory_center_research_integration()
+
         # Information panel
         with st.expander("ℹ️ About Dream Canvas", expanded=False):
             st.markdown("""
@@ -2692,6 +2702,788 @@ def render_dream_canvas():
         st.error(f"Error loading Dream Canvas: {e}")
         import traceback
         st.error(f"Details: {traceback.format_exc()}")
+
+def render_workflow_automation_controls():
+    """Render workflow automation controls for complete Dream Canvas automation."""
+    try:
+        st.markdown("#### 🔄 Workflow Automation")
+
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+
+        with col1:
+            # Main workflow automation toggle
+            workflow_enabled = st.session_state.get('workflow_automation_enabled', False)
+            new_workflow_enabled = st.checkbox(
+                "🤖 Auto-Workflow",
+                value=workflow_enabled,
+                help="Automatically sequence: Enter Dream State → Run Synthesis → Auto-Research"
+            )
+
+            if new_workflow_enabled != workflow_enabled:
+                st.session_state.workflow_automation_enabled = new_workflow_enabled
+                if new_workflow_enabled:
+                    st.success("✅ Workflow automation enabled")
+                    st.info("💡 Workflow will run: Dream State → Synthesis → Research")
+                else:
+                    st.info("⏸️ Workflow automation disabled")
+                st.rerun()
+
+        with col2:
+            if st.session_state.get('workflow_automation_enabled', False):
+                # Auto-research toggle for workflow
+                auto_research_enabled = st.session_state.get('workflow_auto_research', True)
+                new_auto_research = st.checkbox(
+                    "🔬 Auto-Research",
+                    value=auto_research_enabled,
+                    help="Automatically research best insights after synthesis"
+                )
+                st.session_state.workflow_auto_research = new_auto_research
+            else:
+                st.markdown("*Enable Auto-Workflow to configure research*")
+
+        with col3:
+            if st.session_state.get('workflow_automation_enabled', False):
+                # Research papers per insight
+                max_papers = st.selectbox(
+                    "Papers per Insight",
+                    options=[1, 2, 3, 5],
+                    index=1,  # Default to 2
+                    help="Papers to research per selected insight"
+                )
+                st.session_state.workflow_max_papers = max_papers
+            else:
+                st.markdown("*Configure research settings*")
+
+        with col4:
+            # Workflow status indicator
+            if st.session_state.get('workflow_running', False):
+                st.markdown("🔄 **Running**")
+            elif st.session_state.get('workflow_automation_enabled', False):
+                st.markdown("✅ **Ready**")
+            else:
+                st.markdown("⏸️ **Disabled**")
+
+        # Workflow execution button
+        if st.session_state.get('workflow_automation_enabled', False):
+            st.markdown("---")
+            col1, col2, col3 = st.columns([2, 2, 2])
+
+            with col1:
+                if st.button("🚀 Run Complete Workflow", type="primary", use_container_width=True,
+                           help="Execute full workflow: Dream State → Synthesis → Research"):
+                    trigger_complete_workflow()
+
+            with col2:
+                # Show workflow progress if running
+                if st.session_state.get('workflow_running', False):
+                    current_step = st.session_state.get('workflow_current_step', 'Starting...')
+                    st.info(f"🔄 {current_step}")
+
+            with col3:
+                # Stop workflow button
+                if st.session_state.get('workflow_running', False):
+                    if st.button("⏹️ Stop Workflow", type="secondary", use_container_width=True):
+                        st.session_state.workflow_running = False
+                        st.session_state.workflow_current_step = "Stopped by user"
+                        st.warning("⏹️ Workflow stopped")
+                        st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Workflow automation controls error: {e}")
+        logger.error(f"Workflow automation error: {e}")
+
+def trigger_direct_synthesis():
+    """Trigger direct synthesis with default parameters - simplified version for Run Synthesis button."""
+    try:
+        with st.spinner("🔄 Running synthesis..."):
+            # Import synthesis components
+            from memory.synthesis import SynthesisEngine, SynthesisConfig
+            from memory.memory_vectorstore import get_memory_store, VectorStoreType
+
+            # Get memory store
+            memory_store = get_memory_store(
+                store_type=VectorStoreType.CHROMA,
+                storage_directory="memory_store",
+                embedding_dimension=384
+            )
+
+            # Configure synthesis engine with default settings
+            config = SynthesisConfig(
+                enable_reingestion=True,
+                enable_deduplication=True
+            )
+
+            synthesis_engine = SynthesisEngine(config=config)
+
+            # Run synthesis
+            result = synthesis_engine.run_synthesis(memory_store, visualize=True)
+
+            # Store results in session state
+            synthesis_results = {
+                'run_id': result.run_id,
+                'timestamp': result.timestamp,
+                'clusters_found': result.clusters_found,
+                'insights_generated': result.insights_generated,
+                'output_file': result.output_file,
+                'insights': [insight.__dict__ for insight in result.insights] if hasattr(result, 'insights') else [],
+                'synthesis_log': result.synthesis_log if hasattr(result, 'synthesis_log') else {}
+            }
+
+            # Add to synthesis history
+            if 'synthesis_history' not in st.session_state:
+                st.session_state.synthesis_history = []
+
+            st.session_state.synthesis_history.append(synthesis_results)
+            st.session_state.latest_synthesis = synthesis_results
+
+            st.success(f"✨ Synthesis complete! Generated **{result.insights_generated} insights** from **{result.clusters_found} clusters**.")
+            st.info("💡 View results in the 'Synthesis History' section below or use 'Load in Dream Canvas' to visualize.")
+
+    except Exception as e:
+        st.error(f"❌ Synthesis failed: {e}")
+        logger.error(f"Direct synthesis error: {e}")
+
+def trigger_complete_workflow():
+    """Execute the complete automated workflow: Dream State → Synthesis → Research."""
+    try:
+        # Set workflow as running
+        st.session_state.workflow_running = True
+        st.session_state.workflow_current_step = "Initializing workflow..."
+
+        # Get workflow settings
+        auto_research = st.session_state.get('workflow_auto_research', True)
+        max_papers = st.session_state.get('workflow_max_papers', 2)
+
+        # Get clustering parameters from UI
+        cluster_radius = st.session_state.get('cluster_radius', 0.5)
+        min_samples = st.session_state.get('min_samples', 5)
+        min_cluster_size = st.session_state.get('min_cluster_size', 3)
+        max_clusters = st.session_state.get('max_clusters', 20)
+
+        st.info("🚀 Starting complete workflow automation...")
+
+        # STEP 1: Enter Dream State (Advanced Synthesis)
+        st.session_state.workflow_current_step = "Step 1/3: Entering Dream State..."
+        st.rerun()
+
+        with st.spinner("🌙 Step 1: Entering Dream State..."):
+            try:
+                # Import synthesis components
+                from memory.synthesis import SynthesisEngine, SynthesisConfig
+                from memory.memory_vectorstore import get_memory_store
+
+                # Get memory store
+                memory_store = get_memory_store(
+                    store_type=VectorStoreType.CHROMA,
+                    storage_directory="memory_store",
+                    embedding_dimension=384
+                )
+
+                # Configure synthesis with advanced parameters
+                config = SynthesisConfig(
+                    clustering_eps=cluster_radius,
+                    clustering_min_samples=min_samples,
+                    min_cluster_size=min_cluster_size,
+                    max_clusters=max_clusters,
+                    quality_threshold=0.4,
+                    min_insight_quality=0.3,
+                    enable_reingestion=True
+                )
+
+                synthesis_engine = SynthesisEngine(config=config)
+
+                # Run advanced synthesis
+                result = synthesis_engine.run_synthesis(memory_store, visualize=True)
+
+                st.success(f"✅ Step 1 Complete: Dream State generated {result.clusters_found} clusters")
+
+            except Exception as e:
+                st.error(f"❌ Step 1 Failed: {e}")
+                st.session_state.workflow_running = False
+                return
+
+        # STEP 2: Run Synthesis (Generate Insights)
+        st.session_state.workflow_current_step = "Step 2/3: Generating Insights..."
+        st.rerun()
+
+        with st.spinner("🔄 Step 2: Running Synthesis..."):
+            try:
+                # Store results in session state
+                synthesis_results = {
+                    'run_id': result.run_id,
+                    'timestamp': result.timestamp,
+                    'clusters_found': result.clusters_found,
+                    'insights_generated': result.insights_generated,
+                    'output_file': result.output_file,
+                    'insights': [insight.__dict__ for insight in result.insights] if hasattr(result, 'insights') else [],
+                    'synthesis_log': result.synthesis_log if hasattr(result, 'synthesis_log') else {}
+                }
+
+                # Add to synthesis history
+                if 'synthesis_history' not in st.session_state:
+                    st.session_state.synthesis_history = []
+
+                st.session_state.synthesis_history.append(synthesis_results)
+                st.session_state.latest_synthesis = synthesis_results
+                st.session_state.synthesis_results = synthesis_results
+
+                st.success(f"✅ Step 2 Complete: Generated {result.insights_generated} insights")
+
+            except Exception as e:
+                st.error(f"❌ Step 2 Failed: {e}")
+                st.session_state.workflow_running = False
+                return
+
+        # STEP 3: Auto-Research (if enabled)
+        if auto_research and result.insights_generated > 0:
+            st.session_state.workflow_current_step = "Step 3/3: Researching Insights..."
+            st.rerun()
+
+            with st.spinner("🔬 Step 3: Researching Best Insights..."):
+                try:
+                    # Auto-select best insights for research
+                    insights = synthesis_results.get('insights', [])
+
+                    if insights:
+                        # Score insights by confidence, novelty, and utility
+                        scored_insights = []
+                        for i, insight in enumerate(insights):
+                            confidence = insight.get('confidence_score', 0.0)
+                            novelty = insight.get('novelty_score', 0.0)
+                            utility = insight.get('utility_score', 0.0)
+
+                            # Combined score (weighted average)
+                            score = (confidence * 0.4) + (novelty * 0.4) + (utility * 0.2)
+                            scored_insights.append((i, insight, score))
+
+                        # Sort by score and select top insights
+                        scored_insights.sort(key=lambda x: x[2], reverse=True)
+
+                        # Select top 3 insights or all if fewer
+                        num_to_research = min(3, len(scored_insights))
+                        selected_insights = [item[1] for item in scored_insights[:num_to_research]]
+
+                        # Trigger research for selected insights
+                        trigger_insight_research_workflow(selected_insights, max_papers)
+
+                        st.success(f"✅ Step 3 Complete: Researching {num_to_research} top insights")
+                    else:
+                        st.warning("⚠️ Step 3 Skipped: No insights available for research")
+
+                except Exception as e:
+                    st.error(f"❌ Step 3 Failed: {e}")
+                    # Don't return here - workflow still partially successful
+        else:
+            st.info("ℹ️ Step 3 Skipped: Auto-research disabled or no insights generated")
+
+        # Workflow complete
+        st.session_state.workflow_running = False
+        st.session_state.workflow_current_step = "Workflow Complete!"
+
+        st.success("🎉 **Complete Workflow Finished Successfully!**")
+        st.info("💡 View results in the sections below or use 'Load in Dream Canvas' to visualize.")
+
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Workflow failed: {e}")
+        st.session_state.workflow_running = False
+        st.session_state.workflow_current_step = "Workflow Failed"
+        logger.error(f"Complete workflow error: {e}")
+
+def trigger_insight_research_workflow(selected_insights, max_papers_per_insight):
+    """Trigger automated research for insights in workflow mode."""
+    try:
+        # Check if research components are available
+        try:
+            from sam.web_retrieval.tools.arxiv_tool import get_arxiv_tool
+            from sam.state.vetting_queue import get_vetting_queue_manager
+            from sam.vetting.analyzer import get_vetting_analyzer
+        except ImportError:
+            st.warning("⚠️ Research components not available. Install Task 27 components to enable automated research.")
+            return
+
+        import threading
+        import asyncio
+
+        arxiv_tool = get_arxiv_tool()
+        vetting_manager = get_vetting_queue_manager()
+        vetting_analyzer = get_vetting_analyzer()
+
+        def run_research():
+            """Run research in background thread."""
+            try:
+                total_papers = 0
+
+                for insight in selected_insights:
+                    insight_text = insight.get('synthesized_text', insight.get('content', 'No content'))
+                    cluster_id = insight.get('cluster_id', 'Unknown')
+
+                    # Extract research query from insight
+                    research_query = extract_research_query(insight_text)
+
+                    if research_query:
+                        # Search for papers
+                        papers = asyncio.run(arxiv_tool.search_papers(
+                            query=research_query,
+                            max_results=max_papers_per_insight
+                        ))
+
+                        # Add papers to vetting queue
+                        for paper in papers:
+                            paper_data = {
+                                'title': paper.get('title', 'Unknown Title'),
+                                'authors': paper.get('authors', []),
+                                'abstract': paper.get('summary', ''),
+                                'url': paper.get('pdf_url', ''),
+                                'source': 'arxiv',
+                                'research_context': {
+                                    'insight_cluster': cluster_id,
+                                    'insight_text': insight_text[:200] + '...',
+                                    'research_query': research_query
+                                }
+                            }
+
+                            vetting_manager.add_document(paper_data)
+                            total_papers += 1
+
+                # Update session state with research results
+                st.session_state.workflow_research_results = {
+                    'papers_found': total_papers,
+                    'insights_researched': len(selected_insights),
+                    'timestamp': datetime.now().isoformat()
+                }
+
+            except Exception as e:
+                logger.error(f"Research workflow error: {e}")
+                st.session_state.workflow_research_error = str(e)
+
+        # Start research in background
+        research_thread = threading.Thread(target=run_research)
+        research_thread.daemon = True
+        research_thread.start()
+
+        st.info(f"🔬 Research started for {len(selected_insights)} insights ({max_papers_per_insight} papers each)")
+
+    except Exception as e:
+        st.error(f"❌ Research workflow failed: {e}")
+        logger.error(f"Research workflow error: {e}")
+
+def render_memory_center_research_integration():
+    """Render research integration controls for Memory Control Center Dream Canvas."""
+    try:
+        # Check if we have synthesis results available
+        synthesis_results = st.session_state.get('synthesis_results')
+        if not synthesis_results:
+            return
+
+        insights = synthesis_results.get('insights', [])
+        if not insights:
+            return
+
+        st.markdown("---")
+        st.markdown("### 🔬 Research Integration")
+        st.markdown("*Select insights for automated research discovery*")
+
+        # Research mode selection
+        col1, col2, col3 = st.columns([2, 2, 2])
+
+        with col1:
+            research_mode = st.radio(
+                "Research Selection Mode:",
+                options=["🤖 SAM Selects Best", "👤 Human Selection"],
+                index=0,
+                help="Choose how insights are selected for research",
+                key="memory_center_research_mode"
+            )
+
+        with col2:
+            max_research_papers = st.selectbox(
+                "Papers per Insight:",
+                options=[1, 2, 3, 5],
+                index=1,  # Default to 2
+                help="Maximum papers to download per selected insight",
+                key="memory_center_max_papers"
+            )
+
+        with col3:
+            st.markdown("**Research Scope:**")
+            st.caption("🎓 ArXiv Academic Papers")
+            st.caption("🧠 Deep Research Available")
+
+        # Insight selection interface
+        if research_mode == "👤 Human Selection":
+            st.markdown("**Select insights for research:**")
+
+            # Initialize selection state for memory center
+            if 'memory_center_selected_insights' not in st.session_state:
+                st.session_state.memory_center_selected_insights = set()
+
+            # Display insights with checkboxes
+            for i, insight in enumerate(insights):
+                insight_id = f"memory_insight_{i}"
+                insight_text = insight.get('content', insight.get('insight', 'No content'))
+                cluster_id = insight.get('cluster_id', 'Unknown')
+                confidence = insight.get('confidence_score', 0.0)
+
+                # Create checkbox for each insight
+                col1, col2 = st.columns([1, 10])
+
+                with col1:
+                    is_selected = st.checkbox(
+                        "",
+                        key=f"memory_select_{insight_id}",
+                        value=insight_id in st.session_state.memory_center_selected_insights
+                    )
+
+                    # Update selection state
+                    if is_selected:
+                        st.session_state.memory_center_selected_insights.add(insight_id)
+                    else:
+                        st.session_state.memory_center_selected_insights.discard(insight_id)
+
+                with col2:
+                    # Display insight content with metadata
+                    st.markdown(f"**Cluster {cluster_id}** (Confidence: {confidence:.2f})")
+                    st.markdown(insight_text)
+                    st.markdown("---")
+
+        else:
+            # SAM automatic selection mode
+            if insights:
+                # Score insights for automatic selection
+                scored_insights = []
+                for i, insight in enumerate(insights):
+                    confidence = insight.get('confidence_score', 0.0)
+                    content = insight.get('content', insight.get('insight', ''))
+
+                    novelty_keywords = ['new', 'novel', 'innovative', 'breakthrough', 'discovery', 'emerging', 'unprecedented']
+                    novelty_score = sum(1 for keyword in novelty_keywords if keyword.lower() in content.lower()) / len(novelty_keywords)
+
+                    research_keywords = ['how', 'why', 'what', 'could', 'might', 'potential', 'explore', 'investigate']
+                    research_score = sum(1 for keyword in research_keywords if keyword.lower() in content.lower()) / len(research_keywords)
+
+                    combined_score = confidence * 0.4 + novelty_score * 0.3 + research_score * 0.3
+                    scored_insights.append((i, insight, combined_score))
+
+                # Sort by score and show top candidate
+                scored_insights.sort(key=lambda x: x[2], reverse=True)
+                best_insight = scored_insights[0]
+
+                st.markdown(f"**🎯 SAM's Top Selection:**")
+                st.markdown(f"**Cluster {best_insight[1].get('cluster_id', 'Unknown')}** (Score: {best_insight[2]:.2f})")
+                st.markdown(f"{best_insight[1].get('content', best_insight[1].get('insight', 'No content'))}")
+
+        # Research action buttons
+        st.markdown("---")
+
+        # Check if research components are available
+        research_available = True
+        try:
+            from sam.web_retrieval.tools.arxiv_tool import get_arxiv_tool
+            from sam.state.vetting_queue import get_vetting_queue_manager
+        except ImportError:
+            research_available = False
+
+        if research_available:
+            # Enhanced research options with Quick and Deep Research
+            col1, col2, col3 = st.columns([2, 2, 2])
+
+            with col1:
+                if st.button("🔬 **Quick Research**", use_container_width=True,
+                           help="Basic ArXiv search for selected insights", key="memory_quick_research"):
+                    # Trigger quick research process
+                    trigger_memory_center_quick_research(research_mode, insights, max_research_papers)
+
+            with col2:
+                if st.button("🧠 **Deep Research**", type="primary", use_container_width=True,
+                           help="Comprehensive multi-step ArXiv analysis with verification", key="memory_deep_research"):
+                    # Trigger deep research process
+                    trigger_memory_center_deep_research(research_mode, insights)
+
+            with col3:
+                if st.button("📋 View Research Queue", use_container_width=True,
+                           help="View pending research papers in vetting queue", key="memory_view_queue"):
+                    # Navigate to vetting queue
+                    st.session_state.memory_page_override = "🔍 Vetting Queue"
+                    st.rerun()
+
+        else:
+            st.warning("⚠️ Research components not available. Install Task 27 components to enable automated research.")
+
+        # Display Deep Research Results if available
+        render_memory_center_deep_research_results()
+
+    except Exception as e:
+        st.error(f"❌ Error loading research integration: {e}")
+
+def extract_research_query(insight_text):
+    """Extract a research query from insight text."""
+    try:
+        # Simple extraction - take first sentence or key phrases
+        sentences = insight_text.split('.')
+        if sentences:
+            # Use first meaningful sentence as research query
+            query = sentences[0].strip()
+
+            # Clean up the query
+            query = query.replace('EMERGENT INSIGHT:', '').strip()
+            query = query.replace('This cluster', '').strip()
+
+            # Limit length
+            if len(query) > 100:
+                query = query[:100] + '...'
+
+            return query if len(query) > 10 else None
+    except:
+        return None
+
+def trigger_memory_center_quick_research(research_mode, insights, max_research_papers):
+    """Trigger quick research from Memory Control Center."""
+    try:
+        if research_mode == "👤 Human Selection":
+            if st.session_state.memory_center_selected_insights:
+                selected_indices = [int(insight_id.split('_')[2]) for insight_id in st.session_state.memory_center_selected_insights]
+                selected_insights_data = [insights[i] for i in selected_indices]
+                trigger_insight_research_workflow(selected_insights_data, max_research_papers)
+                st.success(f"🔬 **Quick Research initiated!** Processing {len(selected_insights_data)} insight{'' if len(selected_insights_data) == 1 else 's'}")
+            else:
+                st.error("❌ Please select at least one insight for research")
+        else:
+            # SAM automatic selection
+            if insights:
+                # Use scoring logic to select best insight
+                scored_insights = []
+                for i, insight in enumerate(insights):
+                    confidence = insight.get('confidence_score', 0.0)
+                    content = insight.get('content', insight.get('insight', ''))
+
+                    novelty_keywords = ['new', 'novel', 'innovative', 'breakthrough', 'discovery', 'emerging', 'unprecedented']
+                    novelty_score = sum(1 for keyword in novelty_keywords if keyword.lower() in content.lower()) / len(novelty_keywords)
+
+                    research_keywords = ['how', 'why', 'what', 'could', 'might', 'potential', 'explore', 'investigate']
+                    research_score = sum(1 for keyword in research_keywords if keyword.lower() in content.lower()) / len(research_keywords)
+
+                    combined_score = confidence * 0.4 + novelty_score * 0.3 + research_score * 0.3
+                    scored_insights.append((i, insight, combined_score))
+
+                scored_insights.sort(key=lambda x: x[2], reverse=True)
+                best_insight = scored_insights[0][1]
+
+                trigger_insight_research_workflow([best_insight], max_research_papers)
+                st.success("🔬 **Quick Research initiated!** Processing SAM's top selected insight")
+            else:
+                st.error("❌ No insights available for research")
+
+    except Exception as e:
+        st.error(f"❌ Failed to start quick research: {e}")
+
+def trigger_memory_center_deep_research(research_mode, insights):
+    """Trigger deep research from Memory Control Center."""
+    try:
+        from sam.agents.strategies.deep_research import DeepResearchStrategy
+        import threading
+
+        def run_memory_center_deep_research():
+            """Run deep research in background thread for Memory Control Center."""
+            try:
+                selected_insights_data = []
+
+                if research_mode == "👤 Human Selection":
+                    if st.session_state.memory_center_selected_insights:
+                        selected_indices = [int(insight_id.split('_')[2]) for insight_id in st.session_state.memory_center_selected_insights]
+                        selected_insights_data = [insights[i] for i in selected_indices]
+                    else:
+                        st.session_state.memory_center_deep_research_error = "No insights selected"
+                        return
+                else:
+                    # SAM automatic selection
+                    if insights:
+                        # Use scoring logic to select best insight
+                        scored_insights = []
+                        for i, insight in enumerate(insights):
+                            confidence = insight.get('confidence_score', 0.0)
+                            content = insight.get('content', insight.get('insight', ''))
+
+                            novelty_keywords = ['new', 'novel', 'innovative', 'breakthrough', 'discovery', 'emerging', 'unprecedented']
+                            novelty_score = sum(1 for keyword in novelty_keywords if keyword.lower() in content.lower()) / len(novelty_keywords)
+
+                            research_keywords = ['how', 'why', 'what', 'could', 'might', 'potential', 'explore', 'investigate']
+                            research_score = sum(1 for keyword in research_keywords if keyword.lower() in content.lower()) / len(research_keywords)
+
+                            combined_score = confidence * 0.4 + novelty_score * 0.3 + research_score * 0.3
+                            scored_insights.append((i, insight, combined_score))
+
+                        scored_insights.sort(key=lambda x: x[2], reverse=True)
+                        selected_insights_data = [scored_insights[0][1]]
+                    else:
+                        st.session_state.memory_center_deep_research_error = "No insights available"
+                        return
+
+                # Execute deep research for selected insights
+                research_results = []
+
+                for insight in selected_insights_data:
+                    insight_text = insight.get('content', insight.get('insight', ''))
+                    cluster_id = insight.get('cluster_id', 'Unknown')
+
+                    # Initialize Deep Research Strategy
+                    research_strategy = DeepResearchStrategy(insight_text)
+
+                    # Execute deep research
+                    result = research_strategy.execute_research()
+
+                    # Store result
+                    research_results.append({
+                        'research_id': result.research_id,
+                        'original_insight': result.original_insight,
+                        'cluster_id': cluster_id,
+                        'final_report': result.final_report,
+                        'arxiv_papers': result.arxiv_papers,
+                        'status': result.status.value,
+                        'timestamp': result.timestamp,
+                        'quality_score': research_strategy._assess_research_quality(),
+                        'papers_analyzed': len(result.arxiv_papers),
+                        'iterations_completed': research_strategy.current_iteration
+                    })
+
+                # Store results in session state
+                if 'memory_center_deep_research_results' not in st.session_state:
+                    st.session_state.memory_center_deep_research_results = []
+
+                st.session_state.memory_center_deep_research_results.extend(research_results)
+
+                # Update completion status
+                st.session_state.memory_center_deep_research_completion = {
+                    'success': True,
+                    'insights_processed': len(selected_insights_data),
+                    'reports_generated': len(research_results),
+                    'timestamp': datetime.now().isoformat()
+                }
+
+            except Exception as e:
+                logger.error(f"Memory Center deep research execution failed: {e}")
+                st.session_state.memory_center_deep_research_completion = {
+                    'success': False,
+                    'error': str(e),
+                    'timestamp': datetime.now().isoformat()
+                }
+
+        # Start deep research in background
+        research_thread = threading.Thread(target=run_memory_center_deep_research, daemon=True)
+        research_thread.start()
+
+        if research_mode == "👤 Human Selection":
+            selected_count = len(st.session_state.memory_center_selected_insights)
+            st.success(f"🧠 **Deep Research initiated!** Processing {selected_count} selected insight{'' if selected_count == 1 else 's'}")
+        else:
+            st.success("🧠 **Deep Research initiated!** Processing SAM's top selected insight")
+
+        st.info("📊 **Comprehensive Analysis**: Multi-step ArXiv research with verification and critique")
+        st.info("📄 **Report Generation**: Structured research reports will be generated")
+        st.info("🔄 **Check Results**: Results will appear in the Deep Research Results section below")
+
+    except ImportError:
+        st.error("❌ Deep Research Engine not available. Please ensure sam.agents.strategies.deep_research is installed.")
+    except Exception as e:
+        st.error(f"❌ Failed to start deep research: {e}")
+
+def render_memory_center_deep_research_results():
+    """Display Deep Research results for Memory Control Center."""
+    try:
+        if 'memory_center_deep_research_results' not in st.session_state or not st.session_state.memory_center_deep_research_results:
+            return
+
+        st.markdown("---")
+        st.markdown("### 🧠 Deep Research Results")
+        st.markdown("*Comprehensive ArXiv analysis reports with verification*")
+
+        # Show completion status if available
+        if 'memory_center_deep_research_completion' in st.session_state:
+            completion = st.session_state.memory_center_deep_research_completion
+            if completion.get('success'):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Insights Analyzed", completion.get('insights_processed', 0))
+                with col2:
+                    st.metric("Reports Generated", completion.get('reports_generated', 0))
+                with col3:
+                    timestamp = completion.get('timestamp', '')
+                    if timestamp:
+                        time_str = timestamp.split('T')[1][:5] if 'T' in timestamp else 'Unknown'
+                        st.metric("Completed", time_str)
+
+        # Display research results
+        for i, result in enumerate(st.session_state.memory_center_deep_research_results):
+            with st.expander(f"📊 Research Report {i+1}: {result['original_insight'][:60]}...", expanded=i==0):
+
+                # Research metadata
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Quality Score", f"{result.get('quality_score', 0):.2f}")
+                with col2:
+                    st.metric("Papers Analyzed", result.get('papers_analyzed', 0))
+                with col3:
+                    st.metric("Iterations", result.get('iterations_completed', 0))
+                with col4:
+                    status_color = "🟢" if result.get('status') == 'COMPLETED' else "🟡"
+                    st.metric("Status", f"{status_color} {result.get('status', 'Unknown')}")
+
+                # Display the full research report
+                st.markdown("#### 📄 Research Report")
+                st.markdown(result.get('final_report', 'Report not available'))
+
+                # Show ArXiv papers found
+                if result.get('arxiv_papers'):
+                    st.markdown("#### 📚 ArXiv Papers Analyzed")
+                    for j, paper in enumerate(result['arxiv_papers'][:5]):  # Show top 5
+                        title = paper.get('title', 'Unknown Title')
+                        authors = ', '.join(paper.get('authors', [])[:3])
+                        year = paper.get('published', '')[:4] if paper.get('published') else 'Unknown'
+
+                        st.markdown(f"**{j+1}. {title}** ({year})")
+                        st.markdown(f"*Authors*: {authors}")
+                        if paper.get('summary'):
+                            st.markdown(f"*Summary*: {paper['summary'][:150]}...")
+                        st.markdown("---")
+
+                # Action buttons
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button(f"📋 View Papers in Queue", key=f"memory_queue_{result['research_id']}"):
+                        st.session_state.memory_page_override = "🔍 Vetting Queue"
+                        st.rerun()
+
+                with col2:
+                    if st.button(f"📄 Export Report", key=f"memory_export_{result['research_id']}"):
+                        # Create downloadable report
+                        report_content = result.get('final_report', '')
+                        st.download_button(
+                            label="Download Report",
+                            data=report_content,
+                            file_name=f"memory_center_deep_research_report_{result['research_id']}.md",
+                            mime="text/markdown",
+                            key=f"memory_download_{result['research_id']}"
+                        )
+
+                with col3:
+                    if st.button(f"🔄 Re-run Research", key=f"memory_rerun_{result['research_id']}"):
+                        # Re-trigger research for this insight
+                        insight_data = {
+                            'content': result['original_insight'],
+                            'cluster_id': result.get('cluster_id', 'Unknown')
+                        }
+                        trigger_memory_center_deep_research("🤖 SAM Selects Best", [insight_data])
+
+        # Clear results button
+        if st.button("🗑️ Clear Deep Research Results", key="memory_clear_deep_research"):
+            st.session_state.memory_center_deep_research_results = []
+            if 'memory_center_deep_research_completion' in st.session_state:
+                del st.session_state.memory_center_deep_research_completion
+            st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Error displaying deep research results: {e}")
 
 def trigger_synthesis_with_params(eps, min_samples, min_cluster_size, max_clusters):
     """Trigger cognitive synthesis process with custom parameters."""
@@ -3148,6 +3940,38 @@ def create_focused_synthesis_visualization(insights, run_id):
 def generate_cluster_insight(contents, sources, cluster_id):
     """Generate meaningful 'So What' insights from cluster content."""
     try:
+        # First, try to get enhanced insight from cluster registry
+        try:
+            from memory.synthesis.cluster_registry import get_cluster_stats
+            cluster_stats = get_cluster_stats(f"cluster_{cluster_id:03d}")
+
+            if cluster_stats['exists'] and cluster_stats['dominant_themes']:
+                # Use registry data for enhanced insights
+                themes = cluster_stats['dominant_themes']
+                memory_count = cluster_stats['memory_count']
+                source_count = cluster_stats['source_count']
+                coherence = cluster_stats['coherence_score']
+
+                if len(themes) >= 2:
+                    themes_str = ", ".join(themes[:2])
+                    if source_count > 1:
+                        insight = f"This cluster represents a convergence of ideas around **{themes_str}**, drawing from {source_count} different sources with {memory_count} related memories. The high coherence score ({coherence:.2f}) suggests this is a well-defined knowledge domain that SAM has identified as conceptually related."
+                    else:
+                        insight = f"This cluster focuses on **{themes_str}** within a specific domain, containing {memory_count} related memories. The coherence score ({coherence:.2f}) indicates how tightly related these concepts are in SAM's understanding."
+                else:
+                    insight = f"This cluster contains {memory_count} related memories from {source_count} sources, representing a coherent knowledge area with a coherence score of {coherence:.2f}."
+
+                # Add actionable "So What"
+                if memory_count > 10:
+                    insight += f" **So What:** This represents a major knowledge domain for SAM - consider this cluster when asking questions about {themes[0] if themes else 'this topic'}."
+                else:
+                    insight += f" **So What:** This is a specialized knowledge cluster that could provide focused insights for specific queries about {themes[0] if themes else 'related topics'}."
+
+                return insight
+        except Exception as e:
+            logger.debug(f"Could not get enhanced cluster insight: {e}")
+
+        # Fallback to original analysis if registry lookup fails
         # Analyze content patterns
         content_text = " ".join(contents)
 
@@ -3438,9 +4262,24 @@ def render_dream_canvas_visualization(visualization_data):
 
                         with col1:
                             st.markdown("**📊 Cluster Stats:**")
-                            st.write(f"• **{cluster['count']} memories** in this cluster")
-                            st.write(f"• **Avg importance:** {cluster['avg_importance']:.2f}")
-                            st.write(f"• **Sources:** {len(cluster['sources'])} unique")
+                            # Try to get enhanced stats from cluster registry
+                            try:
+                                from memory.synthesis.cluster_registry import get_cluster_stats
+                                enhanced_stats = get_cluster_stats(f"cluster_{cluster['id']:03d}")
+                                if enhanced_stats['exists']:
+                                    st.write(f"• **{enhanced_stats['memory_count']} memories** in this cluster")
+                                    st.write(f"• **Avg importance:** {enhanced_stats['avg_importance']:.2f}")
+                                    st.write(f"• **Sources:** {enhanced_stats['source_count']} unique")
+                                else:
+                                    # Fallback to original stats
+                                    st.write(f"• **{cluster['count']} memories** in this cluster")
+                                    st.write(f"• **Avg importance:** {cluster['avg_importance']:.2f}")
+                                    st.write(f"• **Sources:** {len(cluster['sources'])} unique")
+                            except Exception:
+                                # Fallback to original stats
+                                st.write(f"• **{cluster['count']} memories** in this cluster")
+                                st.write(f"• **Avg importance:** {cluster['avg_importance']:.2f}")
+                                st.write(f"• **Sources:** {len(cluster['sources'])} unique")
 
                         with col2:
                             st.markdown("**📝 Sample Content:**")

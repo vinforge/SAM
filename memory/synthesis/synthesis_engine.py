@@ -197,6 +197,15 @@ class SynthesisEngine:
                 logger.info("Phase 5: Re-ingesting synthetic insights into memory store...")
                 reingested_count = self._reingest_synthetic_insights(output_file, memory_store)
 
+            # Phase 6: Register clusters in cluster registry for UI access
+            try:
+                from .cluster_registry import get_cluster_registry
+                registry = get_cluster_registry()
+                registered_count = registry.register_clusters_from_synthesis(Path(output_file))
+                logger.info(f"Phase 6: Registered {registered_count} clusters in registry")
+            except Exception as e:
+                logger.warning(f"Could not register clusters in registry: {e}")
+
             # Create final result
             result = SynthesisResult(
                 run_id=run_id,
@@ -279,15 +288,31 @@ class SynthesisEngine:
             ]
         }
     
-    def _save_synthesis_output(self, run_id: str, insights: List[SynthesizedInsight], 
+    def _save_synthesis_output(self, run_id: str, insights: List[SynthesizedInsight],
                               synthesis_log: Dict[str, Any]) -> str:
-        """Save synthesis output to JSON file."""
+        """Save synthesis output to JSON file with enhanced cluster metadata."""
         # Create output data structure
         output_data = {
             "synthesis_run_log": synthesis_log,
-            "insights": []
+            "insights": [],
+            "cluster_metadata": {}  # NEW: Store cluster metadata for UI retrieval
         }
-        
+
+        # Extract cluster metadata from synthesis log
+        if "cluster_summary" in synthesis_log:
+            for cluster_info in synthesis_log["cluster_summary"]:
+                cluster_id = cluster_info["cluster_id"]
+                output_data["cluster_metadata"][cluster_id] = {
+                    "cluster_id": cluster_id,
+                    "size": cluster_info["size"],
+                    "coherence_score": cluster_info["coherence_score"],
+                    "dominant_themes": cluster_info["dominant_themes"],
+                    "memory_count": cluster_info["size"],
+                    "avg_importance": 0.0,  # Will be calculated from source chunks
+                    "sources": [],  # Will be populated from source chunks
+                    "insight_generated": cluster_info["insight_generated"]
+                }
+
         # Add insights in the format expected by Phase 8B
         for insight in insights:
             insight_data = {
@@ -302,6 +327,21 @@ class SynthesisEngine:
                 "synthesis_metadata": insight.synthesis_metadata
             }
             output_data["insights"].append(insight_data)
+
+            # Enhance cluster metadata with insight-specific data
+            cluster_id = insight.cluster_id
+            if cluster_id in output_data["cluster_metadata"]:
+                cluster_meta = output_data["cluster_metadata"][cluster_id]
+
+                # Calculate average importance from source chunks
+                if insight.source_chunks:
+                    importance_scores = [chunk.importance_score for chunk in insight.source_chunks]
+                    cluster_meta["avg_importance"] = sum(importance_scores) / len(importance_scores)
+
+                    # Extract unique sources
+                    sources = list(set(chunk.source for chunk in insight.source_chunks))
+                    cluster_meta["sources"] = sources
+                    cluster_meta["source_count"] = len(sources)
         
         # Save to file
         output_file = self.output_dir / f"synthesis_run_log_{run_id}.json"

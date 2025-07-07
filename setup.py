@@ -15,8 +15,6 @@ Version: 1.0.0
 import os
 import sys
 import subprocess
-import time
-import webbrowser
 from pathlib import Path
 
 def print_banner():
@@ -213,183 +211,6 @@ def show_documentation():
     
     input("\nPress Enter to continue...")
 
-def check_and_install_dependencies():
-    """Check and install required dependencies for SAM services."""
-    print("\n🔍 **Checking SAM Dependencies...**")
-
-    required_packages = [
-        'streamlit',
-        'chromadb',
-        'flask',
-        'argon2-cffi',
-        'cryptography'
-    ]
-
-    missing_packages = []
-
-    for package in required_packages:
-        try:
-            __import__(package.replace('-', '_'))
-            print(f"   ✅ {package}")
-        except ImportError:
-            print(f"   ❌ {package} (missing)")
-            missing_packages.append(package)
-
-    if missing_packages:
-        print(f"\n📦 **Installing Missing Dependencies...**")
-        print(f"   Installing: {', '.join(missing_packages)}")
-
-        try:
-            # Install missing packages
-            subprocess.run([
-                sys.executable, "-m", "pip", "install"
-            ] + missing_packages, check=True, capture_output=True)
-
-            print("   ✅ Dependencies installed successfully!")
-            return True
-
-        except subprocess.CalledProcessError as e:
-            print(f"   ❌ Failed to install dependencies: {e}")
-            print("   💡 Please run manually: pip install streamlit chromadb")
-            return False
-    else:
-        print("   ✅ All dependencies satisfied!")
-        return True
-
-def start_registration_interface():
-    """Start the SAM Pro registration interface for key registration."""
-    try:
-        print("\n🔑 **Starting SAM Pro Key Registration Interface...**")
-        print("   This will allow you to register for a free SAM Pro activation key")
-
-        # Check if registration system is available
-        if not Path("sam_pro_registration.py").exists():
-            print("   ❌ Registration interface not found (sam_pro_registration.py)")
-            print("   💡 You can register later or contact support for a key")
-            return False
-
-        # Check dependencies first
-        if not check_and_install_dependencies():
-            print("   ❌ Cannot start registration interface due to missing dependencies")
-            return False
-
-        # Start the registration interface
-        print("   🚀 Starting registration interface on port 8503...")
-
-        try:
-            # Start registration interface in background
-            process = subprocess.Popen([
-                sys.executable, "-m", "streamlit", "run",
-                "sam_pro_registration.py",
-                "--server.port=8503",
-                "--server.address=localhost",
-                "--browser.gatherUsageStats=false"
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            print("   ✅ Registration interface starting...")
-            print("   ⏳ Waiting for interface to initialize (10 seconds)...")
-            time.sleep(10)
-
-            # Open browser to registration interface
-            registration_url = "http://localhost:8503"
-            print(f"   🌐 Opening registration interface: {registration_url}")
-
-            webbrowser.open(registration_url)
-
-            print("   ✅ Registration interface opened in browser!")
-            print("\n💡 **Registration Instructions:**")
-            print("   1. Fill out the registration form with your details")
-            print("   2. Submit the form")
-            print("   3. Your activation key will be sent via email automatically")
-            print("   4. Return here and press Enter when you have your key")
-            print("   5. Or press 'C' to continue installation without a key")
-
-            return True
-
-        except Exception as e:
-            print(f"   ❌ Failed to start registration interface: {e}")
-            print("   💡 You can start it manually later with:")
-            print("   💡 streamlit run sam_pro_registration.py --server.port 8503")
-            return False
-
-    except Exception as e:
-        print(f"   ❌ Registration interface startup failed: {e}")
-        return False
-
-def handle_sam_pro_activation():
-    """Handle SAM Pro activation during setup."""
-    print("\n🔑 **SAM Pro Activation Setup**")
-    print("=" * 50)
-    print("SAM Pro unlocks advanced features like:")
-    print("• 🧠 TPV Active Reasoning Control")
-    print("• 🎨 Dream Canvas Memory Visualization")
-    print("• 🤖 Cognitive Automation (SLP System)")
-    print("• 📊 Advanced Analytics and Insights")
-
-    while True:
-        print("\n🎯 **Choose your activation option:**")
-        print("1. 🔑 Register for FREE activation key now")
-        print("2. 📧 I already have an activation key")
-        print("3. ⏭️  Continue installation without activation (add key later)")
-
-        try:
-            choice = input("\nEnter your choice (1-3) [1]: ").strip().lower()
-            if not choice:
-                choice = "1"
-
-            if choice in ['1', 'register', 'r']:
-                # Start registration interface
-                if start_registration_interface():
-                    # Wait for user to complete registration
-                    while True:
-                        user_input = input("\n❓ Have you completed registration and received your key? (y/n/c) [c]: ").strip().lower()
-                        if user_input in ['y', 'yes']:
-                            key = input("🔑 Enter your activation key: ").strip()
-                            if key:
-                                print(f"✅ Activation key saved: {key[:8]}...")
-                                print("💡 You can activate SAM Pro after installation completes")
-                                return True
-                            else:
-                                print("⚠️ No key entered")
-                        elif user_input in ['c', 'continue', '']:
-                            print("⏭️ Continuing installation without activation key")
-                            print("💡 You can register later at: http://localhost:8503")
-                            return True
-                        elif user_input in ['n', 'no']:
-                            print("⏳ Take your time. The registration interface is still open.")
-                            continue
-                        else:
-                            print("❌ Please enter 'y' (yes), 'n' (no), or 'c' (continue)")
-                else:
-                    print("⏭️ Continuing installation without registration interface")
-                    return True
-
-            elif choice in ['2', 'key', 'k']:
-                # User already has a key
-                key = input("🔑 Enter your activation key: ").strip()
-                if key:
-                    print(f"✅ Activation key saved: {key[:8]}...")
-                    print("💡 You can activate SAM Pro after installation completes")
-                    return True
-                else:
-                    print("⚠️ No key entered, please try again")
-                    continue
-
-            elif choice in ['3', 'continue', 'c', 'skip', 's']:
-                # Continue without activation
-                print("⏭️ Continuing installation without SAM Pro activation")
-                print("💡 You can register for a key later at: http://localhost:8503")
-                print("💡 Or run: streamlit run sam_pro_registration.py --server.port 8503")
-                return True
-
-            else:
-                print("❌ Please enter 1, 2, or 3")
-                continue
-
-        except KeyboardInterrupt:
-            print("\n⏭️ Skipping SAM Pro activation setup")
-            return True
-
 def main():
     """Main setup launcher."""
     try:
@@ -440,11 +261,6 @@ def main():
         
         # Final message
         if choice != 6:
-            print("\n🎉 **SAM Installation Complete!**")
-
-            # Handle SAM Pro activation during setup
-            handle_sam_pro_activation()
-
             print("\n🚀 **SAM is ready!**")
             print("\n📍 **Access Points:**")
             print("   • Secure Chat: http://localhost:8502")
@@ -454,49 +270,16 @@ def main():
             print("\n🔑 **Start SAM:**")
             print("   python start_sam_secure.py --mode full")
 
-            print("\n🎯 **SAM Pro Activation:**")
-            print("   • Navigate to http://localhost:8502 after starting SAM")
-            print("   • Look for '🔑 SAM Pro Activation' in the sidebar")
-            print("   • Enter your activation key to unlock premium features")
-
-            print("\n🔑 **Need an Activation Key Later?**")
-            print("   • Register at: http://localhost:8503")
-            print("   • Or run: streamlit run sam_pro_registration.py --server.port 8503")
-            print("   • Keys are delivered automatically via email")
+            print("\n🎯 **Unlock SAM Pro Features:**")
+            print("   python register_sam_pro.py")
+            print("   • Dream Canvas Memory Visualization")
+            print("   • TPV Active Reasoning Control")
+            print("   • Cognitive Automation (SLP System)")
+            print("   • Advanced Analytics and Insights")
 
             print("\n📖 **Documentation:**")
             print("   • SETUP_OPTIONS.md - All setup options")
             print("   • docs/ - Complete documentation")
-
-            # Offer to start SAM automatically
-            try:
-                start_sam = input("\n❓ Would you like to start SAM now? (y/n) [y]: ").strip().lower()
-                if not start_sam or start_sam in ['y', 'yes']:
-                    print("\n🚀 Starting SAM...")
-                    if check_and_install_dependencies():
-                        subprocess.Popen([
-                            sys.executable, "start_sam_secure.py", "--mode", "full"
-                        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-                        print("   ✅ SAM services starting...")
-                        print("   ⏳ Waiting for services to initialize (15 seconds)...")
-                        time.sleep(15)
-
-                        print("   🌐 Opening SAM interface...")
-                        webbrowser.open("http://localhost:8502")
-
-                        print("   ✅ SAM opened in your browser!")
-                        print("\n💡 **Next Steps:**")
-                        print("   1. Enter your master password to unlock SAM")
-                        print("   2. Use the '🔑 SAM Pro Activation' sidebar if you have a key")
-                        print("   3. Start chatting with your AI assistant!")
-                    else:
-                        print("   ❌ Cannot start SAM due to missing dependencies")
-                        print("   💡 Please install dependencies and run: python start_sam_secure.py --mode full")
-                else:
-                    print("   ⏭️ You can start SAM later with: python start_sam_secure.py --mode full")
-            except KeyboardInterrupt:
-                print("\n   ⏭️ Skipping auto-start")
     
     except KeyboardInterrupt:
         print("\n\n👋 Setup cancelled by user")

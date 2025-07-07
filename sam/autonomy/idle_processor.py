@@ -361,6 +361,11 @@ class IdleTimeProcessor:
                 else:
                     return  # Still processing current goal
 
+            # Check if memory synthesis should run (Task 33, Phase 2)
+            if self._should_run_memory_synthesis():
+                self._execute_memory_synthesis()
+                return
+
             # Get top priority goals
             top_goals = self.goal_stack.get_top_priority_goals(
                 limit=self.config.max_concurrent_goals,
@@ -600,6 +605,59 @@ class IdleTimeProcessor:
             'average_processing_time': 0.0
         }
         self.logger.info("Processing statistics reset")
+
+    def _should_run_memory_synthesis(self) -> bool:
+        """Check if memory synthesis should run during this idle cycle (Task 33, Phase 2)."""
+        try:
+            # Import memory synthesizer
+            from memory.synthesis.conversation_synthesizer import MemorySynthesizer
+
+            # Initialize synthesizer if not exists
+            if not hasattr(self, '_memory_synthesizer'):
+                self._memory_synthesizer = MemorySynthesizer()
+
+            # Check if synthesis is due
+            return self._memory_synthesizer.should_run_synthesis()
+
+        except Exception as e:
+            self.logger.warning(f"Memory synthesis check failed: {e}")
+            return False
+
+    def _execute_memory_synthesis(self) -> None:
+        """Execute memory synthesis during idle time (Task 33, Phase 2)."""
+        try:
+            self.logger.info("Starting memory synthesis during idle cycle")
+            self.state = IdleState.PROCESSING
+            self.processing_start_time = datetime.now()
+
+            # Import and run memory synthesizer
+            from memory.synthesis.conversation_synthesizer import MemorySynthesizer
+
+            if not hasattr(self, '_memory_synthesizer'):
+                self._memory_synthesizer = MemorySynthesizer()
+
+            # Run conversation synthesis (use asyncio.run for sync context)
+            import asyncio
+            synthesis_result = asyncio.run(self._memory_synthesizer.run_conversation_synthesis())
+
+            # Log results
+            if synthesis_result.get('status') == 'completed':
+                insights_count = synthesis_result.get('insights_generated', 0)
+                self.logger.info(f"Memory synthesis completed: {insights_count} insights generated")
+                self.stats['successful_executions'] += 1
+            else:
+                self.logger.warning(f"Memory synthesis failed: {synthesis_result.get('error', 'Unknown error')}")
+                self.stats['failed_executions'] += 1
+
+            # Update state
+            self.state = IdleState.IDLE
+            self.processing_start_time = None
+
+        except Exception as e:
+            self.logger.error(f"Memory synthesis execution failed: {e}")
+            self.state = IdleState.ERROR
+            self.processing_start_time = None
+            self.stats['failed_executions'] += 1
 
 
 def create_idle_processor(goal_stack: GoalStack,
