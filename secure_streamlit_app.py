@@ -284,6 +284,62 @@ def initialize_secure_sam():
             st.session_state.memoir_integration = None
             st.session_state.memoir_enabled = False
 
+    # Initialize Cognitive Distillation Engine (NEW - Phase 2 Integration)
+    if 'cognitive_distillation_initialized' not in st.session_state:
+        try:
+            from sam.discovery.distillation import SAMCognitiveDistillation
+
+            # Initialize with automation enabled for production
+            st.session_state.cognitive_distillation = SAMCognitiveDistillation(enable_automation=True)
+            st.session_state.cognitive_distillation_initialized = True
+            st.session_state.cognitive_distillation_enabled = True
+
+            logger.info("✅ Cognitive Distillation Engine initialized with automated principle discovery")
+
+            # Setup default triggers for common SAM strategies
+            try:
+                automation = st.session_state.cognitive_distillation.automation
+                if automation:
+                    # Add triggers for SAM's main reasoning strategies
+                    automation.add_trigger(
+                        strategy_id="secure_chat_reasoning",
+                        trigger_type="interaction_threshold",
+                        trigger_condition={
+                            'min_interactions': 20,
+                            'min_success_rate': 0.8,
+                            'cooldown_hours': 48
+                        }
+                    )
+
+                    automation.add_trigger(
+                        strategy_id="document_analysis",
+                        trigger_type="interaction_threshold",
+                        trigger_condition={
+                            'min_interactions': 15,
+                            'min_success_rate': 0.85,
+                            'cooldown_hours': 72
+                        }
+                    )
+
+                    automation.add_trigger(
+                        strategy_id="web_search_integration",
+                        trigger_type="time_based",
+                        trigger_condition={
+                            'interval_hours': 168  # Weekly
+                        }
+                    )
+
+                    logger.info("✅ Cognitive distillation automation triggers configured")
+
+            except Exception as trigger_error:
+                logger.warning(f"Failed to setup distillation triggers: {trigger_error}")
+
+        except Exception as e:
+            logger.warning(f"Cognitive Distillation Engine not available: {e}")
+            st.session_state.cognitive_distillation = None
+            st.session_state.cognitive_distillation_initialized = False
+            st.session_state.cognitive_distillation_enabled = False
+
 # TPV control sidebar function removed to clean up the interface
 
 def render_messages_from_sam_alert():
@@ -484,6 +540,7 @@ def render_sam_pro_sidebar():
                     • MEMOIR Lifelong Learning
                     • Dream Canvas Visualization
                     • Cognitive Automation Engine
+                    • Cognitive Distillation Engine
 
                     **🔧 Advanced Tools:**
                     • Enhanced Memory Analytics
@@ -556,6 +613,7 @@ def render_sam_pro_sidebar():
                     • **Enhanced SLP Learning** - Advanced pattern recognition
                     • **MEMOIR Lifelong Learning** - Continuous knowledge updates
                     • **Dream Canvas** - Interactive memory visualization
+                    • **Cognitive Distillation Engine** - AI introspection & self-improvement
 
                     **🔧 Premium Tools:**
                     • **Cognitive Automation Engine** - Automated reasoning
@@ -692,6 +750,16 @@ def render_sam_pro_sidebar():
             status_items.append("🧠 Dissonance Monitor: ✅ Active")
         else:
             status_items.append("🧠 Dissonance Monitor: ❌ Inactive")
+
+        # Cognitive Distillation status (NEW - Phase 2 Integration)
+        cognitive_distillation_active = False
+        if st.session_state.get('cognitive_distillation_enabled'):
+            cognitive_distillation_active = True
+
+        if cognitive_distillation_active:
+            status_items.append("🧠 Cognitive Distillation: ✅ Active")
+        else:
+            status_items.append("🧠 Cognitive Distillation: ❌ Inactive")
 
         for item in status_items:
             st.caption(item)
@@ -1885,6 +1953,9 @@ def render_chat_interface():
                                 # Add the clean response to chat history
                                 st.session_state.chat_history.append({"role": "assistant", "content": processed.visible_content})
 
+                                # Add Cognitive Distillation Thought Transparency (NEW - Phase 2 Integration)
+                                render_thought_transparency()
+
                                 # Add feedback system
                                 render_feedback_system(len(st.session_state.chat_history) - 1)
 
@@ -1895,6 +1966,9 @@ def render_chat_interface():
                                 else:
                                     st.markdown(raw_response)
                                 st.session_state.chat_history.append({"role": "assistant", "content": raw_response})
+
+                                # Add Cognitive Distillation Thought Transparency (NEW - Phase 2 Integration)
+                                render_thought_transparency()
 
                                 # Add feedback system
                                 render_feedback_system(len(st.session_state.chat_history) - 1)
@@ -2332,6 +2406,7 @@ def render_integrated_memory_control_center():
             "📁 Bulk Ingestion",
             "🔑 API Key Manager",
             "🧠🎨 Dream Canvas",
+            "🧠🔬 Cognitive Distillation",
             "🏆 Memory Ranking",
             "📊 Memory Analytics",
             "🧠⚡ SLP Analytics",
@@ -2394,6 +2469,8 @@ def render_integrated_memory_control_center():
             render_api_key_manager()
         elif memory_page == "🧠🎨 Dream Canvas":
             render_dream_canvas_integrated()
+        elif memory_page == "🧠🔬 Cognitive Distillation":
+            render_cognitive_distillation_management()
         elif memory_page == "🏆 Memory Ranking":
             render_memory_ranking_integrated()
         elif memory_page == "📊 Memory Analytics":
@@ -2439,6 +2516,7 @@ def render_basic_memory_interface():
         • **Bulk Ingestion** - Process multiple documents
         • **API Key Manager** - Configure web tools
         • **🧠🎨 Dream Canvas** - Cognitive synthesis visualization
+        • **🧠🔬 Cognitive Distillation** - AI introspection & principle discovery
         • **Memory Analytics** - Advanced statistics
         • **Memory Ranking** - Importance scoring
         """)
@@ -3445,6 +3523,113 @@ def render_feedback_system(message_index: int):
 
     except Exception as e:
         logger.error(f"Feedback system error: {e}")
+
+def render_thought_transparency():
+    """Render cognitive distillation thought transparency display (NEW - Phase 2 Integration)."""
+    try:
+        # Check if cognitive distillation is enabled and transparency data is available
+        if (not st.session_state.get('cognitive_distillation_enabled', False) or
+            not st.session_state.get('completed_transparency_data')):
+            return
+
+        transparency_data = st.session_state.get('completed_transparency_data', {})
+        active_principles = transparency_data.get('active_principles', [])
+
+        # Only show if principles were applied
+        if not active_principles:
+            return
+
+        # Thought transparency display
+        with st.expander("🧠 **Reasoning Transparency** - See how SAM thought through this response", expanded=False):
+            st.markdown("### 🎯 Applied Cognitive Principles")
+
+            for i, principle in enumerate(active_principles, 1):
+                with st.container():
+                    col1, col2 = st.columns([3, 1])
+
+                    with col1:
+                        st.markdown(f"**{i}. {principle['text']}**")
+
+                        # Show principle details
+                        details_col1, details_col2 = st.columns(2)
+                        with details_col1:
+                            st.caption(f"🎯 Domains: {', '.join(principle['domains'])}")
+                            st.caption(f"📊 Confidence: {principle['confidence']:.2f}")
+                        with details_col2:
+                            st.caption(f"🔄 Usage: {principle['usage_count']} times")
+                            st.caption(f"✅ Success Rate: {principle['success_rate']:.1%}")
+
+                    with col2:
+                        # Priority indicator
+                        priority = principle.get('display_priority', 0.5)
+                        if priority > 0.8:
+                            st.success("🔥 High Priority")
+                        elif priority > 0.6:
+                            st.info("⭐ Medium Priority")
+                        else:
+                            st.caption("📝 Applied")
+
+            # Meta-cognition insights
+            meta_cognition = transparency_data.get('meta_cognition', {})
+            if meta_cognition:
+                st.markdown("### 🤔 Meta-Cognitive Analysis")
+
+                reasoning_approach = meta_cognition.get('reasoning_approach', '')
+                if reasoning_approach:
+                    st.info(f"**Reasoning Approach:** {reasoning_approach}")
+
+                principle_selection = meta_cognition.get('principle_selection', '')
+                if principle_selection:
+                    st.info(f"**Principle Selection:** {principle_selection}")
+
+                confidence_assessment = meta_cognition.get('confidence_assessment', '')
+                if confidence_assessment:
+                    st.info(f"**Confidence Assessment:** {confidence_assessment}")
+
+            # Principle impact summary
+            principle_impact = transparency_data.get('principle_impact', {})
+            if principle_impact:
+                st.markdown("### 📈 Principle Impact")
+
+                total_impact = principle_impact.get('total_impact', 0)
+                impact_summary = principle_impact.get('impact_summary', '')
+
+                if total_impact > 0:
+                    st.success(f"**Confidence Boost:** +{total_impact:.1%}")
+
+                if impact_summary:
+                    st.caption(impact_summary)
+
+            # Reasoning trace (if available)
+            reasoning_trace = transparency_data.get('reasoning_trace')
+            if reasoning_trace and reasoning_trace.get('reasoning_steps'):
+                st.markdown("### 🔍 Reasoning Steps")
+
+                steps = reasoning_trace['reasoning_steps']
+                for step in steps:
+                    step_num = step.get('step', 0)
+                    step_type = step.get('type', 'unknown')
+                    description = step.get('description', '')
+
+                    # Icon based on step type
+                    if step_type == 'principle_application':
+                        icon = "🧠"
+                    elif step_type == 'query_analysis':
+                        icon = "🔍"
+                    elif step_type == 'response_generation':
+                        icon = "✍️"
+                    else:
+                        icon = "📝"
+
+                    st.markdown(f"{icon} **Step {step_num}:** {description}")
+
+            # Footer with system info
+            st.markdown("---")
+            st.caption("🔬 **Cognitive Distillation Engine** - SAM's introspective reasoning system")
+
+    except Exception as e:
+        logger.warning(f"Failed to render thought transparency: {e}")
+        # Fail silently to not disrupt the main chat experience
 
 def submit_secure_feedback(message_index: int, feedback_type: str, correction_text: str):
     """Submit feedback to the secure learning system with comprehensive integration."""
@@ -7586,6 +7771,41 @@ def diagnose_memory_retrieval(query: str) -> dict:
 def generate_draft_response(prompt: str, force_local: bool = False) -> str:
     """Generate a draft response using SAM's capabilities (Stage 1 of two-stage pipeline - Task 30 Phase 2)."""
     try:
+        # Phase -3: Cognitive Distillation Enhancement (NEW - Phase 2 Integration)
+        enhanced_prompt = prompt
+        transparency_data = {}
+
+        try:
+            if (st.session_state.get('cognitive_distillation_enabled', False) and
+                st.session_state.get('cognitive_distillation')):
+
+                cognitive_distillation = st.session_state.cognitive_distillation
+
+                # Prepare context for principle selection
+                context = {
+                    'user_session': st.session_state.get('session_id', 'default'),
+                    'interface': 'secure_chat',
+                    'force_local': force_local,
+                    'query_length': len(prompt),
+                    'timestamp': datetime.now().isoformat()
+                }
+
+                # Enhance reasoning with cognitive principles
+                enhanced_prompt, transparency_data = cognitive_distillation.enhance_reasoning(prompt, context)
+
+                # Store transparency data for UI display
+                st.session_state['last_transparency_data'] = transparency_data
+
+                if transparency_data.get('active_principles'):
+                    logger.info(f"🧠 Enhanced reasoning with {len(transparency_data['active_principles'])} cognitive principles")
+                else:
+                    logger.info(f"🧠 No relevant principles found for enhancement")
+
+        except Exception as e:
+            logger.warning(f"Cognitive distillation enhancement failed, continuing with original prompt: {e}")
+            enhanced_prompt = prompt
+            transparency_data = {}
+
         # Phase -2: Conversational Buffer Management (Task 30 Phase 1)
         conversation_history = ""
         try:
@@ -7602,7 +7822,7 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
                 st.session_state['session_id'] = session_id
                 logger.info(f"🗣️ Created new conversation session: {session_id}")
 
-            # Add user turn to conversation buffer
+            # Add user turn to conversation buffer (use original prompt for history)
             session_manager.add_turn(session_id, 'user', prompt)
 
             # Get formatted conversation history
@@ -7894,8 +8114,10 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
                     try:
                         if hasattr(enhanced_slp_integration, 'process_query'):
                             # Use the process_query method for better metrics collection
+                            # Use enhanced prompt if available from cognitive distillation
+                            query_to_use = enhanced_prompt if enhanced_prompt != prompt else prompt
                             slp_result = enhanced_slp_integration.process_query(
-                                prompt,
+                                query_to_use,
                                 slp_context,
                                 user_profile=slp_context['user_profile'],
                                 fallback_generator=sam_fallback_generator
@@ -7910,8 +8132,10 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
                                 return enhanced_response
                         else:
                             # Fallback to legacy method
+                            # Use enhanced prompt if available from cognitive distillation
+                            query_to_use = enhanced_prompt if enhanced_prompt != prompt else prompt
                             enhanced_slp_response = enhanced_slp_integration.generate_response_with_slp(
-                                query=prompt,
+                                query=query_to_use,
                                 context=slp_context,
                                 user_profile=slp_context['user_profile'],
                                 fallback_generator=sam_fallback_generator
@@ -8190,7 +8414,9 @@ If the information isn't sufficient, say so clearly. Always be concise but thoro
                 else:
                     logger.warning(f"⚠️ DEBUG: No conversation history available - history: '{conversation_history}'")
 
-                user_prompt_parts.append(f"Question: {prompt}")
+                # Use enhanced prompt if available from cognitive distillation
+                question_to_use = enhanced_prompt if enhanced_prompt != prompt else prompt
+                user_prompt_parts.append(f"Question: {question_to_use}")
 
                 # Add MEMOIR knowledge if available
                 if memoir_context.get('relevant_edits'):
@@ -8665,6 +8891,36 @@ def generate_final_response(user_question: str, force_local: bool = False) -> st
 
             except Exception as e:
                 logger.warning(f"Failed to cache response: {e}")
+
+        # Phase 4: Complete Cognitive Distillation Reasoning Trace (NEW - Phase 2 Integration)
+        try:
+            if (st.session_state.get('cognitive_distillation_enabled', False) and
+                st.session_state.get('cognitive_distillation') and
+                st.session_state.get('last_transparency_data')):
+
+                cognitive_distillation = st.session_state.cognitive_distillation
+                transparency_data = st.session_state.last_transparency_data
+
+                # Complete the reasoning trace with the final response
+                completed_transparency = cognitive_distillation.complete_reasoning_trace(
+                    transparency_data, final_response
+                )
+
+                # Store completed transparency data for UI display
+                st.session_state['completed_transparency_data'] = completed_transparency
+
+                # Update principle feedback based on response quality (simplified heuristic)
+                if transparency_data.get('active_principles'):
+                    response_quality = 'success' if len(final_response) > 100 else 'neutral'
+                    for principle in transparency_data['active_principles']:
+                        cognitive_distillation.update_principle_feedback(
+                            principle['id'], response_quality
+                        )
+
+                logger.info(f"🧠 Completed cognitive distillation reasoning trace")
+
+        except Exception as e:
+            logger.warning(f"Failed to complete cognitive distillation reasoning trace: {e}")
 
         return final_response
 
@@ -11440,6 +11696,206 @@ def store_learning_content(content: str, learning_intent: Dict[str, Any]) -> boo
     except Exception as e:
         logger.error(f"Error storing learning content: {e}")
         return False
+
+def render_cognitive_distillation_management():
+    """Render Cognitive Distillation Engine management interface (NEW - Phase 2 Integration)."""
+    st.header("🧠🔬 Cognitive Distillation Engine")
+    st.markdown("**SAM's introspective reasoning system that discovers and applies cognitive principles**")
+
+    try:
+        # Check if cognitive distillation is available
+        if not st.session_state.get('cognitive_distillation_enabled', False):
+            st.warning("🔧 Cognitive Distillation Engine is not currently enabled")
+            st.info("💡 The Cognitive Distillation Engine requires SAM Pro activation and proper initialization")
+            return
+
+        cognitive_distillation = st.session_state.get('cognitive_distillation')
+        if not cognitive_distillation:
+            st.error("❌ Cognitive Distillation Engine not available")
+            return
+
+        # System Status Overview
+        st.subheader("📊 System Status")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            system_status = cognitive_distillation.get_system_status()
+            health = system_status.get('system_health', {})
+            health_status = health.get('status', 'unknown')
+
+            if health_status == 'healthy':
+                st.success("✅ System Healthy")
+            elif health_status == 'warning':
+                st.warning("⚠️ System Warning")
+            else:
+                st.error("❌ System Degraded")
+
+        with col2:
+            registry_stats = system_status.get('registry', {})
+            active_principles = registry_stats.get('active_principles', 0)
+            st.metric("Active Principles", active_principles)
+
+        with col3:
+            automation_stats = system_status.get('automation', {})
+            if automation_stats.get('is_running', False):
+                st.success("🤖 Automation Active")
+            else:
+                st.warning("🤖 Automation Inactive")
+
+        # Active Principles Management
+        st.subheader("🎯 Active Cognitive Principles")
+
+        active_principles = cognitive_distillation.get_active_principles(limit=20)
+
+        if active_principles:
+            # Principles table
+            for i, principle in enumerate(active_principles):
+                with st.expander(f"**Principle {i+1}:** {principle['text'][:60]}...", expanded=False):
+                    col1, col2 = st.columns([2, 1])
+
+                    with col1:
+                        st.markdown(f"**Full Text:** {principle['text']}")
+                        st.caption(f"**Domains:** {', '.join(principle['domains'])}")
+                        st.caption(f"**Source Strategy:** {principle['source_strategy']}")
+                        st.caption(f"**Discovered:** {principle['discovered_date']}")
+
+                    with col2:
+                        st.metric("Confidence", f"{principle['confidence']:.2f}")
+                        st.metric("Usage Count", principle['usage_count'])
+                        st.metric("Success Rate", f"{principle['success_rate']:.1%}")
+
+                        # Feedback buttons
+                        col_good, col_bad = st.columns(2)
+                        with col_good:
+                            if st.button("👍 Good", key=f"good_{principle['id']}"):
+                                cognitive_distillation.update_principle_feedback(principle['id'], 'success')
+                                st.success("Feedback recorded!")
+                                st.rerun()
+
+                        with col_bad:
+                            if st.button("👎 Poor", key=f"poor_{principle['id']}"):
+                                cognitive_distillation.update_principle_feedback(principle['id'], 'failure')
+                                st.success("Feedback recorded!")
+                                st.rerun()
+        else:
+            st.info("📝 No active principles found. Principles will be discovered automatically as SAM learns from successful interactions.")
+
+        # Manual Principle Discovery
+        st.subheader("🔍 Manual Principle Discovery")
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            strategy_id = st.text_input(
+                "Strategy ID",
+                placeholder="e.g., financial_analysis, technical_support, research_queries",
+                help="Enter a strategy ID to discover principles for"
+            )
+
+        with col2:
+            interaction_limit = st.number_input(
+                "Interaction Limit",
+                min_value=5,
+                max_value=50,
+                value=20,
+                help="Number of interactions to analyze"
+            )
+
+        if st.button("🔍 Discover New Principles", disabled=not strategy_id):
+            if strategy_id:
+                with st.spinner(f"Discovering principles for strategy: {strategy_id}..."):
+                    result = cognitive_distillation.manual_principle_discovery(strategy_id, interaction_limit)
+
+                    if result.get('success'):
+                        st.success("🎉 New principle discovered!")
+                        principle = result.get('principle', {})
+                        st.info(f"**Discovered:** {principle.get('text', 'Unknown')}")
+                        st.info(f"**Confidence:** {principle.get('confidence', 0):.2f}")
+                        st.rerun()
+                    else:
+                        st.warning("No new principles discovered. This could be due to:")
+                        st.markdown("""
+                        • Insufficient interaction data for the strategy
+                        • Low quality interactions (below threshold)
+                        • Existing principles already cover this domain
+                        • LLM integration issues
+                        """)
+
+        # Recent Reasoning Traces
+        st.subheader("🔍 Recent Reasoning Traces")
+
+        recent_traces = cognitive_distillation.get_recent_reasoning_traces(limit=5)
+
+        if recent_traces:
+            for i, trace in enumerate(recent_traces):
+                with st.expander(f"**Trace {i+1}:** {trace.get('query', 'Unknown query')[:50]}...", expanded=False):
+                    st.markdown(f"**Query:** {trace.get('query', 'Unknown')}")
+                    st.markdown(f"**Timestamp:** {trace.get('timestamp', 'Unknown')}")
+
+                    applied_principles = trace.get('applied_principles', [])
+                    if applied_principles:
+                        st.markdown("**Applied Principles:**")
+                        for principle in applied_principles:
+                            st.markdown(f"• {principle.get('text', 'Unknown principle')}")
+
+                    confidence_boost = trace.get('confidence_boost', 0)
+                    if confidence_boost > 0:
+                        st.success(f"**Confidence Boost:** +{confidence_boost:.1%}")
+        else:
+            st.info("📝 No recent reasoning traces available.")
+
+        # System Configuration
+        st.subheader("⚙️ System Configuration")
+
+        with st.expander("🔧 Advanced Settings", expanded=False):
+            st.markdown("**Current Configuration:**")
+
+            config_data = {
+                "Max Principles per Prompt": 3,
+                "Min Principle Confidence": 0.5,
+                "Semantic Similarity Threshold": 0.6,
+                "Cache TTL": "1 hour",
+                "Automation Enabled": automation_stats.get('is_running', False)
+            }
+
+            for key, value in config_data.items():
+                st.markdown(f"• **{key}:** {value}")
+
+            st.info("💡 Configuration changes require system restart")
+
+        # Performance Analytics
+        st.subheader("📈 Performance Analytics")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**Registry Statistics:**")
+            for key, value in registry_stats.items():
+                if isinstance(value, (int, float)):
+                    st.metric(key.replace('_', ' ').title(), value)
+
+        with col2:
+            if automation_stats:
+                st.markdown("**Automation Statistics:**")
+                for key, value in automation_stats.items():
+                    if isinstance(value, (int, float)) and key != 'is_running':
+                        st.metric(key.replace('_', ' ').title(), value)
+
+        # System Health Details
+        if health.get('issues'):
+            st.subheader("⚠️ System Issues")
+            for issue in health['issues']:
+                st.warning(f"• {issue}")
+
+        if health.get('recommendations'):
+            st.subheader("💡 Recommendations")
+            for rec in health['recommendations']:
+                st.info(f"• {rec}")
+
+    except Exception as e:
+        st.error(f"❌ Error loading Cognitive Distillation management: {e}")
+        logger.error(f"Cognitive Distillation management error: {e}")
 
 if __name__ == "__main__":
     main()
