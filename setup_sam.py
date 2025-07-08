@@ -148,6 +148,8 @@ def create_directory_structure():
         "logs",
         "data",
         "cache",
+        "utils",
+        "ui",
         "sam/discovery/distillation/data"
     ]
 
@@ -469,21 +471,20 @@ def main():
         print()
         print("📋 Next Steps:")
         print("1. Start SAM:")
-        if platform.system() == "Windows":
-            print(f"   {Colors.CYAN}start_sam_simple.bat{Colors.END} (Double-click or run in PowerShell)")
-            print("   OR")
-            print(f"   {Colors.CYAN}python -m streamlit run secure_streamlit_app.py{Colors.END}")
-        else:
-            print(f"   {Colors.CYAN}python start_sam_simple.py{Colors.END}")
-            print("   OR")
-            print(f"   {Colors.CYAN}python -m streamlit run secure_streamlit_app.py{Colors.END}")
-        print("   OR")
-        print(f"   {Colors.CYAN}python start_sam.py{Colors.END} (Advanced launcher)")
+        print(f"   {Colors.CYAN}python start_sam.py{Colors.END}")
         print()
-        print("2. Open your browser and go to:")
-        print(f"   {Colors.CYAN}http://localhost:8502{Colors.END}")
+        print("2. Follow the setup wizard to:")
+        print("   • Create your master password")
+        print("   • Activate SAM Pro features")
+        print("   • Complete your profile")
         print()
-        print("3. Enter your activation key when prompted")
+        print("3. Start chatting with SAM!")
+        print()
+        print()
+        print("💡 SAM will automatically:")
+        print("   • Open in your browser at http://localhost:8502")
+        print("   • Guide you through first-time setup")
+        print("   • Activate your Pro features with the key above")
         print()
         print("4. Enjoy SAM Pro features:")
         print("   • 🧠 Cognitive Distillation Engine")

@@ -16,27 +16,11 @@ python setup_sam.py
 ```
 
 ### Step 3: Start SAM
-
-**Windows Users:**
-```cmd
-start_sam_simple.bat
-```
-*Or in PowerShell:*
-```powershell
-python -m streamlit run secure_streamlit_app.py
-```
-
-**macOS/Linux Users:**
-```bash
-python start_sam_simple.py
-```
-
-*Advanced launcher (all platforms):*
 ```bash
 python start_sam.py
 ```
 
-**That's it!** 🎉 SAM will open in your browser at `http://localhost:8502`
+**That's it!** 🎉 SAM will open in your browser and guide you through first-time setup
 
 ---
 
@@ -113,13 +97,18 @@ python secure_streamlit_app.py
 
 ## 🌟 What's Next?
 
-Once SAM is running:
+SAM will automatically guide you through:
 
-1. **Enter your activation key** in the sidebar
-2. **Upload documents** to build your knowledge base
-3. **Start chatting** with SAM's advanced AI
-4. **Explore features** like Dream Canvas and Memory Control
-5. **Customize settings** to match your workflow
+1. **Create master password** - Secure encryption for your data
+2. **Activate SAM Pro** - Unlock all premium features
+3. **Quick tour** - Learn about SAM's capabilities
+4. **Start chatting** - Begin using SAM immediately
+
+Then explore:
+- **Upload documents** to build your knowledge base
+- **Dream Canvas** - Interactive memory visualization
+- **Memory Control** - Advanced memory management
+- **Cognitive features** - TPV, MEMOIR, and more
 
 **Welcome to the future of AI!** 🚀🧠
 

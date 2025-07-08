@@ -1,8 +1,13 @@
 @echo off
-REM SAM Simple Launcher for Windows
-REM This batch file starts SAM using Streamlit
+REM SAM Main Launcher for Windows
+REM This batch file starts SAM with first-time setup detection
 
-echo Starting SAM...
+echo ============================================================
+echo 🚀 SAM - Starting Up
+echo ============================================================
+echo Welcome to SAM - The world's most advanced AI system
+echo with human-like introspection and self-improvement!
+echo ============================================================
 echo.
 
 REM Check if Python is available
@@ -14,25 +19,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if Streamlit is available
-python -m streamlit --version >nul 2>&1
-if errorlevel 1 (
-    echo Error: Streamlit is not installed
-    echo Installing Streamlit...
-    python -m pip install streamlit
-    if errorlevel 1 (
-        echo Failed to install Streamlit
-        pause
-        exit /b 1
-    )
-)
-
-REM Start SAM
-echo Starting SAM on http://localhost:8502
-echo Press Ctrl+C to stop SAM
+REM Start SAM using the main launcher
+echo Starting SAM with setup detection...
 echo.
 
-python -m streamlit run secure_streamlit_app.py --server.port 8502 --server.address localhost --browser.gatherUsageStats false
+python start_sam.py
 
 echo.
 echo SAM has stopped
