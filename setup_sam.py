@@ -234,12 +234,66 @@ def generate_sam_pro_key():
         with open(keystore_file, 'w') as f:
             json.dump(keystore, f, indent=2)
 
+        # Add key hash to entitlements for validation
+        add_key_hash_to_entitlements(activation_key)
+
         print_success("SAM Pro key generated and registered")
         return activation_key
 
     except Exception as e:
         print_error(f"Key generation failed: {e}")
         return None
+
+def add_key_hash_to_entitlements(activation_key: str):
+    """Add key hash to entitlements configuration for validation."""
+    try:
+        import hashlib
+
+        # Generate SHA-256 hash of the key
+        key_hash = hashlib.sha256(activation_key.encode('utf-8')).hexdigest()
+
+        # Load entitlements config from sam/config/entitlements.json
+        entitlements_config_file = Path("sam/config/entitlements.json")
+        if entitlements_config_file.exists():
+            with open(entitlements_config_file, 'r') as f:
+                config = json.load(f)
+        else:
+            # Create basic config if it doesn't exist
+            config = {
+                "version": "1.1",
+                "features": {},
+                "valid_key_hashes": [],
+                "metadata": {
+                    "generated": datetime.now().isoformat(),
+                    "total_keys": 0,
+                    "hash_algorithm": "SHA-256"
+                }
+            }
+
+        # Add the hash to valid_key_hashes if not already present
+        if "valid_key_hashes" not in config:
+            config["valid_key_hashes"] = []
+
+        if key_hash not in config["valid_key_hashes"]:
+            config["valid_key_hashes"].append(key_hash)
+
+            # Update metadata
+            if "metadata" not in config:
+                config["metadata"] = {}
+            config["metadata"]["last_updated"] = datetime.now().isoformat()
+            config["metadata"]["total_keys"] = len(config["valid_key_hashes"])
+
+            # Ensure sam/config directory exists
+            entitlements_config_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Save updated config
+            with open(entitlements_config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+
+            print_success(f"Key hash added to entitlements configuration")
+
+    except Exception as e:
+        print_error(f"Failed to add key hash to entitlements: {e}")
 
 def initialize_databases():
     """Initialize SAM databases."""
