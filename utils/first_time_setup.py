@@ -171,20 +171,43 @@ class FirstTimeSetupManager:
     def get_sam_pro_key(self) -> Optional[str]:
         """Get the first available SAM Pro key."""
         try:
-            if not self.keystore_file.exists():
-                return None
-            
-            with open(self.keystore_file, 'r') as f:
-                keystore = json.load(f)
-            
-            # Return the first active key
-            for key, data in keystore.items():
-                if data.get('status') == 'active':
-                    return key
-            
+            # First, check if we stored the key in setup status
+            status = self.get_setup_status()
+            if 'sam_pro_key' in status:
+                return status['sam_pro_key']
+
+            # Check keystore for activation keys (skip metadata entries)
+            if self.keystore_file.exists():
+                with open(self.keystore_file, 'r') as f:
+                    keystore = json.load(f)
+
+                # Look for UUID-format keys (activation keys)
+                import re
+                uuid_pattern = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+                for key, data in keystore.items():
+                    # Skip metadata entries
+                    if key in ['metadata', 'kdf_config', 'salt', 'verifier', 'security_settings', 'audit_log']:
+                        continue
+
+                    # Check if it's a UUID format key with active status
+                    if re.match(uuid_pattern, key) and isinstance(data, dict) and data.get('status') == 'active':
+                        return key
+
+            # Fallback: Check if there's a key file from setup
+            setup_key_file = Path("sam_pro_key.txt")
+            if setup_key_file.exists():
+                with open(setup_key_file, 'r') as f:
+                    key = f.read().strip()
+                    if key:
+                        # Store it in setup status for future reference
+                        self.update_setup_status('sam_pro_key', key)
+                        return key
+
             return None
-            
-        except Exception:
+
+        except Exception as e:
+            print(f"Error getting SAM Pro key: {e}")
             return None
     
     def get_next_setup_step(self) -> str:

@@ -332,6 +332,14 @@ def generate_quick_pro_key(email: str, name: str = "") -> str:
         # Add key hash to entitlements for validation
         add_key_hash_to_entitlements_config(activation_key)
 
+        # Save key for future reference
+        try:
+            from utils.first_time_setup import get_first_time_setup_manager
+            setup_manager = get_first_time_setup_manager()
+            setup_manager.update_setup_status('sam_pro_key', activation_key)
+        except:
+            pass  # Continue even if this fails
+
         return activation_key
 
     except Exception as e:

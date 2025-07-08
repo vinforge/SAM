@@ -237,6 +237,9 @@ def generate_sam_pro_key():
         # Add key hash to entitlements for validation
         add_key_hash_to_entitlements(activation_key)
 
+        # Save key for setup wizard to find
+        save_key_for_setup_wizard(activation_key)
+
         print_success("SAM Pro key generated and registered")
         return activation_key
 
@@ -294,6 +297,23 @@ def add_key_hash_to_entitlements(activation_key: str):
 
     except Exception as e:
         print_error(f"Failed to add key hash to entitlements: {e}")
+
+def save_key_for_setup_wizard(activation_key: str):
+    """Save the activation key for the setup wizard to find."""
+    try:
+        # Save to setup status file
+        from utils.first_time_setup import get_first_time_setup_manager
+        setup_manager = get_first_time_setup_manager()
+        setup_manager.update_setup_status('sam_pro_key', activation_key)
+
+        # Also save to a simple text file as backup
+        with open("sam_pro_key.txt", "w") as f:
+            f.write(activation_key)
+
+        print_success("Key saved for setup wizard")
+
+    except Exception as e:
+        print_error(f"Failed to save key for setup wizard: {e}")
 
 def initialize_databases():
     """Initialize SAM databases."""
