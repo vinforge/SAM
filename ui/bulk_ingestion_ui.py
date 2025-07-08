@@ -637,16 +637,21 @@ class BulkIngestionUI:
                                         if result["stderr"]:
                                             st.error(result["stderr"])
 
-                                # Force refresh to show the new source
-                                st.rerun()
+                                # Clear form fields by updating session state
+                                if 'selected_folder_path' in st.session_state:
+                                    st.session_state.selected_folder_path = ""
+
+                                # Show success message and guidance
+                                st.info("🔄 Source added successfully! Refresh the page or navigate to 'Manual Scan' tab to see the new source.")
                             else:
                                 st.error("❌ Failed to add source. Please check the logs for details.")
                     else:
                         # Show detailed path validation error
                         st.error(f"❌ Path validation failed: {path_validation['error']}")
 
-                        # Show debugging information
-                        with st.expander("🔍 Path Debugging Information"):
+                        # Show debugging information using container instead of nested expander
+                        st.markdown("**🔍 Path Debugging Information:**")
+                        with st.container():
                             st.code(f"""
 Original path: {source_path}
 Normalized path: {path_validation.get('normalized_path', 'N/A')}
@@ -656,8 +661,9 @@ Platform: {path_validation.get('platform', 'Unknown')}
 Error details: {path_validation.get('error_details', 'None')}
                             """)
 
-            # Add helpful path suggestions outside the form
-            with st.expander("💡 Need help finding folder paths?", expanded=False):
+            # Add helpful path suggestions outside the form using container instead of nested expander
+            st.markdown("**💡 Need help finding folder paths?**")
+            with st.container():
                 import platform
                 system = platform.system()
 
@@ -1243,8 +1249,9 @@ Error details: {path_validation.get('error_details', 'None')}
                 time_saved_estimate = preview["already_processed"] * 2  # Estimate 2 minutes per file
                 st.info(f"⚡ **Incremental Processing Benefit:** {preview['already_processed']} files already processed and will be skipped, saving approximately {time_saved_estimate} minutes of processing time!")
 
-                # Add detailed breakdown
-                with st.expander("📊 Incremental Processing Details", expanded=False):
+                # Add detailed breakdown using container instead of nested expander
+                st.markdown("**📊 Incremental Processing Details:**")
+                with st.container():
                     col1, col2 = st.columns(2)
                     with col1:
                         st.markdown("**Files to Process:**")
@@ -1280,8 +1287,9 @@ Error details: {path_validation.get('error_details', 'None')}
             else:
                 st.info("✅ All files in this source have already been processed!")
 
-                # Enhanced options with recently processed files view
-                with st.expander("📋 Recently Processed Files & Options", expanded=False):
+                # Enhanced options with recently processed files view using container instead of nested expander
+                st.markdown("**📋 Recently Processed Files & Options:**")
+                with st.container():
                     # Show recently processed files from this source
                     try:
                         if self.manager.state_db.exists():
@@ -1951,15 +1959,17 @@ Error details: {path_validation.get('error_details', 'None')}
                     st.progress(current_progress.progress_percentage / 100.0)
                     st.caption(f"**Current Step:** {current_progress.current_step}")
 
-                    # Show completed steps
+                    # Show completed steps using container instead of nested expander
                     if current_progress.steps_completed:
-                        with st.expander("✅ Completed Steps", expanded=False):
+                        st.markdown("**✅ Completed Steps:**")
+                        with st.container():
                             for step in current_progress.steps_completed:
                                 st.success(f"✅ {step}")
 
-                    # Show errors if any
+                    # Show errors if any using container instead of nested expander
                     if current_progress.errors:
-                        with st.expander("⚠️ Errors", expanded=True):
+                        st.markdown("**⚠️ Errors:**")
+                        with st.container():
                             for error in current_progress.errors:
                                 st.error(f"❌ {error}")
 
@@ -2072,7 +2082,9 @@ Error details: {path_validation.get('error_details', 'None')}
 
                     status_emoji = "✅" if status == "completed" else "❌" if status == "failed" else "🔄"
 
-                    with st.expander(f"{status_emoji} **{cycle_id}** - {status} ({insights} insights)", expanded=False):
+                    # Use container with markdown header instead of nested expander
+                    st.markdown(f"**{status_emoji} {cycle_id} - {status} ({insights} insights)**")
+                    with st.container():
                         col1, col2 = st.columns(2)
 
                         with col1:
