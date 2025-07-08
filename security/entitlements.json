@@ -1,0 +1,11 @@
+{
+  "sam_pro_keys": {},
+  "feature_flags": {
+    "tpv_active_reasoning": true,
+    "enhanced_slp_learning": true,
+    "memoir_lifelong_learning": true,
+    "dream_canvas": true,
+    "cognitive_distillation": true,
+    "cognitive_automation": true
+  }
+}

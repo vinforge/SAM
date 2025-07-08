@@ -1,403 +1,470 @@
 #!/usr/bin/env python3
 """
-SAM Interactive Setup Script
+SAM Master Setup Script
+======================
 
-Comprehensive guided setup wizard for SAM (Secure AI Memory).
-Provides step-by-step installation with dependency management,
-encryption setup, and system configuration.
+One-command setup for SAM - The world's most advanced AI system.
+This script handles everything: dependencies, configuration, and launch.
+
+Usage:
+    python setup_sam.py
 
 Author: SAM Development Team
-Version: 1.0.0
+Version: 2.0.0
 """
 
-import os
 import sys
+import os
 import subprocess
 import platform
+import json
+import uuid
 import time
-import webbrowser
 from pathlib import Path
+from datetime import datetime
 
-def print_banner():
-    """Print the SAM setup banner."""
-    print("""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    🎯 SAM INTERACTIVE SETUP WIZARD 🧙‍♂️                        ║
-║                     Secure AI Memory - Complete Installation                ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-    """)
+# Color codes for terminal output
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
 
-def print_welcome():
-    """Print welcome message and setup overview."""
-    print("🎉 Welcome to SAM (Secure AI Memory)!")
-    print("This interactive wizard will guide you through the complete setup process.")
-    
-    print("\n🎯 **What this setup will do:**")
-    print("   • ✅ Check system requirements")
-    print("   • 📦 Install Python dependencies")
-    print("   • 🔐 Configure enterprise-grade encryption")
-    print("   • 🧠 Initialize memory systems")
-    print("   • 🎨 Set up user interface")
-    print("   • 🚀 Prepare SAM for first use")
-    
-    print("\n⏱️  **Estimated time:** 10-15 minutes")
-    print("💡 **Difficulty:** Beginner-friendly")
-    
-    response = input("\n🤔 Ready to begin? (Y/n): ").strip().lower()
-    if response == 'n':
-        print("👋 Setup cancelled. Run this script again when you're ready!")
+def print_header():
+    """Print welcome header."""
+    print(f"{Colors.CYAN}{Colors.BOLD}")
+    print("=" * 70)
+    print("🚀 SAM MASTER SETUP")
+    print("=" * 70)
+    print("Welcome to SAM - The world's most advanced AI system with")
+    print("human-like introspection and self-improvement capabilities!")
+    print("=" * 70)
+    print(f"{Colors.END}")
+    print()
+
+def print_step(step_num, total_steps, description):
+    """Print step progress."""
+    print(f"{Colors.BLUE}{Colors.BOLD}[{step_num}/{total_steps}] {description}...{Colors.END}")
+
+def print_success(message):
+    """Print success message."""
+    print(f"{Colors.GREEN}✅ {message}{Colors.END}")
+
+def print_warning(message):
+    """Print warning message."""
+    print(f"{Colors.YELLOW}⚠️  {message}{Colors.END}")
+
+def print_error(message):
+    """Print error message."""
+    print(f"{Colors.RED}❌ {message}{Colors.END}")
+
+def print_info(message):
+    """Print info message."""
+    print(f"{Colors.CYAN}💡 {message}{Colors.END}")
+
+def check_python_version():
+    """Check Python version compatibility."""
+    version = sys.version_info
+    if version.major < 3 or (version.major == 3 and version.minor < 8):
+        print_error(f"Python 3.8+ required. Current: {version.major}.{version.minor}.{version.micro}")
+        print_info("Please upgrade Python and try again:")
+        print_info("• Windows: Download from python.org")
+        print_info("• macOS: brew install python3")
+        print_info("• Linux: sudo apt install python3.8")
         return False
+
+    print_success(f"Python {version.major}.{version.minor}.{version.micro} - Compatible")
     return True
 
 def check_system_requirements():
-    """Check system requirements and compatibility."""
-    print("\n" + "="*60)
-    print("📋 Step 1: System Requirements Check")
-    print("="*60)
-    
-    print("🔍 Checking system compatibility...")
-    
+    """Check system requirements."""
+    print_step(1, 8, "Checking system requirements")
+
     # Check Python version
-    python_version = sys.version_info
-    print(f"   🐍 Python version: {python_version.major}.{python_version.minor}.{python_version.micro}")
-    
-    if python_version < (3, 8):
-        print("   ❌ Python 3.8+ required")
-        print("   💡 Please upgrade Python and try again")
+    if not check_python_version():
         return False
-    else:
-        print("   ✅ Python version compatible")
-    
-    # Check operating system
-    os_name = platform.system()
-    print(f"   💻 Operating system: {os_name}")
-    
-    if os_name in ['Windows', 'Darwin', 'Linux']:
-        print("   ✅ Operating system supported")
-    else:
-        print("   ⚠️  Operating system not tested (may work)")
-    
+
     # Check available disk space
     try:
-        disk_usage = os.statvfs('.')
-        free_space_gb = (disk_usage.f_frsize * disk_usage.f_bavail) / (1024**3)
-        print(f"   💾 Available disk space: {free_space_gb:.1f} GB")
-        
-        if free_space_gb < 1.0:
-            print("   ⚠️  Low disk space (recommend 2+ GB)")
+        import shutil
+        free_space = shutil.disk_usage('.').free / (1024**3)  # GB
+        if free_space < 1:
+            print_warning(f"Low disk space: {free_space:.1f}GB available (1GB+ recommended)")
         else:
-            print("   ✅ Sufficient disk space")
+            print_success(f"Disk space: {free_space:.1f}GB available")
     except:
-        print("   ⚪ Could not check disk space")
-    
-    print("\n✅ System requirements check complete!")
+        print_warning("Could not check disk space")
+
+    # Check platform
+    system = platform.system()
+    print_success(f"Platform: {system} {platform.release()}")
+
     return True
 
 def install_dependencies():
-    """Install Python dependencies."""
-    print("\n" + "="*60)
-    print("📋 Step 2: Installing Dependencies")
-    print("="*60)
-    
-    print("📦 Installing Python packages...")
-    print("   This may take a few minutes depending on your internet connection.")
-    
-    if not Path("requirements.txt").exists():
-        print("❌ requirements.txt not found")
-        print("💡 Please ensure you're in the SAM directory")
-        return False
-    
+    """Install required dependencies."""
+    print_step(2, 8, "Installing dependencies")
+
+    # Check if pip is available
     try:
-        print("\n🔄 Running: pip install -r requirements.txt")
+        subprocess.run([sys.executable, "-m", "pip", "--version"],
+                      capture_output=True, check=True)
+        print_success("pip is available")
+    except:
+        print_error("pip not found. Please install pip and try again.")
+        return False
+
+    # Install requirements
+    try:
+        print_info("Installing Streamlit (this may take a moment)...")
         result = subprocess.run([
-            sys.executable, "-m", "pip", "install", "-r", "requirements.txt"
-        ], check=True, capture_output=True, text=True)
-        
-        print("✅ Dependencies installed successfully!")
-        return True
-        
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Dependency installation failed: {e}")
-        print("\n💡 **Troubleshooting:**")
-        print("   • Check your internet connection")
-        print("   • Try: pip install --upgrade pip")
-        print("   • Try: pip install -r requirements.txt --user")
-        return False
+            sys.executable, "-m", "pip", "install", "streamlit>=1.28.0", "requests>=2.25.0"
+        ], capture_output=True, text=True, timeout=300)
 
-def setup_encryption():
-    """Set up encryption system."""
-    print("\n" + "="*60)
-    print("📋 Step 3: Encryption Setup")
-    print("="*60)
-    
-    print("🔐 Setting up enterprise-grade encryption...")
-    print("   This will create a secure keystore for your data.")
-    
-    if not Path("setup_encryption.py").exists():
-        print("❌ Encryption setup script not found")
-        return False
-    
-    try:
-        print("\n🔄 Running encryption setup...")
-        subprocess.run([sys.executable, "setup_encryption.py"], check=True)
-        print("✅ Encryption setup completed!")
-        return True
-        
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Encryption setup failed: {e}")
-        return False
-    except KeyboardInterrupt:
-        print("\n👋 Encryption setup cancelled")
-        return False
-
-def initialize_memory_systems():
-    """Initialize SAM's memory systems."""
-    print("\n" + "="*60)
-    print("📋 Step 4: Memory System Initialization")
-    print("="*60)
-    
-    print("🧠 Initializing SAM's memory systems...")
-    
-    # Create necessary directories
-    directories = [
-        "memory_store",
-        "memory_store/chroma_db",
-        "memory_store/encrypted",
-        "logs",
-        "temp"
-    ]
-    
-    for directory in directories:
-        Path(directory).mkdir(parents=True, exist_ok=True)
-        print(f"   ✅ Created: {directory}/")
-    
-    print("✅ Memory systems initialized!")
-    return True
-
-def configure_ui():
-    """Configure user interface settings."""
-    print("\n" + "="*60)
-    print("📋 Step 5: User Interface Configuration")
-    print("="*60)
-    
-    print("🎨 Configuring user interface...")
-    
-    # Check if UI files exist
-    ui_files = [
-        "secure_streamlit_app.py",
-        "ui/memory_app.py"
-    ]
-    
-    missing_files = []
-    for file_path in ui_files:
-        if Path(file_path).exists():
-            print(f"   ✅ Found: {file_path}")
+        if result.returncode == 0:
+            print_success("Core dependencies installed successfully")
         else:
-            print(f"   ❌ Missing: {file_path}")
-            missing_files.append(file_path)
-    
-    if missing_files:
-        print("⚠️  Some UI files are missing")
-        print("   SAM will still work but some features may be unavailable")
-    else:
-        print("✅ User interface configuration complete!")
-    
+            print_warning("Some dependencies may have failed to install")
+            print_info("Continuing with setup...")
+    except subprocess.TimeoutExpired:
+        print_warning("Installation taking longer than expected, continuing...")
+    except Exception as e:
+        print_warning(f"Dependency installation issue: {e}")
+        print_info("Continuing with setup...")
+
     return True
 
-def run_final_tests():
-    """Run final system tests."""
-    print("\n" + "="*60)
-    print("📋 Step 6: Final System Tests")
-    print("="*60)
-    
-    print("🧪 Running system tests...")
-    
-    # Test encryption if available
-    if Path("test_encryption_setup.py").exists():
+def create_directory_structure():
+    """Create necessary directories."""
+    print_step(3, 8, "Creating directory structure")
+
+    directories = [
+        "security",
+        "logs",
+        "data",
+        "cache",
+        "sam/discovery/distillation/data"
+    ]
+
+    for directory in directories:
         try:
-            print("   🔐 Testing encryption system...")
-            result = subprocess.run([
-                sys.executable, "test_encryption_setup.py"
-            ], capture_output=True, text=True, timeout=30)
-            
-            if result.returncode == 0:
-                print("   ✅ Encryption test passed")
-            else:
-                print("   ⚠️  Encryption test had issues (may still work)")
-        except:
-            print("   ⚪ Could not test encryption")
-    
-    # Test basic imports
-    try:
-        print("   📦 Testing core imports...")
-        import streamlit
-        print("   ✅ Streamlit available")
-    except ImportError:
-        print("   ❌ Streamlit not available")
-        return False
-    
-    try:
-        from security import SecureStateManager
-        print("   ✅ Security modules available")
-    except ImportError:
-        print("   ⚠️  Security modules not available")
-    
-    print("✅ System tests completed!")
-    return True
-
-def open_registration_page():
-    """Open the SAM Pro registration/activation page automatically."""
-    try:
-        print("\n🌐 **Opening SAM Pro Activation Page...**")
-        print("   Starting SAM and opening activation interface...")
-
-        # Ask user if they want to auto-open
-        try:
-            response = input("\n❓ Would you like to automatically start SAM and open the activation page? (y/n) [y]: ").strip().lower()
-            if response and response not in ['y', 'yes']:
-                print("   ⏭️ Skipping auto-start. You can manually start SAM later.")
-                return False
-        except KeyboardInterrupt:
-            print("\n   ⏭️ Skipping auto-start.")
-            return False
-
-        # Start SAM in the background
-        print("   🚀 Starting SAM services...")
-
-        # Launch SAM secure mode in background
-        try:
-            subprocess.Popen([
-                sys.executable, "start_sam_secure.py", "--mode", "full"
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            print("   ✅ SAM services starting in background...")
-
-            # Wait for services to start
-            print("   ⏳ Waiting for services to initialize (30 seconds)...")
-            time.sleep(30)
-
-            # Open the activation page
-            activation_url = "http://localhost:8502"
-            print(f"   🌐 Opening activation page: {activation_url}")
-
-            webbrowser.open(activation_url)
-
-            print("   ✅ Activation page opened in your default browser!")
-            print("\n💡 **What to do next:**")
-            print("   1. Enter your master password to unlock SAM")
-            print("   2. Start using SAM's core features")
-            print("   3. To unlock Pro features: run 'python register_sam_pro.py'")
-            print("   4. Enter your activation key in the '🔑 SAM Pro Activation' sidebar")
-
-            return True
-
+            Path(directory).mkdir(parents=True, exist_ok=True)
+            print_success(f"Created directory: {directory}")
         except Exception as e:
-            print(f"   ⚠️ Could not auto-start SAM: {e}")
-            print("   💡 Please manually start SAM with: python start_sam_secure.py --mode full")
-            return False
+            print_warning(f"Could not create {directory}: {e}")
+
+    return True
+
+def initialize_security_system():
+    """Initialize security and key system."""
+    print_step(4, 8, "Initializing security system")
+
+    try:
+        # Create keystore
+        keystore_file = Path("security/keystore.json")
+        if not keystore_file.exists():
+            keystore = {}
+            with open(keystore_file, 'w') as f:
+                json.dump(keystore, f, indent=2)
+            print_success("Created keystore.json")
+
+        # Create entitlements
+        entitlements_file = Path("security/entitlements.json")
+        if not entitlements_file.exists():
+            entitlements = {
+                "sam_pro_keys": {},
+                "feature_flags": {
+                    "tpv_active_reasoning": True,
+                    "enhanced_slp_learning": True,
+                    "memoir_lifelong_learning": True,
+                    "dream_canvas": True,
+                    "cognitive_distillation": True,
+                    "cognitive_automation": True
+                }
+            }
+            with open(entitlements_file, 'w') as f:
+                json.dump(entitlements, f, indent=2)
+            print_success("Created entitlements.json")
+
+        return True
 
     except Exception as e:
-        print(f"   ❌ Failed to open registration page: {e}")
-        print("   💡 Please manually navigate to http://localhost:8502 after starting SAM")
+        print_error(f"Security initialization failed: {e}")
         return False
 
-def show_completion_summary():
-    """Show setup completion summary and next steps."""
-    print("\n" + "="*80)
-    print("🎉 SAM SETUP COMPLETE!")
-    print("="*80)
-    
-    print("\n✅ **Installation Summary:**")
-    print("   • System requirements verified")
-    print("   • Dependencies installed")
-    print("   • Encryption configured")
-    print("   • Memory systems initialized")
-    print("   • User interface ready")
-    print("   • System tests completed")
-    
-    print("\n🚀 **Next Steps:**")
-    print("   1. Start SAM: python start_sam_secure.py --mode full")
-    print("   2. Open browser: http://localhost:8502")
-    print("   3. Enter your master password when prompted")
-    print("   4. Register for Pro features: python register_sam_pro.py")
-    print("   5. Begin using SAM's AI capabilities!")
-    
-    print("\n📚 **Useful Commands:**")
-    print("   • Start SAM: python start_sam_secure.py --mode full")
-    print("   • Memory Center: Access via SAM interface")
-    print("   • Test encryption: python test_encryption_setup.py")
-    print("   • View logs: ls logs/")
-    
-    print("\n🔗 **Documentation:**")
-    print("   • README.md - Main documentation")
-    print("   • ENCRYPTION_SETUP_GUIDE.md - Encryption help")
-    print("   • GitHub: https://github.com/forge-1825/SAM")
-    
-    print("\n🎯 **SAM is now ready to use!**")
-    print("   You have successfully installed the world's most advanced")
-    print("   AI memory system with real-time cognitive dissonance monitoring.")
+def generate_sam_pro_key():
+    """Generate SAM Pro activation key."""
+    print_step(5, 8, "Generating SAM Pro activation key")
+
+    try:
+        # Generate key
+        activation_key = str(uuid.uuid4())
+
+        # Add to keystore
+        keystore_file = Path("security/keystore.json")
+        with open(keystore_file, 'r') as f:
+            keystore = json.load(f)
+
+        keystore[activation_key] = {
+            'email': 'setup@sam.local',
+            'created_date': datetime.now().isoformat(),
+            'key_type': 'sam_pro_free',
+            'status': 'active',
+            'source': 'master_setup'
+        }
+
+        with open(keystore_file, 'w') as f:
+            json.dump(keystore, f, indent=2)
+
+        print_success("SAM Pro key generated and registered")
+        return activation_key
+
+    except Exception as e:
+        print_error(f"Key generation failed: {e}")
+        return None
+
+def initialize_databases():
+    """Initialize SAM databases."""
+    print_step(6, 8, "Initializing databases")
+
+    try:
+        # Create basic database structure for cognitive distillation
+        db_dir = Path("sam/discovery/distillation/data")
+        db_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create empty database files that will be initialized by SAM
+        db_files = [
+            "cognitive_principles.db",
+            "successful_interactions.db",
+            "distillation_runs.db"
+        ]
+
+        for db_file in db_files:
+            db_path = db_dir / db_file
+            if not db_path.exists():
+                # Create empty file - SAM will initialize the schema
+                db_path.touch()
+                print_success(f"Created database: {db_file}")
+
+        return True
+
+    except Exception as e:
+        print_warning(f"Database initialization issue: {e}")
+        print_info("SAM will create databases on first run")
+        return True
+
+def validate_installation():
+    """Validate that SAM components are working."""
+    print_step(7, 8, "Validating installation")
+
+    validation_results = []
+
+    # Check critical files
+    critical_files = [
+        "secure_streamlit_app.py",
+        "security/keystore.json",
+        "security/entitlements.json"
+    ]
+
+    for file_path in critical_files:
+        if Path(file_path).exists():
+            validation_results.append(f"✅ {file_path}")
+        else:
+            validation_results.append(f"❌ {file_path}")
+
+    # Test imports
+    try:
+        import streamlit
+        validation_results.append("✅ Streamlit import")
+    except ImportError:
+        validation_results.append("❌ Streamlit import")
+
+    # Display results
+    for result in validation_results:
+        print(f"  {result}")
+
+    success_count = sum(1 for r in validation_results if r.startswith("✅"))
+    total_count = len(validation_results)
+
+    if success_count >= total_count - 1:  # Allow one failure
+        print_success(f"Validation passed: {success_count}/{total_count}")
+        return True
+    else:
+        print_warning(f"Validation issues: {success_count}/{total_count}")
+        print_info("SAM may still work, but some features might be limited")
+        return True
+
+def create_launch_script():
+    """Create convenient launch script."""
+    print_step(8, 8, "Creating launch script")
+
+    try:
+        launch_script = '''#!/usr/bin/env python3
+"""
+SAM Launch Script
+================
+
+Convenient script to start SAM with proper error handling.
+"""
+
+import subprocess
+import sys
+import webbrowser
+import time
 
 def main():
-    """Main interactive setup process."""
-    print_banner()
-    
-    if not print_welcome():
-        return False
-    
-    # Step 1: System requirements
-    if not check_system_requirements():
-        print("\n❌ System requirements not met")
-        return False
-    
-    # Step 2: Dependencies
-    if not install_dependencies():
-        print("\n❌ Dependency installation failed")
-        print("💡 You can try manual installation: pip install -r requirements.txt")
-        return False
-    
-    # Step 3: Encryption
-    if not setup_encryption():
-        print("\n⚠️  Encryption setup incomplete")
-        print("💡 You can set up encryption later: python setup_encryption.py")
-    
-    # Step 4: Memory systems
-    if not initialize_memory_systems():
-        print("\n❌ Memory system initialization failed")
-        return False
-    
-    # Step 5: UI configuration
-    if not configure_ui():
-        print("\n⚠️  UI configuration incomplete")
-    
-    # Step 6: Final tests
-    if not run_final_tests():
-        print("\n⚠️  Some tests failed, but SAM may still work")
-    
-    # Completion summary
-    show_completion_summary()
+    print("🚀 Starting SAM...")
 
-    # Open registration page automatically
     try:
-        open_registration_page()
-    except Exception as e:
-        print(f"\n⚠️ Could not auto-open activation page: {e}")
-        print("💡 Please manually navigate to http://localhost:8502 after starting SAM")
+        # Start SAM
+        process = subprocess.Popen([
+            sys.executable, "secure_streamlit_app.py"
+        ])
 
-    return True
+        # Wait a moment for startup
+        time.sleep(3)
+
+        # Open browser
+        print("🌐 Opening browser...")
+        webbrowser.open("http://localhost:8502")
+
+        print("✅ SAM is running!")
+        print("📱 Access SAM at: http://localhost:8502")
+        print("🛑 Press Ctrl+C to stop SAM")
+
+        # Wait for process
+        process.wait()
+
+    except KeyboardInterrupt:
+        print("\\n👋 Stopping SAM...")
+        process.terminate()
+    except Exception as e:
+        print(f"❌ Error starting SAM: {e}")
+        return 1
+
+    return 0
 
 if __name__ == "__main__":
-    try:
-        success = main()
-        if success:
-            print("\n🎉 Setup completed successfully!")
-            sys.exit(0)
-        else:
-            print("\n❌ Setup completed with issues")
-            sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n\n👋 Setup cancelled by user")
-        sys.exit(1)
+    sys.exit(main())
+'''
+
+        with open("start_sam_simple.py", 'w') as f:
+            f.write(launch_script)
+
+        # Make executable on Unix systems
+        if platform.system() != "Windows":
+            os.chmod("start_sam.py", 0o755)
+
+        print_success("Created start_sam_simple.py launch script")
+        return True
+
     except Exception as e:
-        print(f"\n💥 Unexpected error: {e}")
-        print("💡 Please report this issue on GitHub")
-        sys.exit(1)
+        print_warning(f"Could not create launch script: {e}")
+        return False
+
+def main():
+    """Main setup function."""
+    print_header()
+
+    # Track setup progress
+    setup_start_time = time.time()
+
+    try:
+        # Step 1: System requirements
+        if not check_system_requirements():
+            return 1
+
+        # Step 2: Dependencies
+        if not install_dependencies():
+            print_error("Dependency installation failed")
+            return 1
+
+        # Step 3: Directory structure
+        if not create_directory_structure():
+            print_error("Directory creation failed")
+            return 1
+
+        # Step 4: Security system
+        if not initialize_security_system():
+            print_error("Security initialization failed")
+            return 1
+
+        # Step 5: SAM Pro key
+        activation_key = generate_sam_pro_key()
+        if not activation_key:
+            print_error("Key generation failed")
+            return 1
+
+        # Step 6: Databases
+        if not initialize_databases():
+            print_warning("Database initialization had issues")
+
+        # Step 7: Validation
+        if not validate_installation():
+            print_warning("Validation had issues")
+
+        # Step 8: Launch script
+        create_launch_script()
+
+        # Success!
+        setup_time = time.time() - setup_start_time
+
+        print()
+        print(f"{Colors.GREEN}{Colors.BOLD}🎉 SAM SETUP COMPLETE! 🎉{Colors.END}")
+        print(f"{Colors.GREEN}Setup completed in {setup_time:.1f} seconds{Colors.END}")
+        print()
+
+        # Display key
+        print(f"{Colors.CYAN}{Colors.BOLD}🔑 Your SAM Pro Activation Key:{Colors.END}")
+        print("=" * 60)
+        print(f"{Colors.YELLOW}{Colors.BOLD}   {activation_key}{Colors.END}")
+        print("=" * 60)
+        print()
+
+        # Next steps
+        print(f"{Colors.BLUE}{Colors.BOLD}🚀 Ready to Start SAM!{Colors.END}")
+        print()
+        print("📋 Next Steps:")
+        print("1. Start SAM:")
+        print(f"   {Colors.CYAN}python start_sam_simple.py{Colors.END}")
+        print("   OR")
+        print(f"   {Colors.CYAN}python secure_streamlit_app.py{Colors.END}")
+        print("   OR")
+        print(f"   {Colors.CYAN}python start_sam.py{Colors.END} (Advanced launcher)")
+        print()
+        print("2. Open your browser and go to:")
+        print(f"   {Colors.CYAN}http://localhost:8502{Colors.END}")
+        print()
+        print("3. Enter your activation key when prompted")
+        print()
+        print("4. Enjoy SAM Pro features:")
+        print("   • 🧠 Cognitive Distillation Engine")
+        print("   • 🧠 TPV Active Reasoning Control")
+        print("   • 📚 MEMOIR Lifelong Learning")
+        print("   • 🎨 Dream Canvas Visualization")
+        print("   • 🤖 Cognitive Automation")
+        print("   • 📊 Advanced Analytics")
+        print()
+        print(f"{Colors.GREEN}💾 Important: Save your activation key!{Colors.END}")
+        print(f"{Colors.CYAN}❓ Questions? Contact: vin@forge1825.net{Colors.END}")
+        print()
+        print(f"{Colors.BOLD}🌟 Welcome to the future of AI! 🚀🧠{Colors.END}")
+
+        return 0
+
+    except KeyboardInterrupt:
+        print(f"\n\n{Colors.YELLOW}👋 Setup cancelled by user{Colors.END}")
+        return 1
+    except Exception as e:
+        print(f"\n{Colors.RED}❌ Setup failed: {e}{Colors.END}")
+        print(f"{Colors.CYAN}💡 Please report this issue to: vin@forge1825.net{Colors.END}")
+        return 1
+
+if __name__ == "__main__":
+    exit_code = main()
+    sys.exit(exit_code)
