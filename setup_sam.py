@@ -318,33 +318,36 @@ import webbrowser
 import time
 
 def main():
-    print("🚀 Starting SAM...")
+    print("Starting SAM...")
 
     try:
-        # Start SAM
+        # Start SAM using streamlit run command
         process = subprocess.Popen([
-            sys.executable, "secure_streamlit_app.py"
+            sys.executable, "-m", "streamlit", "run", "secure_streamlit_app.py",
+            "--server.port", "8502",
+            "--server.address", "localhost",
+            "--browser.gatherUsageStats", "false"
         ])
 
         # Wait a moment for startup
         time.sleep(3)
 
         # Open browser
-        print("🌐 Opening browser...")
+        print("Opening browser...")
         webbrowser.open("http://localhost:8502")
 
-        print("✅ SAM is running!")
-        print("📱 Access SAM at: http://localhost:8502")
-        print("🛑 Press Ctrl+C to stop SAM")
+        print("SAM is running!")
+        print("Access SAM at: http://localhost:8502")
+        print("Press Ctrl+C to stop SAM")
 
         # Wait for process
         process.wait()
 
     except KeyboardInterrupt:
-        print("\\n👋 Stopping SAM...")
+        print("\\nStopping SAM...")
         process.terminate()
     except Exception as e:
-        print(f"❌ Error starting SAM: {e}")
+        print(f"Error starting SAM: {e}")
         return 1
 
     return 0
@@ -353,7 +356,7 @@ if __name__ == "__main__":
     sys.exit(main())
 '''
 
-        with open("start_sam_simple.py", 'w') as f:
+        with open("start_sam_simple.py", 'w', encoding='utf-8') as f:
             f.write(launch_script)
 
         # Make executable on Unix systems
@@ -361,6 +364,41 @@ if __name__ == "__main__":
             os.chmod("start_sam.py", 0o755)
 
         print_success("Created start_sam_simple.py launch script")
+
+        # Create Windows batch file for easier launching
+        if platform.system() == "Windows":
+            try:
+                batch_script = '''@echo off
+REM SAM Simple Launcher for Windows
+echo Starting SAM...
+echo.
+
+REM Check if Python is available
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo Error: Python is not installed or not in PATH
+    pause
+    exit /b 1
+)
+
+REM Start SAM
+echo Starting SAM on http://localhost:8502
+echo Press Ctrl+C to stop SAM
+echo.
+
+python -m streamlit run secure_streamlit_app.py --server.port 8502 --server.address localhost --browser.gatherUsageStats false
+
+echo.
+echo SAM has stopped
+pause'''
+
+                with open("start_sam_simple.bat", 'w', encoding='utf-8') as f:
+                    f.write(batch_script)
+
+                print_success("Created start_sam_simple.bat for Windows")
+            except Exception as e:
+                print_warning(f"Could not create Windows batch file: {e}")
+
         return True
 
     except Exception as e:
@@ -431,9 +469,14 @@ def main():
         print()
         print("📋 Next Steps:")
         print("1. Start SAM:")
-        print(f"   {Colors.CYAN}python start_sam_simple.py{Colors.END}")
-        print("   OR")
-        print(f"   {Colors.CYAN}python secure_streamlit_app.py{Colors.END}")
+        if platform.system() == "Windows":
+            print(f"   {Colors.CYAN}start_sam_simple.bat{Colors.END} (Double-click or run in PowerShell)")
+            print("   OR")
+            print(f"   {Colors.CYAN}python -m streamlit run secure_streamlit_app.py{Colors.END}")
+        else:
+            print(f"   {Colors.CYAN}python start_sam_simple.py{Colors.END}")
+            print("   OR")
+            print(f"   {Colors.CYAN}python -m streamlit run secure_streamlit_app.py{Colors.END}")
         print("   OR")
         print(f"   {Colors.CYAN}python start_sam.py{Colors.END} (Advanced launcher)")
         print()

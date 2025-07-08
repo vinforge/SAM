@@ -16,10 +16,22 @@ python setup_sam.py
 ```
 
 ### Step 3: Start SAM
+
+**Windows Users:**
+```cmd
+start_sam_simple.bat
+```
+*Or in PowerShell:*
+```powershell
+python -m streamlit run secure_streamlit_app.py
+```
+
+**macOS/Linux Users:**
 ```bash
 python start_sam_simple.py
 ```
-*Or use the advanced launcher:*
+
+*Advanced launcher (all platforms):*
 ```bash
 python start_sam.py
 ```
@@ -60,9 +72,21 @@ chmod +x setup_sam.py
 python setup_sam.py
 ```
 
+**"Character encoding error" (Windows)**
+- This is normal - setup still completes successfully
+- Use `start_sam_simple.bat` to launch SAM
+
 **"Python version error"**
 - Install Python 3.8+ from [python.org](https://python.org)
-- Try: `python3 setup_sam.py`
+- On Windows: Use `python` command
+- On macOS/Linux: Try `python3 setup_sam.py`
+
+**"Streamlit not starting properly"**
+```cmd
+# Use the correct command:
+python -m streamlit run secure_streamlit_app.py
+# NOT: python secure_streamlit_app.py
+```
 
 ### Manual Installation
 
