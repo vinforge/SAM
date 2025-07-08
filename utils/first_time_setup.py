@@ -143,8 +143,12 @@ class FirstTimeSetupManager:
             crypto_manager = CryptoManager()
             return crypto_manager.is_initialized()
         except ImportError:
-            # Security module not available, assume no password
-            return False
+            # Security module not available, check for setup status file
+            try:
+                status = self.get_setup_status()
+                return status.get('master_password_created', False)
+            except:
+                return False
         except Exception:
             # If we can't check, assume no password
             return False

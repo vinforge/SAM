@@ -122,6 +122,14 @@ class SecurityUI:
                         success = self.security_manager.initialize_security(password)
 
                     if success:
+                        # Mark master password as created in setup status
+                        try:
+                            from utils.first_time_setup import get_first_time_setup_manager
+                            setup_manager = get_first_time_setup_manager()
+                            setup_manager.update_setup_status('master_password_created', True)
+                        except:
+                            pass  # Continue even if setup status update fails
+
                         st.success("✅ Security setup completed successfully!")
                         st.info("🔄 Please refresh the page to continue")
                         return False  # Require refresh

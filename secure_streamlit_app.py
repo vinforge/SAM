@@ -51,8 +51,8 @@ logger = logging.getLogger(__name__)
 Path('logs').mkdir(exist_ok=True)
 
 def main():
-    """Main Streamlit application with security integration."""
-    
+    """Main Streamlit application with security integration and first-time setup."""
+
     # Configure Streamlit page
     st.set_page_config(
         page_title="SAM - Secure AI Assistant",
@@ -60,7 +60,23 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+
+    # Check for first-time user and route to setup wizard
+    try:
+        from utils.first_time_setup import get_first_time_setup_manager
+        setup_manager = get_first_time_setup_manager()
+
+        if setup_manager.is_first_time_user():
+            # Route to setup wizard for first-time users
+            render_setup_wizard()
+            return
+
+    except ImportError:
+        # If first-time setup module not available, continue with normal flow
+        logger.warning("First-time setup module not available")
+    except Exception as e:
+        logger.error(f"Error checking first-time setup: {e}")
+
     # Initialize security system
     if 'security_manager' not in st.session_state:
         try:
@@ -69,11 +85,12 @@ def main():
             logger.info("Security manager initialized")
         except ImportError:
             st.error("❌ Security module not available")
+            st.info("💡 Run diagnostic: python security_diagnostic.py")
             st.stop()
         except Exception as e:
             st.error(f"❌ Failed to initialize security: {e}")
             st.stop()
-    
+
     # Create security UI
     try:
         from security import create_security_ui
@@ -81,16 +98,94 @@ def main():
     except Exception as e:
         st.error(f"❌ Failed to create security UI: {e}")
         st.stop()
-    
+
     # Render security interface
     is_unlocked = security_ui.render_security_interface()
-    
+
     if is_unlocked:
         # Show main SAM application
         render_main_sam_application()
     else:
         # Security interface is shown (setup or unlock)
         st.stop()
+
+def render_setup_wizard():
+    """Render the first-time setup wizard."""
+    try:
+        from ui.setup_wizard import show_setup_wizard
+        show_setup_wizard()
+    except ImportError:
+        # Fallback to basic setup if setup wizard not available
+        render_basic_first_time_setup()
+    except Exception as e:
+        st.error(f"❌ Setup wizard error: {e}")
+        render_basic_first_time_setup()
+
+def render_basic_first_time_setup():
+    """Basic first-time setup fallback."""
+    st.markdown("# 🚀 Welcome to SAM!")
+    st.markdown("### Let's get you set up in just a few steps")
+
+    st.info("""
+    **Welcome to SAM - The world's most advanced AI system!**
+
+    To get started, you'll need to:
+    1. 🔐 Create your master password for secure encryption
+    2. 🔑 Activate your SAM Pro features
+    3. 🎓 Complete a quick tour of SAM's capabilities
+    """)
+
+    # Check what step we're on
+    try:
+        from utils.first_time_setup import get_first_time_setup_manager
+        setup_manager = get_first_time_setup_manager()
+        progress = setup_manager.get_setup_progress()
+        next_step = progress['next_step']
+
+        st.progress(progress['progress_percent'] / 100)
+        st.markdown(f"**Setup Progress:** {progress['completed_steps']}/{progress['total_steps']} steps complete")
+
+        if next_step == 'master_password':
+            st.markdown("## 🔐 Step 1: Create Master Password")
+            st.markdown("Your master password protects all SAM data with enterprise-grade encryption.")
+
+            if st.button("🔐 Set Up Master Password", type="primary"):
+                st.info("🔄 Refreshing to security setup...")
+                st.rerun()
+
+        elif next_step == 'sam_pro_activation':
+            st.markdown("## 🔑 Step 2: Activate SAM Pro")
+            sam_pro_key = setup_manager.get_sam_pro_key()
+            if sam_pro_key:
+                st.code(sam_pro_key, language=None)
+                st.markdown("**💾 Important: Save this key!**")
+
+                if st.button("✅ Activate SAM Pro Features", type="primary"):
+                    setup_manager.update_setup_status('sam_pro_activated', True)
+                    st.success("🎉 SAM Pro activated!")
+                    st.rerun()
+            else:
+                st.warning("No SAM Pro key found. Please run setup again.")
+
+        elif next_step == 'onboarding':
+            st.markdown("## 🎓 Step 3: Quick Tour")
+            st.markdown("Ready to explore SAM's capabilities!")
+
+            if st.button("🎉 Complete Setup & Start Using SAM!", type="primary"):
+                setup_manager.update_setup_status('onboarding_completed', True)
+                st.success("✅ Setup complete! Welcome to SAM!")
+                st.rerun()
+        else:
+            st.success("✅ Setup complete! Redirecting to SAM...")
+            st.rerun()
+
+    except Exception as e:
+        st.error(f"Setup error: {e}")
+        st.markdown("### 🔧 Manual Setup")
+        st.markdown("Please complete setup manually:")
+        st.markdown("1. Create your master password in the Security section")
+        st.markdown("2. Enter your SAM Pro activation key")
+        st.markdown("3. Start using SAM!")
 
 def render_main_sam_application():
     """Render the main SAM application with security integration."""
