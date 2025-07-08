@@ -10,6 +10,7 @@ import json
 import logging
 import hashlib
 import time
+import re
 from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -154,6 +155,19 @@ class DynamicPlanner:
         self.logger.info(f"Creating plan for query: {uif.input_query[:100]}... (mode: {mode})")
 
         try:
+            # Check for Test-Time Training (TTT) opportunity first
+            ttt_plan = self._check_for_ttt_opportunity(uif)
+            if ttt_plan:
+                generation_time = time.time() - start_time
+                return PlanGenerationResult(
+                    plan=ttt_plan,
+                    confidence=0.9,
+                    reasoning="Detected few-shot reasoning task - using Test-Time Training adaptation",
+                    cache_hit=False,
+                    generation_time=generation_time,
+                    fallback_used=False
+                )
+
             # Check cache first
             if self._config.enable_plan_caching:
                 cached_result = self._check_plan_cache(uif)
@@ -167,7 +181,7 @@ class DynamicPlanner:
                         generation_time=generation_time,
                         fallback_used=False
                     )
-            
+
             # Generate new plan - prioritize LLM for enhanced tool selection
             if self._llm_model:
                 result = self._generate_llm_plan(uif, background_goal)
@@ -908,3 +922,161 @@ class DynamicPlanner:
             "default_graph_depth": 2,
             "max_graph_depth": 4
         }
+
+    def _check_for_ttt_opportunity(self, uif: SAM_UIF) -> Optional[List[str]]:
+        """
+        Check if the query represents a few-shot reasoning task suitable for TTT.
+
+        Args:
+            uif: Universal Interface Format with query and context
+
+        Returns:
+            TTT-enabled plan if applicable, None otherwise
+        """
+        try:
+            query = uif.input_query.lower()
+
+            # Pattern 1: Explicit few-shot structure (Example: ... Problem: ...)
+            example_pattern = r'example\s*\d*\s*:.*?(?=example\s*\d*\s*:|problem\s*:|$)'
+            examples = re.findall(example_pattern, query, re.IGNORECASE | re.DOTALL)
+
+            if len(examples) >= 2:
+                self.logger.info(f"Detected {len(examples)} explicit examples - TTT applicable")
+                return self._create_ttt_plan(examples, "explicit_examples")
+
+            # Pattern 2: Input-Output pairs
+            io_pattern = r'(?:input|in)\s*:.*?(?:output|out|answer)\s*:.*?(?=(?:input|in)\s*:|$)'
+            io_pairs = re.findall(io_pattern, query, re.IGNORECASE | re.DOTALL)
+
+            if len(io_pairs) >= 2:
+                self.logger.info(f"Detected {len(io_pairs)} input-output pairs - TTT applicable")
+                return self._create_ttt_plan(io_pairs, "io_pairs")
+
+            # Pattern 3: Numbered examples (1. ... 2. ... Now solve: ...)
+            numbered_pattern = r'\d+\.\s+.*?(?=\d+\.\s+|now\s+solve|solve\s+this|what\s+is|$)'
+            numbered_examples = re.findall(numbered_pattern, query, re.IGNORECASE | re.DOTALL)
+
+            if len(numbered_examples) >= 2 and any(keyword in query for keyword in ['solve', 'what is', 'find', 'determine']):
+                self.logger.info(f"Detected {len(numbered_examples)} numbered examples - TTT applicable")
+                return self._create_ttt_plan(numbered_examples, "numbered_examples")
+
+            # Pattern 4: Analogical reasoning (A is to B as C is to ?)
+            analogy_pattern = r'.*?\s+is\s+to\s+.*?\s+as\s+.*?\s+is\s+to\s+.*?'
+            if re.search(analogy_pattern, query, re.IGNORECASE):
+                self.logger.info("Detected analogical reasoning pattern - TTT applicable")
+                return self._create_ttt_plan([query], "analogical_reasoning")
+
+            # Pattern 5: Rule learning from examples
+            rule_keywords = ['pattern', 'rule', 'follows', 'sequence', 'series', 'logic']
+            if any(keyword in query for keyword in rule_keywords) and len(query.split()) > 20:
+                # Look for multiple instances of similar structures
+                sentences = query.split('.')
+                if len(sentences) >= 3:
+                    self.logger.info("Detected potential rule learning task - TTT applicable")
+                    return self._create_ttt_plan(sentences, "rule_learning")
+
+            return None
+
+        except Exception as e:
+            self.logger.error(f"Error in TTT detection: {e}")
+            return None
+
+    def _create_ttt_plan(self, examples: List[str], task_type: str) -> List[str]:
+        """
+        Create a TTT-enabled execution plan.
+
+        Args:
+            examples: Detected examples or patterns
+            task_type: Type of few-shot task detected
+
+        Returns:
+            List of skill names for TTT execution
+        """
+        # Store TTT context for the skill
+        ttt_context = {
+            "examples": examples,
+            "task_type": task_type,
+            "example_count": len(examples),
+            "detected_at": datetime.now().isoformat()
+        }
+
+        self.logger.info(f"Creating TTT plan for {task_type} with {len(examples)} examples")
+
+        # TTT-enabled plan: adaptation first, then response generation
+        return ["TestTimeAdaptation", "ResponseGeneration"]
+
+    def _extract_few_shot_examples(self, query: str, pattern_type: str) -> List[Dict[str, str]]:
+        """
+        Extract structured few-shot examples from query text.
+
+        Args:
+            query: Input query text
+            pattern_type: Type of pattern detected
+
+        Returns:
+            List of structured examples with input/output pairs
+        """
+        examples = []
+
+        try:
+            if pattern_type == "explicit_examples":
+                # Extract Example: ... format
+                example_blocks = re.findall(r'example\s*\d*\s*:(.*?)(?=example\s*\d*\s*:|problem\s*:|$)',
+                                          query, re.IGNORECASE | re.DOTALL)
+
+                for i, block in enumerate(example_blocks):
+                    # Try to split into input/output
+                    if '->' in block:
+                        parts = block.split('->', 1)
+                        examples.append({
+                            "input": parts[0].strip(),
+                            "output": parts[1].strip(),
+                            "example_id": f"explicit_{i}"
+                        })
+                    else:
+                        examples.append({
+                            "input": block.strip(),
+                            "output": "",
+                            "example_id": f"explicit_{i}"
+                        })
+
+            elif pattern_type == "io_pairs":
+                # Extract Input: ... Output: ... format
+                pairs = re.findall(r'(?:input|in)\s*:(.*?)(?:output|out|answer)\s*:(.*?)(?=(?:input|in)\s*:|$)',
+                                 query, re.IGNORECASE | re.DOTALL)
+
+                for i, (inp, out) in enumerate(pairs):
+                    examples.append({
+                        "input": inp.strip(),
+                        "output": out.strip(),
+                        "example_id": f"io_pair_{i}"
+                    })
+
+            elif pattern_type == "numbered_examples":
+                # Extract numbered examples
+                numbered = re.findall(r'\d+\.\s+(.*?)(?=\d+\.\s+|now\s+solve|solve\s+this|what\s+is|$)',
+                                    query, re.IGNORECASE | re.DOTALL)
+
+                for i, example in enumerate(numbered):
+                    if '->' in example or '=' in example:
+                        if '->' in example:
+                            parts = example.split('->', 1)
+                        else:
+                            parts = example.split('=', 1)
+
+                        examples.append({
+                            "input": parts[0].strip(),
+                            "output": parts[1].strip(),
+                            "example_id": f"numbered_{i}"
+                        })
+                    else:
+                        examples.append({
+                            "input": example.strip(),
+                            "output": "",
+                            "example_id": f"numbered_{i}"
+                        })
+
+        except Exception as e:
+            self.logger.error(f"Error extracting examples: {e}")
+
+        return examples

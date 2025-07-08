@@ -8,10 +8,13 @@ generation, conceptual understanding, and multi-hop reasoning.
 
 Reasoning Skills:
 - ImplicitKnowledgeSkill: Generates implicit connections between explicit knowledge chunks
+- TestTimeAdaptationSkill: Test-Time Training for few-shot reasoning adaptation
 """
 
 from .implicit_knowledge import ImplicitKnowledgeSkill
+from .test_time_adaptation import TestTimeAdaptationSkill
 
 __all__ = [
     'ImplicitKnowledgeSkill',
+    'TestTimeAdaptationSkill',
 ]
