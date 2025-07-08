@@ -121,10 +121,21 @@ def install_dependencies():
 
     # Install requirements
     try:
-        print_info("Installing Streamlit (this may take a moment)...")
+        print_info("Installing core dependencies (this may take a moment)...")
+
+        # Essential packages for SAM to work
+        essential_packages = [
+            "streamlit>=1.28.0",
+            "requests>=2.25.0",
+            "cryptography>=41.0.0",
+            "argon2-cffi>=23.1.0",
+            "pydantic>=2.0.0",
+            "python-dotenv>=1.0.0"
+        ]
+
         result = subprocess.run([
-            sys.executable, "-m", "pip", "install", "streamlit>=1.28.0", "requests>=2.25.0"
-        ], capture_output=True, text=True, timeout=300)
+            sys.executable, "-m", "pip", "install"
+        ] + essential_packages, capture_output=True, text=True, timeout=600)
 
         if result.returncode == 0:
             print_success("Core dependencies installed successfully")

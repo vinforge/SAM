@@ -34,18 +34,18 @@ def check_first_time_setup():
     try:
         from utils.first_time_setup import get_first_time_setup_manager
         setup_manager = get_first_time_setup_manager()
-        
+
         if setup_manager.is_first_time_user():
             print("🎯 First-time setup detected!")
             print()
-            
+
             # Show setup progress
             progress = setup_manager.get_setup_progress()
             next_step = progress['next_step']
-            
+
             print(f"📋 Setup Progress: {progress['completed_steps']}/{progress['total_steps']} steps complete")
             print()
-            
+
             if next_step == 'master_password':
                 print("🔐 Next: Create your master password for secure encryption")
                 print("💡 This password protects all your SAM data and conversations")
@@ -58,18 +58,24 @@ def check_first_time_setup():
             elif next_step == 'onboarding':
                 print("🎓 Next: Complete the quick onboarding tour")
                 print("💡 Learn about SAM's powerful features and capabilities")
-            
+
             print()
             print("🌐 SAM will open in your browser with the setup wizard")
             print("📱 Follow the on-screen instructions to complete setup")
             print()
-            
+
             return True
         else:
             print("✅ Setup complete - launching SAM...")
             print()
             return False
-            
+
+    except ImportError as e:
+        print(f"⚠️  Missing dependencies: {e}")
+        print("🔧 Run security diagnostic: python security_diagnostic.py")
+        print("🚀 Continuing with SAM launch...")
+        print()
+        return False
     except Exception as e:
         print(f"⚠️  Could not check setup status: {e}")
         print("🚀 Continuing with SAM launch...")
@@ -81,19 +87,31 @@ def check_dependencies():
     try:
         import streamlit
         print("✅ Streamlit available")
-        return True
     except ImportError:
         print("❌ Streamlit not found")
         print("💡 Installing Streamlit...")
         try:
-            subprocess.run([sys.executable, "-m", "pip", "install", "streamlit"], 
+            subprocess.run([sys.executable, "-m", "pip", "install", "streamlit"],
                          check=True, capture_output=True)
             print("✅ Streamlit installed successfully")
-            return True
         except:
             print("❌ Failed to install Streamlit")
             print("💡 Please run: pip install streamlit")
             return False
+
+    # Check security dependencies
+    try:
+        from security import is_security_available
+        if is_security_available():
+            print("✅ Security modules available")
+        else:
+            print("⚠️  Security modules have missing dependencies")
+            print("💡 Run diagnostic: python security_diagnostic.py")
+    except ImportError:
+        print("⚠️  Security modules not available")
+        print("💡 Run diagnostic: python security_diagnostic.py")
+
+    return True
 
 def start_sam():
     """Start SAM using Streamlit."""
