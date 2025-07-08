@@ -394,8 +394,11 @@ class BulkIngestionUI:
                 col1, col2 = st.columns([2, 1])
 
                 with col1:
-                    # Enhanced path input with platform-specific examples
+                    # Enhanced path input with platform-specific examples and folder browser
                     import platform
+                    import os
+                    from pathlib import Path
+
                     system = platform.system()
 
                     if system == "Windows":
@@ -408,12 +411,132 @@ class BulkIngestionUI:
                         placeholder = "/home/username/documents"
                         help_text = "Enter the full Linux path (e.g., /home/username/documents or ~/documents)"
 
-                    source_path = st.text_input(
-                        "Folder Path",
-                        placeholder=placeholder,
-                        help=help_text,
-                        key="new_source_path"
-                    )
+                    # Folder path input with browser functionality
+                    st.markdown("**📁 Select Folder to Ingest:**")
+
+                    # Initialize session state for folder browser
+                    if 'current_browse_path' not in st.session_state:
+                        st.session_state.current_browse_path = str(Path.home())
+                    if 'selected_folder_path' not in st.session_state:
+                        st.session_state.selected_folder_path = ""
+
+                    # Folder browser toggle
+                    use_browser = st.checkbox("🗂️ Use Folder Browser", key="use_folder_browser",
+                                            help="Browse and select folders visually instead of typing paths")
+
+                    if use_browser:
+                        # Folder browser interface
+                        st.markdown("**Current Location:**")
+                        current_path = Path(st.session_state.current_browse_path)
+                        st.code(str(current_path))
+
+                        # Navigation buttons
+                        col_nav1, col_nav2, col_nav3 = st.columns([1, 1, 2])
+
+                        with col_nav1:
+                            if st.button("⬆️ Parent", key="nav_parent"):
+                                parent = current_path.parent
+                                if parent != current_path:  # Not at root
+                                    st.session_state.current_browse_path = str(parent)
+                                    st.rerun()
+
+                        with col_nav2:
+                            if st.button("🏠 Home", key="nav_home"):
+                                st.session_state.current_browse_path = str(Path.home())
+                                st.rerun()
+
+                        with col_nav3:
+                            # Quick navigation to common folders
+                            common_folders = []
+                            if system == "Windows":
+                                common_folders = [
+                                    ("📄 Documents", str(Path.home() / "Documents")),
+                                    ("📥 Downloads", str(Path.home() / "Downloads")),
+                                    ("🖥️ Desktop", str(Path.home() / "Desktop")),
+                                ]
+                            else:
+                                common_folders = [
+                                    ("📄 Documents", str(Path.home() / "Documents")),
+                                    ("📥 Downloads", str(Path.home() / "Downloads")),
+                                    ("🖥️ Desktop", str(Path.home() / "Desktop")),
+                                ]
+
+                            selected_common = st.selectbox(
+                                "Quick Navigation",
+                                options=[""] + [f[0] for f in common_folders],
+                                key="quick_nav"
+                            )
+
+                            if selected_common:
+                                for name, path in common_folders:
+                                    if name == selected_common and Path(path).exists():
+                                        st.session_state.current_browse_path = path
+                                        st.rerun()
+
+                        # List directories in current path
+                        try:
+                            directories = []
+                            for item in current_path.iterdir():
+                                if item.is_dir() and not item.name.startswith('.'):
+                                    directories.append(item)
+
+                            directories.sort(key=lambda x: x.name.lower())
+
+                            if directories:
+                                st.markdown("**📁 Available Folders:**")
+
+                                # Create a grid of folder buttons
+                                cols_per_row = 3
+                                for i in range(0, len(directories), cols_per_row):
+                                    cols = st.columns(cols_per_row)
+                                    for j, col in enumerate(cols):
+                                        if i + j < len(directories):
+                                            folder = directories[i + j]
+                                            with col:
+                                                if st.button(f"📁 {folder.name}", key=f"folder_{i+j}"):
+                                                    st.session_state.current_browse_path = str(folder)
+                                                    st.rerun()
+
+                                # Select current folder button
+                                st.markdown("---")
+                                col_select1, col_select2 = st.columns([1, 1])
+
+                                with col_select1:
+                                    if st.button("✅ Select This Folder", type="primary", key="select_current_folder"):
+                                        st.session_state.selected_folder_path = str(current_path)
+                                        st.success(f"Selected: {current_path}")
+
+                                with col_select2:
+                                    if st.session_state.selected_folder_path:
+                                        st.info(f"Selected: {Path(st.session_state.selected_folder_path).name}")
+                            else:
+                                st.info("No subdirectories found in this location")
+
+                                # Still allow selecting the current folder
+                                if st.button("✅ Select This Folder", type="primary", key="select_empty_folder"):
+                                    st.session_state.selected_folder_path = str(current_path)
+                                    st.success(f"Selected: {current_path}")
+
+                        except PermissionError:
+                            st.error("❌ Permission denied - cannot access this folder")
+                        except Exception as e:
+                            st.error(f"❌ Error browsing folder: {e}")
+
+                        # Use selected path
+                        source_path = st.session_state.selected_folder_path
+
+                        # Show selected path
+                        if source_path:
+                            st.markdown("**Selected Folder:**")
+                            st.code(source_path)
+                    else:
+                        # Manual path input
+                        source_path = st.text_input(
+                            "Folder Path",
+                            placeholder=placeholder,
+                            help=help_text,
+                            key="new_source_path"
+                        )
 
                     source_name = st.text_input(
                         "Source Name",
@@ -1308,7 +1431,9 @@ Error details: {path_validation.get('error_details', 'None')}
                 summary_section = stdout[summary_start:summary_start+500]
 
                 if use_expander:
-                    with st.expander(f"📊 {source_name} Detailed Results"):
+                    # Use container with markdown header instead of nested expander
+                    st.markdown(f"**📊 {source_name} Detailed Results:**")
+                    with st.container():
                         st.code(summary_section)
 
                         if dry_run:
@@ -1325,7 +1450,9 @@ Error details: {path_validation.get('error_details', 'None')}
             st.error(f"❌ {source_name}: Scan failed")
 
             if use_expander:
-                with st.expander(f"🔍 {source_name} Error Details"):
+                # Use container with markdown header instead of nested expander
+                st.markdown(f"**🔍 {source_name} Error Details:**")
+                with st.container():
                     if result["stderr"]:
                         st.code(result["stderr"])
                     if result["stdout"]:
