@@ -251,13 +251,13 @@ def show_setup_complete():
 def create_master_password(password: str) -> bool:
     """Create master password for encryption."""
     try:
-        from security.crypto_utils import CryptoManager
-        crypto_manager = CryptoManager()
-        
-        # Initialize encryption with the password
-        success = crypto_manager.initialize_encryption(password)
+        from security import SecureStateManager
+        security_manager = SecureStateManager()
+
+        # Initialize security system with the password
+        success = security_manager.initialize_security(password)
         return success
-        
+
     except Exception as e:
         st.error(f"Error creating master password: {e}")
         return False

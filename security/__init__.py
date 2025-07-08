@@ -39,8 +39,6 @@ except ImportError as e:
             self.available = False
         def is_initialized(self):
             return False
-        def initialize_encryption(self, password):
-            return False
 
 try:
     from .keystore_manager import KeystoreManager
