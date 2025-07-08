@@ -291,10 +291,10 @@ class SecureStateManager:
     def setup_security(self, password: str) -> bool:
         """
         Setup initial security configuration.
-        
+
         Args:
             password: Master password to set
-            
+
         Returns:
             bool: True if setup successful
         """
@@ -302,17 +302,21 @@ class SecureStateManager:
             # Create keystore
             if not self.keystore_manager.create_keystore(password):
                 return False
-            
-            # Initialize crypto manager
+
+            # Initialize crypto manager with session key
             self.crypto_manager = CryptoManager()
-            
+
+            # Derive key from password and set session key
+            derived_key, salt = self.crypto_manager.derive_key_from_password(password)
+            self.crypto_manager.set_session_key(derived_key)
+
             # Start session
             self.session_start_time = time.time()
             self.last_activity = time.time()
             self.current_state = SecurityState.AUTHENTICATED
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Security setup error: {e}")
             self.current_state = SecurityState.ERROR
@@ -358,3 +362,17 @@ class SecureStateManager:
             "authenticated": self.is_authenticated(),
             "locked": self.is_locked()
         }
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the security system is fully initialized.
+
+        Returns:
+            bool: True if keystore exists and crypto manager is ready
+        """
+        try:
+            return (self.keystore_manager.is_initialized() and
+                    self.crypto_manager is not None and
+                    self.crypto_manager.is_initialized())
+        except Exception:
+            return False

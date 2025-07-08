@@ -356,7 +356,16 @@ class CryptoManager:
     def generate_secure_token(self, length: int = 32) -> str:
         """Generate a cryptographically secure random token."""
         return secrets.token_urlsafe(length)
-    
+
     def constant_time_compare(self, a: str, b: str) -> bool:
         """Constant-time string comparison to prevent timing attacks."""
         return secrets.compare_digest(a.encode('utf-8'), b.encode('utf-8'))
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the crypto manager is initialized with a session key.
+
+        Returns:
+            bool: True if session key is set and ready for encryption/decryption
+        """
+        return self.session_key is not None and self.aesgcm is not None

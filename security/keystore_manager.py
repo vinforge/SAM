@@ -455,3 +455,29 @@ class KeystoreManager:
         except Exception as e:
             self.logger.error(f"Backup failed: {e}")
             return False
+
+    def is_initialized(self) -> bool:
+        """
+        Check if the keystore is initialized (exists and has valid structure).
+
+        Returns:
+            bool: True if keystore exists and is properly initialized
+        """
+        try:
+            if not self.keystore_path.exists():
+                return False
+
+            # Try to load and validate keystore structure
+            with open(self.keystore_path, 'r') as f:
+                keystore_data = json.load(f)
+
+            # Check for required fields
+            required_fields = ['installation_id', 'kdf_config', 'verifier']
+            for field in required_fields:
+                if field not in keystore_data:
+                    return False
+
+            return True
+
+        except Exception:
+            return False
