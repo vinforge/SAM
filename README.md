@@ -95,16 +95,20 @@ python3 --version  # Should show Python 3.8+
 git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
-# Option A: Automatic installation (recommended)
+# Option A: Comprehensive installation (recommended)
 python3 install_linux_dependencies.py
 
-# Option B: Manual dependency installation
+# Option B: Quick dependency installation
 python3 -m pip install --user streamlit numpy pandas requests cryptography
+
+# Option C: System packages + Python packages
+sudo apt install python3-numpy python3-pandas python3-dev build-essential
+python3 -m pip install --user streamlit requests cryptography
 
 # Run SAM setup
 python3 setup_sam.py
 
-# Start SAM
+# Start SAM (will auto-install missing packages if needed)
 python3 start_sam.py
 ```
 
@@ -115,13 +119,20 @@ python3 start_sam.py
 
 **🔧 If Installation Fails:**
 ```bash
-# Use the specialized Linux installer
+# Option 1: Quick preparation script (recommended)
+python3 prepare_linux.py
+
+# Option 2: Comprehensive Linux installer
 python3 install_linux_dependencies.py
 
-# Or install manually with different methods:
+# Option 3: Manual installation
 pip3 install --user streamlit numpy pandas requests cryptography
 # OR
 sudo python3 -m pip install streamlit numpy pandas requests cryptography
+
+# Option 4: System packages first
+sudo apt install python3-numpy python3-pandas python3-dev build-essential
+python3 -m pip install --user streamlit requests cryptography
 ```
 
 ### 🪟 **Windows Installation**

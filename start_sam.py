@@ -155,32 +155,56 @@ def check_dependencies():
             except Exception as e:
                 print(f"⚠️  Alternative installation error: {e}")
 
-        # If automatic installation failed, provide manual instructions
+        # If automatic installation failed, try specialized installers
         if not installation_success:
-            print("\n❌ Automatic installation failed")
-            print("📋 Please install dependencies manually:")
-            print()
+            print("\n⚠️  Automatic installation failed")
 
             if system == "Linux":
-                print("🐧 For Linux (Ubuntu/Debian):")
-                print("   sudo apt update")
-                print("   sudo apt install python3-pip")
-                print(f"   python3 -m pip install --user {' '.join(missing_packages)}")
-                print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
-            elif system == "Darwin":  # macOS
-                print("🍎 For macOS:")
-                print(f"   python3 -m pip install --user {' '.join(missing_packages)}")
-                print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
-            else:  # Windows
-                print("🪟 For Windows:")
-                print(f"   python -m pip install {' '.join(missing_packages)}")
-                print("   # Or try: pip install " + ' '.join(missing_packages))
+                print("🐧 Trying specialized Linux installer...")
+                try:
+                    # Run the specialized Linux installer
+                    result = subprocess.run([
+                        python_cmd, "install_linux_dependencies.py"
+                    ], capture_output=True, text=True, timeout=600)
 
-            print()
-            print("💡 After manual installation, run this script again:")
-            print(f"   {python_cmd} start_sam.py")
-            print()
-            return False
+                    if result.returncode == 0:
+                        print("✅ Linux installer succeeded!")
+                        installation_success = True
+                    else:
+                        print(f"⚠️  Linux installer failed: {result.stderr[:200]}...")
+                except Exception as e:
+                    print(f"⚠️  Could not run Linux installer: {e}")
+
+            # If still failed, provide manual instructions
+            if not installation_success:
+                print("\n❌ All automatic installation methods failed")
+                print("📋 Please install dependencies manually:")
+                print()
+
+                if system == "Linux":
+                    print("🐧 For Linux (Ubuntu/Debian):")
+                    print("   # Option 1: Using apt (system packages)")
+                    print("   sudo apt update")
+                    print("   sudo apt install python3-pip python3-numpy python3-pandas")
+                    print("   python3 -m pip install --user streamlit requests cryptography")
+                    print()
+                    print("   # Option 2: Using pip only")
+                    print(f"   python3 -m pip install --user {' '.join(missing_packages)}")
+                    print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
+                elif system == "Darwin":  # macOS
+                    print("🍎 For macOS:")
+                    print(f"   python3 -m pip install --user {' '.join(missing_packages)}")
+                    print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
+                else:  # Windows
+                    print("🪟 For Windows:")
+                    print(f"   python -m pip install {' '.join(missing_packages)}")
+                    print("   # Or try: pip install " + ' '.join(missing_packages))
+
+                print()
+                print("💡 After manual installation, run this script again:")
+                print(f"   {python_cmd} start_sam.py")
+                print()
+                return False
 
         # Re-check packages after installation
         print("\n🔍 Verifying installation...")
