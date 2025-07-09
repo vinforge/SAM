@@ -130,7 +130,10 @@ def install_dependencies():
             "cryptography>=41.0.0",
             "argon2-cffi>=23.1.0",
             "pydantic>=2.0.0",
-            "python-dotenv>=1.0.0"
+            "python-dotenv>=1.0.0",
+            "numpy>=1.21.0",
+            "pandas>=1.3.0",
+            "plotly>=5.0.0"
         ]
 
         result = subprocess.run([

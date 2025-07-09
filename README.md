@@ -66,122 +66,235 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.8 or higher
-- 4GB+ RAM recommended
-- 2GB+ free disk space
-
-### 🎯 **New Users Quick Install Guide**
-
-**Complete installation in 5 simple steps:**
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/forge-1825/SAM.git
-cd SAM
-
-# 2. Run setup wizard
-python setup.py
-
-# 3. Select Option 1 (Interactive Script - Recommended)
-# Follow the guided installation process
-
-# 4. When prompted for encryption setup, choose Option 2 (Reset Encryption)
-# Type: RESET
-# Create your master password when prompted
-
-# 5. Start SAM
-python start_sam_secure.py --mode full
-
-# 6. Open browser to: http://localhost:8502
-```
-
-**That's it! SAM is now running with full security and all features enabled.**
-
-### 🎯 **Unlock SAM Pro Features (Optional)**
-
-After installation, register for premium features:
-
-```bash
-# Register for SAM Pro activation key
-python register_sam_pro.py
-
-# This will:
-# 1. Start registration interface at localhost:8503
-# 2. Guide you through the registration process
-# 3. Send activation key via email
-# 4. Unlock premium features like Dream Canvas and TPV Active Reasoning
-```
-
-**SAM Pro Features:**
-- 🎨 **Dream Canvas** - Interactive memory visualization
-- 🧠 **TPV Active Reasoning Control** - Advanced reasoning monitoring
-- 📁 **Cognitive Automation** - Bulk document processing
-- 🔬 **Advanced Analytics** - Comprehensive insights and monitoring
+- **Python 3.8 or higher** (Python 3.9+ recommended)
+- **4GB+ RAM** recommended
+- **2GB+ free disk space**
+- **Internet connection** for dependency installation
 
 ---
 
-### Alternative Installation Methods
+## 📋 **Platform-Specific Installation Guides**
 
-#### Option A: Quick Setup (5 minutes)
+### 🐧 **Linux (Ubuntu/Debian) Installation**
+
+**Step 1: System Preparation**
 ```bash
-# Clone and setup
-git clone https://github.com/forge-1825/SAM.git
-cd SAM
+# Update system packages
+sudo apt update && sudo apt upgrade -y
 
-# Fast installation with defaults
-python install_sam.py
+# Install Python 3 and pip (if not already installed)
+sudo apt install python3 python3-pip python3-venv git -y
+
+# Verify Python installation
+python3 --version  # Should show Python 3.8+
 ```
 
-#### Option B: Manual Installation (Advanced)
+**Step 2: Install SAM**
 ```bash
 # Clone the repository
 git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
-# Install dependencies
-pip install -r requirements.txt
+# Install Python dependencies
+python3 -m pip install --upgrade pip
+python3 -m pip install numpy streamlit pandas requests
 
-# Setup encryption
-python setup_encryption.py
+# Run SAM setup
+python3 setup_sam.py
 
 # Start SAM
-python start_sam_secure.py --mode full
+python3 start_sam.py
 ```
 
-### 🎉 **After Installation**
+**Step 3: Access SAM**
+- Open browser to: **http://localhost:8502**
+- Enter the master password you created during setup
+- Use your SAM Pro activation key from the setup output
 
-1. **SAM is now running!** If you followed the Quick Install Guide above, SAM should already be started.
+### 🪟 **Windows Installation**
 
-2. **Access SAM**:
-   - **🔒 Secure Chat Interface**: http://localhost:8502 (Main Interface)
-   - **🧠 Memory Control Center**: Access via secure chat interface
+**Step 1: Install Python**
+- Download Python 3.9+ from [python.org](https://python.org)
+- ✅ **Important**: Check "Add Python to PATH" during installation
+
+**Step 2: Install SAM**
+```cmd
+# Clone the repository
+git clone https://github.com/forge-1825/SAM.git
+cd SAM
+
+# Run setup
+python setup_sam.py
+
+# Start SAM
+python start_sam.py
+```
+
+**Step 3: Access SAM**
+- Open browser to: **http://localhost:8502**
+- Enter your master password and activation key
+
+### 🍎 **macOS Installation**
+
+**Step 1: Install Prerequisites**
+```bash
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Python 3
+brew install python3 git
+
+# Verify installation
+python3 --version
+```
+
+**Step 2: Install SAM**
+```bash
+# Clone the repository
+git clone https://github.com/forge-1825/SAM.git
+cd SAM
+
+# Run setup
+python3 setup_sam.py
+
+# Start SAM
+python3 start_sam.py
+```
+
+**Step 3: Access SAM**
+- Open browser to: **http://localhost:8502**
+- Enter your master password and activation key
+
+---
+
+## 🔧 **Troubleshooting Common Issues**
+
+### Linux-Specific Issues
+
+**Issue: "python: command not found"**
+```bash
+# Solution: Use python3 instead
+python3 setup_sam.py
+python3 start_sam.py
+```
+
+**Issue: "No module named 'numpy'" or "No module named 'streamlit'"**
+```bash
+# Solution: Install missing dependencies
+python3 -m pip install numpy streamlit pandas requests
+# Then retry setup
+python3 setup_sam.py
+```
+
+**Issue: Permission denied errors**
+```bash
+# Solution: Install packages for user only
+python3 -m pip install --user numpy streamlit pandas requests
+```
+
+**Issue: "pip: command not found"**
+```bash
+# Solution: Install pip
+sudo apt install python3-pip
+# Or use alternative installation
+curl https://bootstrap.pypa.io/get-pip.py | python3
+```
+
+### Windows-Specific Issues
+
+**Issue: "python is not recognized"**
+- **Solution**: Reinstall Python with "Add to PATH" checked
+- Or add Python to PATH manually in System Environment Variables
+
+**Issue: Antivirus blocking installation**
+- **Solution**: Temporarily disable antivirus or add SAM folder to exclusions
+
+### macOS-Specific Issues
+
+**Issue: "command not found: python"**
+```bash
+# Solution: Use python3
+python3 setup_sam.py
+```
+
+**Issue: Permission errors**
+```bash
+# Solution: Use user installation
+python3 -m pip install --user numpy streamlit pandas requests
+```
+
+---
+
+## ✅ **Verification Steps**
+
+After installation, verify everything is working:
+
+```bash
+# Test Python dependencies
+python3 -c "import streamlit, numpy, pandas; print('✅ All dependencies installed')"
+
+# Test SAM installation
+python3 -c "from sam.orchestration.uif import SAM_UIF; print('✅ SAM core modules working')"
+
+# Start SAM and check browser
+python3 start_sam.py
+# Should open browser to localhost:8502
+```
+
+---
+
+## 🎯 **After Installation**
+
+### First-Time Setup
+1. **SAM Setup Wizard**: Follow the guided setup process
+2. **Create Master Password**: This encrypts all your data
+3. **Save Activation Key**: Copy the SAM Pro key from setup output
+4. **Access SAM**: Open http://localhost:8502 in your browser
+
+### SAM Pro Features (Included)
+Your setup includes a **free SAM Pro activation key** with access to:
+- 🎨 **Dream Canvas** - Interactive memory visualization
+- 🧠 **TPV Active Reasoning Control** - Advanced reasoning monitoring
+- 🧠 **Test-Time Training** - Cognitive adaptation for few-shot learning
+- 📁 **Cognitive Automation** - Bulk document processing
+- 🔬 **Advanced Analytics** - Comprehensive insights and monitoring
+
+### Starting SAM Later
+```bash
+# Navigate to SAM directory
+cd SAM
+
+# Start SAM (use python3 on Linux/macOS)
+python start_sam.py
+# or
+python3 start_sam.py
+
+# Open browser to: http://localhost:8502
+```
+
+### 🎯 **Quick Start Guide**
+
+1. **Access SAM Interfaces**:
+   - **🔒 Main Chat**: http://localhost:8502 (Primary interface)
+   - **🧠 Memory Control Center**: Access via main chat interface
    - **🎨 Dream Canvas**: Available in Memory Control Center
-   - **📊 Security Dashboard**: Built into secure interface
 
-3. **First-Time Usage**:
+2. **First-Time Usage**:
    - **Enter Master Password**: Use the password you created during setup
+   - **Enter SAM Pro Key**: Use the activation key from setup output
    - **Upload Documents**: Drag & drop files directly in chat interface
-   - **Ask Questions**: Start chatting with SAM immediately
-   - **Explore Features**: Try Dream Canvas, automated research, and cognitive synthesis
-   - **Important**: Your master password encrypts all data - keep it safe!
+   - **Start Chatting**: Ask questions and explore SAM's capabilities
 
-4. **Starting SAM Later**:
-   ```bash
-   # To start SAM again after closing
-   cd SAM
-   python start_sam_secure.py --mode full
+3. **Key Features to Try**:
+   - **Document Analysis**: Upload PDFs and ask questions about them
+   - **Dream Canvas**: Visualize SAM's memory and generate insights
+   - **Automated Research**: Let SAM discover and analyze research papers
+   - **Test-Time Training**: Experience adaptive reasoning on pattern tasks
 
-   # Then open: http://localhost:8502
-   ```
-
-5. **Troubleshooting**:
-   ```bash
-   # Test your installation
-   python test_encryption_setup.py
-
-   # Reset encryption if needed
-   python setup_encryption.py
-   ```
+4. **Important Security Notes**:
+   - **Master Password**: Encrypts all your data - keep it safe!
+   - **Local Operation**: All data stays on your machine
+   - **Zero-Knowledge**: Even we can't access your encrypted data
 
 ## 📖 Usage Guide
 

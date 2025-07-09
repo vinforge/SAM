@@ -84,19 +84,41 @@ def check_first_time_setup():
 
 def check_dependencies():
     """Check if required dependencies are available."""
-    try:
-        import streamlit
-        print("✅ Streamlit available")
-    except ImportError:
-        print("❌ Streamlit not found")
-        print("💡 Installing Streamlit...")
+    missing_packages = []
+
+    # Check essential packages
+    essential_packages = {
+        'streamlit': 'streamlit>=1.28.0',
+        'numpy': 'numpy>=1.21.0',
+        'pandas': 'pandas>=1.3.0',
+        'requests': 'requests>=2.25.0',
+        'cryptography': 'cryptography>=41.0.0'
+    }
+
+    for package_name, package_spec in essential_packages.items():
         try:
-            subprocess.run([sys.executable, "-m", "pip", "install", "streamlit"],
-                         check=True, capture_output=True)
-            print("✅ Streamlit installed successfully")
-        except:
-            print("❌ Failed to install Streamlit")
-            print("💡 Please run: pip install streamlit")
+            __import__(package_name)
+            print(f"✅ {package_name} available")
+        except ImportError:
+            print(f"❌ {package_name} not found")
+            missing_packages.append(package_spec)
+
+    # Install missing packages
+    if missing_packages:
+        print(f"💡 Installing {len(missing_packages)} missing packages...")
+        try:
+            subprocess.run([
+                sys.executable, "-m", "pip", "install"
+            ] + missing_packages, check=True, capture_output=True, timeout=300)
+            print("✅ Missing packages installed successfully")
+        except subprocess.TimeoutExpired:
+            print("⚠️  Installation taking longer than expected")
+            print("💡 Please run manually: pip install streamlit numpy pandas requests cryptography")
+            return False
+        except Exception as e:
+            print("❌ Failed to install missing packages")
+            print(f"💡 Please run manually: pip install {' '.join(missing_packages)}")
+            print(f"💡 Or on Linux: python3 -m pip install {' '.join(missing_packages)}")
             return False
 
     # Check security dependencies
