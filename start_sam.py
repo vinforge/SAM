@@ -248,62 +248,113 @@ def check_dependencies():
 
 def is_first_time_user():
     """Check if this is a first-time user who needs setup."""
+    print("🔍 Checking user setup status...")
+
+    # Check multiple indicators of completed setup
+    setup_indicators = []
+
+    # 1. Check for security setup
     try:
-        # Check for security setup
         from security import SecureStateManager
         security_manager = SecureStateManager()
 
         # If security setup is required, this is a first-time user
         if security_manager.is_setup_required():
-            return True
+            setup_indicators.append("Security setup required")
+        else:
+            setup_indicators.append("Security system configured")
 
     except ImportError:
-        pass
-    except Exception:
-        pass
+        setup_indicators.append("Security module not available")
+    except Exception as e:
+        setup_indicators.append(f"Security check failed: {e}")
 
-    # Check setup status file
-    try:
-        setup_file = Path("setup_status.json")
-        if setup_file.exists():
+    # 2. Check setup status file
+    setup_file = Path("setup_status.json")
+    if setup_file.exists():
+        try:
             with open(setup_file, 'r') as f:
                 status = json.load(f)
 
             # Check if master password is created
             if status.get('master_password_created', False):
+                setup_indicators.append("Master password created")
+                print("✅ Setup status: Master password found")
                 return False
+            else:
+                setup_indicators.append("Setup status file exists but incomplete")
 
-    except Exception:
-        pass
+        except Exception as e:
+            setup_indicators.append(f"Setup status file corrupted: {e}")
+    else:
+        setup_indicators.append("No setup status file")
 
-    # Check for keystore file
+    # 3. Check for keystore file
     keystore_file = Path("security/keystore.json")
     if keystore_file.exists():
+        setup_indicators.append("Keystore file exists")
+        print("✅ Setup status: Security keystore found")
         return False
+    else:
+        setup_indicators.append("No keystore file")
 
-    # If no indicators of setup, assume first-time user
+    # 4. Check for SAM Pro key file
+    sam_pro_file = Path("sam_pro_key.txt")
+    if sam_pro_file.exists():
+        setup_indicators.append("SAM Pro key file exists")
+        print("✅ Setup status: SAM Pro key found")
+        return False
+    else:
+        setup_indicators.append("No SAM Pro key file")
+
+    # Log all indicators for debugging
+    print("🔍 Setup indicators found:")
+    for indicator in setup_indicators:
+        print(f"   • {indicator}")
+
+    # If no indicators of completed setup, this is a first-time user
+    print("🎯 Result: First-time user detected")
     return True
 
 def start_sam():
     """Start SAM using Streamlit."""
     try:
         # Check if this is a first-time user
-        if is_first_time_user():
+        first_time = is_first_time_user()
+
+        if first_time:
             print("🎯 First-time user detected!")
             print("🚀 Starting SAM Welcome & Setup page...")
 
-            # Start welcome setup page
-            cmd = [
-                sys.executable, "-m", "streamlit", "run", "welcome_setup.py",
-                "--server.port", "8503",
-                "--server.address", "localhost",
-                "--browser.gatherUsageStats", "false",
-                "--server.headless", "true"
-            ]
+            # Verify welcome_setup.py exists
+            welcome_file = Path("welcome_setup.py")
+            if not welcome_file.exists():
+                print("❌ Welcome setup file not found!")
+                print("💡 Falling back to main interface...")
+                print("📋 Please run: python setup_sam.py first")
+                # Fall back to main interface
+                cmd = [
+                    sys.executable, "-m", "streamlit", "run", "secure_streamlit_app.py",
+                    "--server.port", "8502",
+                    "--server.address", "localhost",
+                    "--browser.gatherUsageStats", "false",
+                    "--server.headless", "true"
+                ]
+            else:
+                # Start welcome setup page
+                cmd = [
+                    sys.executable, "-m", "streamlit", "run", "welcome_setup.py",
+                    "--server.port", "8503",
+                    "--server.address", "localhost",
+                    "--browser.gatherUsageStats", "false",
+                    "--server.headless", "true"
+                ]
 
-            print("🌐 Opening SAM Welcome page in your browser...")
-            print("📱 Setup page: http://localhost:8503")
-            print("📋 After setup, access SAM at: http://localhost:8502")
+                print("🌐 Opening SAM Welcome page in your browser...")
+                print("📱 Setup page: http://localhost:8503")
+                print("📋 Complete setup to create your master password")
+                print("🔑 You'll receive a SAM Pro activation key")
+                print("🚀 After setup, access SAM at: http://localhost:8502")
 
         else:
             print("✅ Existing user detected")
@@ -334,16 +385,18 @@ def start_sam():
 
         # Open browser to appropriate URL
         try:
-            if is_first_time_user():
+            if first_time:
                 webbrowser.open("http://localhost:8503")
+                print("🌐 Browser opened to Welcome page: http://localhost:8503")
             else:
                 webbrowser.open("http://localhost:8502")
+                print("🌐 Browser opened to SAM interface: http://localhost:8502")
         except:
             print("⚠️  Could not open browser automatically")
-            if is_first_time_user():
-                print("🌐 Please open: http://localhost:8503")
+            if first_time:
+                print("🌐 Please open: http://localhost:8503 (Welcome & Setup)")
             else:
-                print("🌐 Please open: http://localhost:8502")
+                print("🌐 Please open: http://localhost:8502 (SAM Interface)")
         
         # Wait for the process
         process.wait()

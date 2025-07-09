@@ -118,7 +118,12 @@ python3 start_sam.py
 **Step 3: Access SAM**
 - **First-time users**: Browser opens to **http://localhost:8503** (Welcome & Setup page)
 - **Existing users**: Browser opens to **http://localhost:8502** (Main SAM interface)
-- Complete the welcome setup, then access SAM at **http://localhost:8502**
+
+**🎯 First-Time Setup Flow:**
+1. **Welcome Page**: Complete master password creation at localhost:8503
+2. **SAM Pro Key**: Receive your activation key automatically
+3. **Main Interface**: Access full SAM at localhost:8502
+4. **Enter Credentials**: Use your master password and SAM Pro key
 
 **🔧 If Installation Fails:**
 ```bash
@@ -195,6 +200,32 @@ python3 start_sam.py
 - **First-time users**: Browser opens to **http://localhost:8503** (Welcome & Setup)
 - **Existing users**: Browser opens to **http://localhost:8502** (Main interface)
 - Complete setup, then access SAM at **http://localhost:8502**
+
+---
+
+## 🎯 **New Installation Flow**
+
+### **🚀 For Fresh Machines (Recommended Path):**
+```bash
+# 1. Clone and setup
+git clone https://github.com/forge-1825/SAM.git
+cd SAM
+
+# 2. Start SAM (will auto-detect first-time user)
+python start_sam.py
+# OR on Linux/macOS: python3 start_sam.py
+
+# 3. Browser opens to: http://localhost:8503 (Welcome page)
+# 4. Complete setup: Create master password
+# 5. Receive: SAM Pro activation key
+# 6. Access main interface: http://localhost:8502
+```
+
+### **✅ What Happens Automatically:**
+- **First-time detection**: System checks for existing setup
+- **Welcome page**: Opens at localhost:8503 for new users
+- **Setup completion**: Creates master password and SAM Pro key
+- **Automatic routing**: Existing users go directly to localhost:8502
 
 ---
 
