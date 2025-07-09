@@ -69,44 +69,79 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
+    # Debug information (can be removed later)
+    with st.expander("🔍 Debug: Setup Status", expanded=False):
+        st.write("**Setup File Status:**")
+
+        setup_file = Path("setup_status.json")
+        if setup_file.exists():
+            try:
+                with open(setup_file, 'r') as f:
+                    status = json.load(f)
+                st.json(status)
+            except:
+                st.write("❌ Could not read setup_status.json")
+        else:
+            st.write("📝 No setup_status.json file")
+
+        keystore_file = Path("security/keystore.json")
+        if keystore_file.exists():
+            try:
+                with open(keystore_file, 'r') as f:
+                    keystore = json.load(f)
+                st.write("**Keystore Status:**")
+                st.write(f"Has password_hash: {'password_hash' in keystore}")
+                st.write(f"Initialized: {keystore.get('initialized', False)}")
+            except:
+                st.write("❌ Could not read keystore.json")
+        else:
+            st.write("📝 No keystore.json file")
+
+        st.write(f"**is_setup_complete() result:** {is_setup_complete()}")
+
     # Check if setup is already complete
     if is_setup_complete():
         show_setup_complete_page()
         return
-    
+
     # Show welcome and setup page
     show_welcome_setup_page()
 
 def is_setup_complete():
-    """Check if SAM setup is already complete."""
-    try:
-        # Check for security setup
-        from security import SecureStateManager
-        security_manager = SecureStateManager()
-        
-        # If security is already configured, setup is complete
-        if not security_manager.is_setup_required():
-            return True
-            
-    except ImportError:
-        pass
-    except Exception:
-        pass
-    
-    # Check setup status file
-    try:
-        setup_file = Path("setup_status.json")
-        if setup_file.exists():
+    """Check if SAM welcome page setup is already complete."""
+    # This should only return True if the user has completed the welcome page flow
+    # NOT if setup_sam.py has just created technical files
+
+    # PRIMARY CHECK: Has user completed welcome page setup?
+    setup_file = Path("setup_status.json")
+    if setup_file.exists():
+        try:
             with open(setup_file, 'r') as f:
                 status = json.load(f)
-            
-            # Check if master password is created
+
+            # Only consider setup complete if master password was created via welcome page
             if status.get('master_password_created', False):
                 return True
-                
-    except Exception:
-        pass
-    
+
+        except Exception:
+            pass
+
+    # SECONDARY CHECK: Security keystore with password hash from welcome page
+    keystore_file = Path("security/keystore.json")
+    if keystore_file.exists():
+        try:
+            with open(keystore_file, 'r') as f:
+                keystore_data = json.load(f)
+
+            # Only consider complete if password_hash exists (from welcome page)
+            if keystore_data.get('password_hash'):
+                return True
+
+        except Exception:
+            pass
+
+    # If we reach here, either no setup files exist, or only technical setup
+    # from setup_sam.py exists - user still needs to complete welcome page
     return False
 
 def show_setup_complete_page():
@@ -149,7 +184,9 @@ def show_welcome_setup_page():
     
     # Header
     st.markdown('<h1 class="main-header">🚀 Welcome to SAM!</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Let\'s get you set up in just a few steps</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">First-Time Setup - Let\'s get you started in just a few steps</p>', unsafe_allow_html=True)
+
+    st.success("🎯 **New Installation Detected** - Complete the setup below to activate SAM")
     
     # Welcome container
     st.markdown("""
