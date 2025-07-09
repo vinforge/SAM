@@ -181,7 +181,18 @@ def show_setup_complete_page():
 
 def show_welcome_setup_page():
     """Show the main welcome and setup page."""
-    
+
+    # Initialize session state for setup completion
+    if 'setup_completed' not in st.session_state:
+        st.session_state.setup_completed = False
+    if 'sam_pro_key' not in st.session_state:
+        st.session_state.sam_pro_key = None
+
+    # If setup was just completed, show success page
+    if st.session_state.setup_completed and st.session_state.sam_pro_key:
+        show_setup_success(st.session_state.sam_pro_key)
+        return
+
     # Header
     st.markdown('<h1 class="main-header">🚀 Welcome to SAM!</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">First-Time Setup - Let\'s get you started in just a few steps</p>', unsafe_allow_html=True)
@@ -248,19 +259,23 @@ def show_welcome_setup_page():
                     
                 if success:
                     st.success("✅ Master password created successfully!")
-                    
+
                     # Generate SAM Pro key
                     sam_pro_key = generate_sam_pro_key()
-                    
+
                     # Update setup status
                     update_setup_status({
                         'master_password_created': True,
                         'sam_pro_key': sam_pro_key,
                         'setup_timestamp': datetime.now().isoformat()
                     })
-                    
-                    # Show success and next steps
-                    show_setup_success(sam_pro_key)
+
+                    # Set session state to show success page
+                    st.session_state.setup_completed = True
+                    st.session_state.sam_pro_key = sam_pro_key
+
+                    # Rerun to show success page
+                    st.rerun()
                 else:
                     st.error("❌ Failed to create master password. Please try again.")
 
@@ -362,23 +377,27 @@ def show_setup_success(sam_pro_key):
     
     with col1:
         if st.button("🧠 Open SAM Chat", type="primary", use_container_width=True):
+            # Use JavaScript to redirect to SAM main interface
             st.markdown("""
             <script>
-            window.open('http://localhost:8502', '_blank');
+            window.location.href = 'http://localhost:8502';
             </script>
             """, unsafe_allow_html=True)
-            st.success("Opening SAM in a new tab...")
+            st.success("🚀 Redirecting to SAM main interface...")
     
     with col2:
         if st.button("📋 Copy Activation Key", use_container_width=True):
-            st.code(sam_pro_key)
-            st.info("Key displayed above - copy and save it!")
+            # Show the key in a copyable format
+            st.text_area("Copy this key:", value=sam_pro_key, height=100)
+            st.info("💾 Key ready to copy - save it securely!")
     
+    # Manual link as backup
     st.markdown("---")
-    
+    st.info("🔗 **Manual Access**: If the button doesn't work, open [http://localhost:8502](http://localhost:8502) in your browser")
+
     st.markdown("### 📚 What's Next?")
     st.markdown("""
-    1. **Open SAM Chat** using the button above
+    1. **Open SAM Chat** using the button above or the manual link
     2. **Enter your master password** when prompted
     3. **Enter your SAM Pro key** to unlock advanced features
     4. **Start chatting** with SAM and explore its capabilities!
