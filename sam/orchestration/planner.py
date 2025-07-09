@@ -189,16 +189,19 @@ class DynamicPlanner:
                 result = self._generate_curriculum_plan(uif, background_goal)
             else:
                 result = self._generate_fallback_plan(uif, background_goal)
-            
+
+            # Phase 5C: Apply SELF-REFLECT policy to enhance plan
+            result = self._apply_self_reflect_policy(result, uif)
+
             # Cache the result if successful
             if self._config.enable_plan_caching and result.plan and result.confidence > 0.5:
                 self._cache_plan(uif, result)
-            
+
             generation_time = time.time() - start_time
             result.generation_time = generation_time
-            
+
             self.logger.info(f"Plan created: {result.plan} (confidence: {result.confidence:.2f})")
-            
+
             return result
             
         except Exception as e:
@@ -1080,3 +1083,128 @@ class DynamicPlanner:
             self.logger.error(f"Error extracting examples: {e}")
 
         return examples
+
+    # SELF-REFLECT Policy Implementation (Phase 5C)
+
+    def _apply_self_reflect_policy(self, result: PlanGenerationResult, uif: SAM_UIF) -> PlanGenerationResult:
+        """
+        Apply SELF-REFLECT policy to enhance execution plan.
+
+        Determines if AutonomousFactualCorrectionSkill should be added to the plan
+        based on query characteristics, confidence levels, and user profiles.
+
+        Args:
+            result: Original plan generation result
+            uif: Universal Interface Format with query context
+
+        Returns:
+            Enhanced plan generation result with SELF-REFLECT if applicable
+        """
+        try:
+            # Check if SELF-REFLECT is enabled
+            if not self._config.enable_self_reflect:
+                return result
+
+            # Check if AutonomousFactualCorrectionSkill is available
+            if "AutonomousFactualCorrectionSkill" not in self._registered_skills:
+                self.logger.warning("AutonomousFactualCorrectionSkill not registered, skipping SELF-REFLECT")
+                return result
+
+            should_add_self_reflect = self._should_trigger_self_reflect_policy(uif, result)
+
+            if should_add_self_reflect:
+                # Add AutonomousFactualCorrectionSkill after ResponseGenerationSkill
+                enhanced_plan = self._insert_self_reflect_skill(result.plan)
+
+                # Update result with enhanced plan
+                enhanced_result = PlanGenerationResult(
+                    plan=enhanced_plan,
+                    confidence=result.confidence,
+                    reasoning=result.reasoning + "; Added SELF-REFLECT for factual verification",
+                    cache_hit=result.cache_hit,
+                    generation_time=result.generation_time,
+                    fallback_used=result.fallback_used
+                )
+
+                self.logger.info("Enhanced plan with SELF-REFLECT capability")
+                return enhanced_result
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Error applying SELF-REFLECT policy: {e}")
+            return result
+
+    def _should_trigger_self_reflect_policy(self, uif: SAM_UIF, result: PlanGenerationResult) -> bool:
+        """
+        Determine if SELF-REFLECT should be triggered based on policy rules.
+
+        Args:
+            uif: Universal Interface Format with query context
+            result: Plan generation result
+
+        Returns:
+            True if SELF-REFLECT should be triggered
+        """
+        try:
+            query = uif.input_query.lower()
+
+            # Rule 1: Check for factual query keywords
+            factual_keywords = self._config.self_reflect_query_keywords
+            if any(keyword in query for keyword in factual_keywords):
+                self.logger.info("SELF-REFLECT triggered by factual query keywords")
+                return True
+
+            # Rule 2: Check confidence threshold
+            if result.confidence < self._config.self_reflect_confidence_threshold:
+                self.logger.info(f"SELF-REFLECT triggered by low confidence: {result.confidence}")
+                return True
+
+            # Rule 3: Check user profile (if available in UIF)
+            user_profile = uif.intermediate_data.get("user_profile", "")
+            if user_profile in self._config.self_reflect_profiles:
+                self.logger.info(f"SELF-REFLECT triggered by user profile: {user_profile}")
+                return True
+
+            # Rule 4: Check for high dissonance indicators
+            dissonance_keywords = ["conflicting", "contradictory", "uncertain", "unclear", "disputed"]
+            if any(keyword in query for keyword in dissonance_keywords):
+                self.logger.info("SELF-REFLECT triggered by dissonance indicators")
+                return True
+
+            # Rule 5: Long responses are more likely to contain errors
+            response_text = uif.intermediate_data.get("response_text", "")
+            if len(response_text.split()) > 150:
+                self.logger.info("SELF-REFLECT triggered by long response length")
+                return True
+
+            return False
+
+        except Exception as e:
+            self.logger.error(f"Error in SELF-REFLECT policy evaluation: {e}")
+            return False
+
+    def _insert_self_reflect_skill(self, original_plan: List[str]) -> List[str]:
+        """
+        Insert AutonomousFactualCorrectionSkill into the execution plan.
+
+        Args:
+            original_plan: Original execution plan
+
+        Returns:
+            Enhanced plan with SELF-REFLECT skill
+        """
+        enhanced_plan = original_plan.copy()
+
+        # Find the best insertion point (after ResponseGenerationSkill)
+        insertion_index = len(enhanced_plan)  # Default to end
+
+        for i, skill_name in enumerate(enhanced_plan):
+            if skill_name == "ResponseGenerationSkill":
+                insertion_index = i + 1
+                break
+
+        # Insert the SELF-REFLECT skill
+        enhanced_plan.insert(insertion_index, "AutonomousFactualCorrectionSkill")
+
+        return enhanced_plan

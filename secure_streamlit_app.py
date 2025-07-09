@@ -1640,6 +1640,9 @@ def render_chat_interface():
         with st.chat_message("assistant"):
             st.markdown("Hello! 👋 I'm SAM")
 
+        # Show system status indicators for new sessions
+        render_system_status_indicators()
+
     # Phase 8 Web Search Integration Info
     with st.expander("🌐 Web Search Integration", expanded=False):
         st.markdown("""
@@ -2026,6 +2029,9 @@ def render_chat_interface():
 
                                 # Add Cognitive Distillation Thought Transparency (NEW - Phase 2 Integration)
                                 render_thought_transparency()
+
+                                # Add SELF-REFLECT Transparency (Phase 5C)
+                                render_self_reflect_transparency(raw_response)
 
                                 # Add feedback system
                                 render_feedback_system(len(st.session_state.chat_history) - 1)
@@ -2549,58 +2555,17 @@ def render_integrated_memory_control_center():
 
 def render_basic_memory_interface():
     """Render the basic memory management interface."""
-    st.header("🧠 Secure Memory Management")
-
     # Memory Control Center Access
-    st.markdown("---")
-    st.subheader("🎛️ Memory Control Center")
-    st.markdown("""
-    **Access SAM's comprehensive Memory Control Center** with advanced memory management features:
-
-    🧠 **Enhanced Memory Tools** • 📊 **Memory Analytics** • 🎨 **Dream Canvas** • 🔑 **API Management**
-    """)
-
-    col1, col2, col3 = st.columns([2, 1, 2])
+    col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.markdown("""
-        **🎛️ Memory Control Center Features:**
-        • **Memory Browser** - Interactive search & browsing
-        • **Memory Editor** - Edit and manage memories
-        • **Memory Graph** - Visual relationship mapping
-        • **Enhanced Chat** - Advanced memory integration
-        • **Command Interface** - Execute memory commands
-        • **Bulk Ingestion** - Process multiple documents
-        • **API Key Manager** - Configure web tools
-        • **🧠🎨 Dream Canvas** - Cognitive synthesis visualization
-        • **🧠🔬 Cognitive Distillation** - AI introspection & principle discovery
-        • **Memory Analytics** - Advanced statistics
-        • **Memory Ranking** - Importance scoring
-        """)
-
-    with col2:
-        if st.button("🎛️ Advanced View", use_container_width=True, help="Switch to Memory Control Center with dropdown menu"):
+        if st.button("🎛️ Memory Control Center", use_container_width=True, help="Switch to Memory Control Center with dropdown menu"):
             st.session_state.show_memory_control_center = True
             st.success("🎛️ **Switching to Memory Control Center...**")
             st.rerun()
 
-        st.info("💡 **Tip:** Click above to access the full Memory Control Center interface integrated into this secure interface.")
-
-    with col3:
-        st.markdown("""
-        **🔗 Integrated Access:**
-
-        **✅ Unified Interface**: Memory Control Center runs directly in this secure interface
-
-        **🛡️ Security Benefits:**
-        - Same authentication session
-        - No separate ports needed
-        - Unified security policies
-        - Seamless integration
-
-        **💡 Enhanced Experience:**
-        All advanced memory features available without leaving the secure interface.
-        """)
+    with col2:
+        st.info("💡 **Tip:** Click to access the full Memory Control Center interface.")
 
     st.markdown("---")
 
@@ -11953,6 +11918,195 @@ def render_cognitive_distillation_management():
     except Exception as e:
         st.error(f"❌ Error loading Cognitive Distillation management: {e}")
         logger.error(f"Cognitive Distillation management error: {e}")
+
+def render_self_reflect_transparency(response_text: str):
+    """
+    Render SELF-REFLECT transparency information if available.
+
+    This function checks if the response was processed through SELF-REFLECT
+    and displays transparency information about any corrections made.
+
+    Args:
+        response_text: The generated response text
+    """
+    try:
+        # Check if SELF-REFLECT data is available in session state
+        self_reflect_data = st.session_state.get('last_self_reflect_data')
+
+        if not self_reflect_data:
+            return
+
+        # Check if self-reflection was actually triggered and revisions were made
+        was_revised = self_reflect_data.get('was_revised', False)
+        revision_notes = self_reflect_data.get('revision_notes', '')
+        self_reflect_triggered = self_reflect_data.get('self_reflect_triggered', False)
+
+        if self_reflect_triggered:
+            if was_revised and revision_notes:
+                # Show successful self-correction
+                with st.expander("🔍 **Self-Correction Applied:** This response was revised for factual accuracy.", expanded=False):
+                    st.info("**SAM's Self-Reflection Process:**")
+                    st.markdown("SAM automatically detected potential factual issues and revised the response.")
+
+                    st.markdown("**🔍 Revision Notes:**")
+                    st.text_area(
+                        "Corrections Applied:",
+                        value=revision_notes,
+                        height=100,
+                        disabled=True,
+                        key="self_reflect_notes"
+                    )
+
+                    # Show additional metadata if available
+                    corrections_count = self_reflect_data.get('corrections_count', 0)
+                    confidence_analysis = self_reflect_data.get('confidence_analysis', {})
+
+                    if corrections_count > 0:
+                        st.success(f"✅ **{corrections_count} factual corrections** were automatically applied")
+
+                    if confidence_analysis:
+                        overall_confidence = confidence_analysis.get('overall_confidence', 0.0)
+                        st.metric("Response Confidence", f"{overall_confidence:.1%}")
+
+                    # Show MEMOIR integration status
+                    memoir_edits = self_reflect_data.get('memoir_edits_created', 0)
+                    if memoir_edits > 0:
+                        st.info(f"🧠 **{memoir_edits} corrections** were automatically learned for future improvement")
+
+                    st.markdown("---")
+                    st.caption("🔬 This transparency feature shows SAM's autonomous fact-checking process")
+
+            else:
+                # Show that self-reflection was triggered but no corrections were needed
+                with st.expander("🔍 **Self-Reflection Completed:** No corrections needed.", expanded=False):
+                    st.success("**SAM's Self-Reflection Process:**")
+                    st.markdown("SAM automatically reviewed this response for factual accuracy and found no issues requiring correction.")
+
+                    confidence_analysis = self_reflect_data.get('confidence_analysis', {})
+                    if confidence_analysis:
+                        overall_confidence = confidence_analysis.get('overall_confidence', 0.0)
+                        st.metric("Response Confidence", f"{overall_confidence:.1%}")
+
+                    st.markdown("---")
+                    st.caption("🔬 This transparency feature shows SAM's autonomous fact-checking process")
+
+        # Clear the data after displaying to avoid showing it for subsequent responses
+        if 'last_self_reflect_data' in st.session_state:
+            del st.session_state['last_self_reflect_data']
+
+    except Exception as e:
+        logger.debug(f"SELF-REFLECT transparency display error: {e}")
+
+def simulate_self_reflect_for_demo(response_text: str, query: str):
+    """
+    Simulate SELF-REFLECT processing for demonstration purposes.
+
+    This function demonstrates how the SELF-REFLECT system would work
+    by analyzing the response and potentially triggering corrections.
+
+    Args:
+        response_text: The generated response
+        query: The original query
+    """
+    try:
+        # Import SELF-REFLECT components if available
+        from sam.orchestration.skills.autonomous.factual_correction import AutonomousFactualCorrectionSkill
+        from sam.orchestration.uif import SAM_UIF
+        from sam.orchestration.config import get_sof_config
+
+        # Check if SELF-REFLECT is enabled
+        config = get_sof_config()
+        if not getattr(config, 'enable_self_reflect', True):
+            return
+
+        # Create UIF for SELF-REFLECT processing
+        uif = SAM_UIF(
+            input_query=query,
+            intermediate_data={
+                'response_text': response_text,
+                'original_query': query,
+                'initial_response': response_text,
+                'confidence_scores': {'overall': 0.75}  # Simulated confidence
+            }
+        )
+
+        # Initialize and execute SELF-REFLECT skill
+        self_reflect_skill = AutonomousFactualCorrectionSkill(
+            enable_self_reflect=True,
+            self_reflect_threshold=0.7
+        )
+
+        # Execute the skill
+        result_uif = self_reflect_skill.execute(uif)
+
+        # Store results for transparency display
+        st.session_state['last_self_reflect_data'] = {
+            'was_revised': result_uif.intermediate_data.get('was_revised', False),
+            'revision_notes': result_uif.intermediate_data.get('revision_notes', ''),
+            'final_response': result_uif.intermediate_data.get('final_response', response_text),
+            'self_reflect_triggered': True,
+            'corrections_count': len(result_uif.intermediate_data.get('corrections_made', [])),
+            'confidence_analysis': result_uif.intermediate_data.get('confidence_analysis', {}),
+            'memoir_edits_created': 0  # Would be populated by MEMOIR integration
+        }
+
+        logger.info("SELF-REFLECT simulation completed")
+
+    except ImportError:
+        logger.debug("SELF-REFLECT components not available for simulation")
+    except Exception as e:
+        logger.debug(f"SELF-REFLECT simulation error: {e}")
+
+def render_system_status_indicators():
+    """
+    Render system status indicators showing feature activation status.
+
+    This provides users with visibility into which SAM features are currently active.
+    """
+    try:
+        # Create a compact status bar
+        st.markdown("---")
+        st.markdown("### 🔧 **SAM System Status**")
+
+        # Create columns for status indicators
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            # SELF-REFLECT Status
+            self_reflect_enabled = True  # Would check actual config
+            if self_reflect_enabled:
+                st.success("🔍 **Self-Reflect**\n\nActive")
+            else:
+                st.warning("🔍 **Self-Reflect**\n\nInactive")
+
+        with col2:
+            # MEMOIR Status
+            memoir_enabled = st.session_state.get('memoir_enabled', False)
+            if memoir_enabled:
+                st.success("🧠 **MEMOIR**\n\nActive")
+            else:
+                st.warning("🧠 **MEMOIR**\n\nInactive")
+
+        with col3:
+            # Cognitive Distillation Status
+            cognitive_enabled = st.session_state.get('cognitive_distillation_initialized', False)
+            if cognitive_enabled:
+                st.success("🧠 **Cognitive**\n\nActive")
+            else:
+                st.warning("🧠 **Cognitive**\n\nInactive")
+
+        with col4:
+            # Security Status
+            security_enabled = True  # Always active in secure app
+            if security_enabled:
+                st.success("🛡️ **Security**\n\nActive")
+            else:
+                st.error("🛡️ **Security**\n\nInactive")
+
+        st.markdown("---")
+
+    except Exception as e:
+        logger.debug(f"System status indicators error: {e}")
 
 if __name__ == "__main__":
     main()

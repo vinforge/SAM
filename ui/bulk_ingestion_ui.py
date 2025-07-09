@@ -430,18 +430,21 @@ class BulkIngestionUI:
                         current_path = Path(st.session_state.current_browse_path)
                         st.code(str(current_path))
 
-                        # Navigation buttons
+                        # Navigation buttons (moved outside form)
+                        st.markdown("**📁 Navigate Folders:**")
                         col_nav1, col_nav2, col_nav3 = st.columns([1, 1, 2])
 
                         with col_nav1:
-                            if st.button("⬆️ Parent", key="nav_parent"):
+                            nav_parent = st.form_submit_button("⬆️ Parent")
+                            if nav_parent:
                                 parent = current_path.parent
                                 if parent != current_path:  # Not at root
                                     st.session_state.current_browse_path = str(parent)
                                     st.rerun()
 
                         with col_nav2:
-                            if st.button("🏠 Home", key="nav_home"):
+                            nav_home = st.form_submit_button("🏠 Home")
+                            if nav_home:
                                 st.session_state.current_browse_path = str(Path.home())
                                 st.rerun()
 
@@ -485,24 +488,29 @@ class BulkIngestionUI:
                             if directories:
                                 st.markdown("**📁 Available Folders:**")
 
-                                # Create a grid of folder buttons
-                                cols_per_row = 3
-                                for i in range(0, len(directories), cols_per_row):
-                                    cols = st.columns(cols_per_row)
-                                    for j, col in enumerate(cols):
-                                        if i + j < len(directories):
-                                            folder = directories[i + j]
-                                            with col:
-                                                if st.button(f"📁 {folder.name}", key=f"folder_{i+j}"):
-                                                    st.session_state.current_browse_path = str(folder)
-                                                    st.rerun()
+                                # Display folders as a selectbox instead of buttons (form-compatible)
+                                folder_options = ["Select a folder..."] + [f"📁 {folder.name}" for folder in directories]
+                                selected_folder_idx = st.selectbox(
+                                    "Choose a folder to navigate to:",
+                                    range(len(folder_options)),
+                                    format_func=lambda x: folder_options[x],
+                                    key="folder_selector"
+                                )
+
+                                if selected_folder_idx > 0:
+                                    selected_folder = directories[selected_folder_idx - 1]
+                                    navigate_to_folder = st.form_submit_button(f"📁 Navigate to {selected_folder.name}")
+                                    if navigate_to_folder:
+                                        st.session_state.current_browse_path = str(selected_folder)
+                                        st.rerun()
 
                                 # Select current folder button
                                 st.markdown("---")
                                 col_select1, col_select2 = st.columns([1, 1])
 
                                 with col_select1:
-                                    if st.button("✅ Select This Folder", type="primary", key="select_current_folder"):
+                                    select_current = st.form_submit_button("✅ Select This Folder", type="primary")
+                                    if select_current:
                                         st.session_state.selected_folder_path = str(current_path)
                                         st.success(f"Selected: {current_path}")
 
@@ -513,7 +521,8 @@ class BulkIngestionUI:
                                 st.info("No subdirectories found in this location")
 
                                 # Still allow selecting the current folder
-                                if st.button("✅ Select This Folder", type="primary", key="select_empty_folder"):
+                                select_empty = st.form_submit_button("✅ Select This Folder", type="primary")
+                                if select_empty:
                                     st.session_state.selected_folder_path = str(current_path)
                                     st.success(f"Selected: {current_path}")
 

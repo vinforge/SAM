@@ -365,6 +365,9 @@ class CoordinatorEngine:
                     uif.set_error(error_msg)
                     return ExecutionResult.FAILURE
         
+        # Phase 5C: Post-execution processing for SELF-REFLECT
+        self._process_self_reflect_results(uif, execution_plan)
+
         # Determine final result
         if not failed_skills:
             uif.status = UIFStatus.SUCCESS
@@ -709,3 +712,87 @@ class CoordinatorEngine:
         if self._domain_constraints:
             return self._domain_constraints.get_constraint_statistics()
         return None
+
+    # SELF-REFLECT Post-Processing (Phase 5C)
+
+    def _process_self_reflect_results(self, uif: SAM_UIF, execution_plan: List[str]) -> None:
+        """
+        Process SELF-REFLECT results and trigger MEMOIR integration.
+
+        This method is called after plan execution to check if AutonomousFactualCorrectionSkill
+        was executed and produced corrections that should be fed into MEMOIR.
+
+        Args:
+            uif: Universal Interface Format with execution results
+            execution_plan: List of executed skills
+        """
+        try:
+            # Check if AutonomousFactualCorrectionSkill was in the execution plan
+            if "AutonomousFactualCorrectionSkill" not in execution_plan:
+                return
+
+            # Check if SELF-REFLECT produced corrections
+            was_revised = uif.intermediate_data.get("was_revised", False)
+            if not was_revised:
+                return
+
+            # Check if MEMOIR auto-correction is enabled
+            config = self._config
+            if not getattr(config, 'enable_memoir_auto_correction', True):
+                self.logger.info("MEMOIR auto-correction disabled, skipping")
+                return
+
+            self.logger.info("Processing SELF-REFLECT results for MEMOIR integration")
+
+            # Initialize MEMOIR feedback handler
+            memoir_handler = self._get_memoir_feedback_handler()
+            if not memoir_handler:
+                self.logger.warning("MEMOIR feedback handler not available")
+                return
+
+            # Process autonomous corrections
+            result = memoir_handler.process_autonomous_correction(uif)
+
+            if result.get('success', False):
+                corrections_processed = result.get('corrections_processed', 0)
+                memoir_edits_created = result.get('memoir_edits_created', 0)
+
+                uif.add_log_entry(
+                    f"MEMOIR integration: {corrections_processed} corrections processed, "
+                    f"{memoir_edits_created} edits created",
+                    "CoordinatorEngine"
+                )
+
+                self.logger.info(
+                    f"Successfully processed SELF-REFLECT corrections: "
+                    f"{corrections_processed} processed, {memoir_edits_created} MEMOIR edits created"
+                )
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                uif.add_warning(f"MEMOIR integration failed: {error_msg}")
+                self.logger.warning(f"MEMOIR integration failed: {error_msg}")
+
+        except Exception as e:
+            self.logger.error(f"Error processing SELF-REFLECT results: {e}")
+            uif.add_warning(f"SELF-REFLECT post-processing failed: {str(e)}")
+
+    def _get_memoir_feedback_handler(self):
+        """
+        Get or create MEMOIR feedback handler instance.
+
+        Returns:
+            MEMOIRFeedbackHandler instance or None if unavailable
+        """
+        try:
+            # Import here to avoid circular dependencies
+            from sam.learning.feedback_handler import MEMOIRFeedbackHandler
+
+            # Create handler instance (could be cached in the future)
+            return MEMOIRFeedbackHandler()
+
+        except ImportError as e:
+            self.logger.error(f"Failed to import MEMOIRFeedbackHandler: {e}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Failed to create MEMOIRFeedbackHandler: {e}")
+            return None

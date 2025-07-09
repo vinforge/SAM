@@ -10,7 +10,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,14 @@ class SOFConfig:
     # Backward compatibility
     fallback_to_legacy: bool = True  # Fallback to old system on SOF failure
     legacy_timeout: float = 30.0
+
+    # SELF-REFLECT Configuration (Phase 5C)
+    enable_self_reflect: bool = True  # Enable SELF-REFLECT methodology
+    self_reflect_confidence_threshold: float = 0.7  # Trigger threshold for low confidence
+    self_reflect_profiles: List[str] = field(default_factory=lambda: ['researcher', 'legal', 'academic'])  # User profiles that trigger self-reflection
+    self_reflect_query_keywords: List[str] = field(default_factory=lambda: ['what is', 'who was', 'when did', 'define', 'explain', 'describe'])  # Query keywords that trigger self-reflection
+    enable_memoir_auto_correction: bool = True  # Auto-feed corrections to MEMOIR
+    self_reflect_max_revisions: int = 1  # Maximum revision attempts per response
 
 
 class SOFConfigManager:

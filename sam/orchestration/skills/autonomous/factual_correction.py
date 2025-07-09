@@ -1,11 +1,14 @@
 """
-Autonomous Factual Correction Skill
+Autonomous Factual Correction Skill with SELF-REFLECT Integration
 
-Autonomous skill that detects and corrects factual errors using MEMOIR framework.
-Integrates with SAM's reasoning systems to identify inconsistencies and hallucinations.
+Enhanced autonomous skill that detects and corrects factual errors using MEMOIR framework
+and the SELF-REFLECT methodology (Generate, Critique, Revise).
+
+Integrates with SAM's reasoning systems to identify inconsistencies and hallucinations,
+then uses structured critique and revision to improve response accuracy.
 
 Author: SAM Development Team
-Version: 1.0.0
+Version: 2.0.0 (Enhanced with SELF-REFLECT)
 """
 
 import logging
@@ -17,35 +20,44 @@ from ...uif import SAM_UIF, UIFStatus
 from ..base import BaseSkillModule, SkillExecutionError
 from ..internal.memoir_edit import MEMOIR_EditSkill
 from ...memoir_sof_integration import get_memoir_sof_integration
+from ..reasoning.self_reflect_prompts import (
+    CRITIQUE_PROMPT_TEMPLATE,
+    REVISE_PROMPT_TEMPLATE,
+    CONFIDENCE_ANALYSIS_PROMPT,
+    ERROR_SEVERITY_PROMPT
+)
 
 logger = logging.getLogger(__name__)
 
 class AutonomousFactualCorrectionSkill(BaseSkillModule):
     """
-    Autonomous skill for detecting and correcting factual errors.
-    
-    This skill uses SAM's reasoning capabilities to identify potential
-    factual errors, hallucinations, and inconsistencies, then automatically
-    creates MEMOIR edits to correct them.
-    
+    Enhanced autonomous skill for detecting and correcting factual errors using SELF-REFLECT.
+
+    This skill implements the SELF-REFLECT methodology:
+    1. Generate: Receives initial response from ResponseGenerationSkill
+    2. Critique: Uses LLM to identify factual errors and inconsistencies
+    3. Revise: Uses LLM to generate corrected response incorporating fixes
+
     Key Features:
+    - SELF-REFLECT critique and revision loop
     - Automatic error detection using confidence analysis
     - Integration with external fact-checking sources
     - Self-correction through MEMOIR edits
     - Learning from correction patterns
     - Comprehensive audit trail
+    - Transparent revision tracking
     """
-    
+
     # Skill identification
     skill_name = "AutonomousFactualCorrectionSkill"
-    skill_version = "1.0.0"
-    skill_description = "Autonomously detects and corrects factual errors using MEMOIR framework"
+    skill_version = "2.0.0"
+    skill_description = "Autonomously detects and corrects factual errors using SELF-REFLECT and MEMOIR"
     skill_category = "autonomous"
-    
-    # Dependency declarations
+
+    # Enhanced dependency declarations for SELF-REFLECT
     required_inputs = ["response_text", "original_query"]
-    optional_inputs = ["confidence_scores", "source_citations", "context_data"]
-    output_keys = ["corrections_made", "correction_details", "confidence_analysis"]
+    optional_inputs = ["confidence_scores", "source_citations", "context_data", "initial_response"]
+    output_keys = ["final_response", "revision_notes", "was_revised", "corrections_made", "correction_details", "confidence_analysis"]
     
     # Skill characteristics
     requires_external_access = True  # May need to verify facts externally
@@ -59,23 +71,34 @@ class AutonomousFactualCorrectionSkill(BaseSkillModule):
         confidence_threshold: float = 0.6,
         enable_external_verification: bool = True,
         max_corrections_per_response: int = 5,
-        memoir_integration: Optional[Any] = None
+        memoir_integration: Optional[Any] = None,
+        enable_self_reflect: bool = True,
+        self_reflect_threshold: float = 0.7,
+        llm_model: Optional[Any] = None
     ):
         """
-        Initialize the autonomous factual correction skill.
-        
+        Initialize the enhanced autonomous factual correction skill with SELF-REFLECT.
+
         Args:
             confidence_threshold: Minimum confidence to avoid correction
             enable_external_verification: Whether to use external fact-checking
             max_corrections_per_response: Maximum corrections per response
             memoir_integration: MEMOIR integration instance
+            enable_self_reflect: Whether to use SELF-REFLECT methodology
+            self_reflect_threshold: Confidence threshold to trigger SELF-REFLECT
+            llm_model: LLM model for critique and revision steps
         """
         super().__init__()
-        
+
         self.confidence_threshold = confidence_threshold
         self.enable_external_verification = enable_external_verification
         self.max_corrections_per_response = max_corrections_per_response
         self.memoir_integration = memoir_integration or get_memoir_sof_integration()
+
+        # SELF-REFLECT configuration
+        self.enable_self_reflect = enable_self_reflect
+        self.self_reflect_threshold = self_reflect_threshold
+        self.llm_model = llm_model
         
         # Error detection patterns
         self.error_patterns = {
@@ -114,31 +137,70 @@ class AutonomousFactualCorrectionSkill(BaseSkillModule):
     
     def execute(self, uif: SAM_UIF) -> SAM_UIF:
         """
-        Execute autonomous factual correction.
-        
+        Execute enhanced autonomous factual correction with SELF-REFLECT methodology.
+
+        Implements the three-step process:
+        1. Generate: Use existing response (already generated)
+        2. Critique: Analyze response for factual errors
+        3. Revise: Generate corrected response if errors found
+
         Args:
             uif: Universal Interface Format with response to analyze
-            
+
         Returns:
-            Updated UIF with correction results
+            Updated UIF with correction results and SELF-REFLECT outputs
         """
         try:
             # Extract input data
-            response_text = uif.intermediate_data["response_text"]
+            response_text = uif.intermediate_data.get("response_text", "")
+            initial_response = uif.intermediate_data.get("initial_response", response_text)
             original_query = uif.intermediate_data["original_query"]
             confidence_scores = uif.intermediate_data.get("confidence_scores", {})
             source_citations = uif.intermediate_data.get("source_citations", [])
             context_data = uif.intermediate_data.get("context_data", {})
-            
+
             self.correction_stats['total_responses_analyzed'] += 1
-            
-            uif.add_log_entry(f"Starting autonomous factual correction analysis", self.skill_name)
-            
-            # Analyze response for potential errors
-            error_analysis = self._analyze_response_for_errors(
-                response_text, original_query, confidence_scores
+
+            uif.add_log_entry(f"Starting SELF-REFLECT factual correction", self.skill_name)
+
+            # Initialize SELF-REFLECT outputs
+            final_response = initial_response
+            revision_notes = ""
+            was_revised = False
+
+            # Step 1: Check if SELF-REFLECT should be triggered
+            should_self_reflect = self._should_trigger_self_reflect(
+                initial_response, original_query, confidence_scores
             )
-            
+
+            if should_self_reflect and self.enable_self_reflect:
+                uif.add_log_entry("Triggering SELF-REFLECT critique and revision", self.skill_name)
+
+                # Step 2: Critique - Identify factual errors
+                critique_result = self._perform_critique(initial_response, original_query)
+
+                if critique_result["has_errors"]:
+                    # Step 3: Revise - Generate corrected response
+                    revision_result = self._perform_revision(
+                        initial_response, original_query, critique_result["revision_notes"]
+                    )
+
+                    if revision_result["success"]:
+                        final_response = revision_result["revised_response"]
+                        revision_notes = critique_result["revision_notes"]
+                        was_revised = True
+
+                        uif.add_log_entry(f"SELF-REFLECT revision completed", self.skill_name)
+                    else:
+                        uif.add_warning(f"SELF-REFLECT revision failed: {revision_result.get('error', 'Unknown')}")
+                else:
+                    uif.add_log_entry("No factual errors detected in critique", self.skill_name)
+
+            # Legacy error detection and correction (for backward compatibility)
+            error_analysis = self._analyze_response_for_errors(
+                final_response, original_query, confidence_scores
+            )
+
             corrections_made = []
             correction_details = []
             
@@ -148,7 +210,7 @@ class AutonomousFactualCorrectionSkill(BaseSkillModule):
                 
                 for error in error_analysis['potential_errors'][:self.max_corrections_per_response]:
                     correction_result = self._attempt_correction(
-                        error, response_text, original_query, context_data
+                        error, final_response, original_query, context_data
                     )
                     
                     if correction_result['success']:
@@ -161,20 +223,29 @@ class AutonomousFactualCorrectionSkill(BaseSkillModule):
                         self.correction_stats['failed_corrections'] += 1
                         uif.add_warning(f"Failed to correct error: {correction_result.get('error', 'Unknown')}")
             
-            # Store results
+            # Store SELF-REFLECT results in UIF
+            uif.intermediate_data["final_response"] = final_response
+            uif.intermediate_data["revision_notes"] = revision_notes
+            uif.intermediate_data["was_revised"] = was_revised
             uif.intermediate_data["corrections_made"] = corrections_made
             uif.intermediate_data["correction_details"] = correction_details
             uif.intermediate_data["confidence_analysis"] = error_analysis
-            
-            # Set skill outputs
+
+            # Set enhanced skill outputs for SELF-REFLECT
             uif.set_skill_output(self.skill_name, {
+                "final_response": final_response,
+                "was_revised": was_revised,
+                "revision_notes": revision_notes,
                 "corrections_count": len(corrections_made),
                 "errors_detected": len(error_analysis['potential_errors']),
                 "overall_confidence": error_analysis['overall_confidence'],
-                "correction_ids": corrections_made
+                "correction_ids": corrections_made,
+                "self_reflect_triggered": should_self_reflect and self.enable_self_reflect
             })
-            
-            if corrections_made:
+
+            if was_revised:
+                uif.add_log_entry(f"SELF-REFLECT completed: Response revised for factual accuracy", self.skill_name)
+            elif corrections_made:
                 uif.add_log_entry(f"Made {len(corrections_made)} autonomous corrections", self.skill_name)
             else:
                 uif.add_log_entry("No corrections needed", self.skill_name)
@@ -546,3 +617,225 @@ class AutonomousFactualCorrectionSkill(BaseSkillModule):
         # Check that we have response text to analyze
         response_text = uif.intermediate_data.get("response_text", "")
         return len(response_text.strip()) > 0
+
+    # SELF-REFLECT Implementation Methods
+
+    def _should_trigger_self_reflect(
+        self,
+        response_text: str,
+        original_query: str,
+        confidence_scores: Dict[str, Any]
+    ) -> bool:
+        """
+        Determine if SELF-REFLECT should be triggered based on confidence and query characteristics.
+
+        Args:
+            response_text: The generated response to analyze
+            original_query: Original user query
+            confidence_scores: Confidence scores from previous skills
+
+        Returns:
+            True if SELF-REFLECT should be triggered
+        """
+        try:
+            # Check overall confidence
+            overall_confidence = confidence_scores.get('overall', 0.8)
+            if overall_confidence < self.self_reflect_threshold:
+                self.logger.info(f"Triggering SELF-REFLECT due to low confidence: {overall_confidence}")
+                return True
+
+            # Check for factual query patterns that benefit from verification
+            factual_keywords = [
+                'what is', 'who was', 'when did', 'where is', 'how many',
+                'define', 'explain', 'describe', 'tell me about'
+            ]
+
+            query_lower = original_query.lower()
+            if any(keyword in query_lower for keyword in factual_keywords):
+                self.logger.info("Triggering SELF-REFLECT for factual query pattern")
+                return True
+
+            # Check response length - longer responses more likely to contain errors
+            if len(response_text.split()) > 100:
+                self.logger.info("Triggering SELF-REFLECT for long response")
+                return True
+
+            return False
+
+        except Exception as e:
+            self.logger.error(f"Error in SELF-REFLECT trigger check: {e}")
+            return False
+
+    def _perform_critique(self, initial_response: str, original_query: str) -> Dict[str, Any]:
+        """
+        Perform the Critique step of SELF-REFLECT methodology.
+
+        Args:
+            initial_response: The response to critique
+            original_query: Original user query
+
+        Returns:
+            Critique result with revision notes
+        """
+        try:
+            if not self.llm_model:
+                # Fallback to pattern-based critique if no LLM available
+                return self._pattern_based_critique(initial_response, original_query)
+
+            # Generate critique prompt
+            critique_prompt = CRITIQUE_PROMPT_TEMPLATE.format(
+                original_query=original_query,
+                initial_response=initial_response
+            )
+
+            # Get critique from LLM
+            critique_response = self.llm_model.generate(
+                prompt=critique_prompt,
+                temperature=0.1,  # Low temperature for consistent fact-checking
+                max_tokens=500
+            )
+
+            # Parse critique response
+            if "No factual errors detected" in critique_response:
+                return {
+                    "has_errors": False,
+                    "revision_notes": "",
+                    "critique_response": critique_response
+                }
+            else:
+                return {
+                    "has_errors": True,
+                    "revision_notes": critique_response,
+                    "critique_response": critique_response
+                }
+
+        except Exception as e:
+            self.logger.error(f"Critique step failed: {e}")
+            return {
+                "has_errors": False,
+                "revision_notes": "",
+                "error": str(e)
+            }
+
+    def _perform_revision(
+        self,
+        initial_response: str,
+        original_query: str,
+        revision_notes: str
+    ) -> Dict[str, Any]:
+        """
+        Perform the Revise step of SELF-REFLECT methodology.
+
+        Args:
+            initial_response: The original response
+            original_query: Original user query
+            revision_notes: Notes from the critique step
+
+        Returns:
+            Revision result with corrected response
+        """
+        try:
+            if not self.llm_model:
+                return {
+                    "success": False,
+                    "error": "No LLM model available for revision"
+                }
+
+            # Generate revision prompt
+            revision_prompt = REVISE_PROMPT_TEMPLATE.format(
+                original_query=original_query,
+                initial_response=initial_response,
+                revision_notes=revision_notes
+            )
+
+            # Get revised response from LLM
+            revised_response = self.llm_model.generate(
+                prompt=revision_prompt,
+                temperature=0.3,  # Slightly higher temperature for natural revision
+                max_tokens=1000
+            )
+
+            # Validate revision quality
+            if self._validate_revision_quality(initial_response, revised_response):
+                return {
+                    "success": True,
+                    "revised_response": revised_response
+                }
+            else:
+                self.logger.warning("Revision quality validation failed, keeping original")
+                return {
+                    "success": False,
+                    "error": "Revision quality validation failed"
+                }
+
+        except Exception as e:
+            self.logger.error(f"Revision step failed: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def _pattern_based_critique(self, response_text: str, original_query: str) -> Dict[str, Any]:
+        """
+        Fallback critique method using pattern matching when LLM is unavailable.
+
+        Args:
+            response_text: Response to critique
+            original_query: Original query
+
+        Returns:
+            Critique result
+        """
+        potential_issues = []
+
+        # Check for common error patterns
+        for error_type, patterns in self.error_patterns.items():
+            for pattern in patterns:
+                matches = re.finditer(pattern, response_text, re.IGNORECASE)
+                for match in matches:
+                    potential_issues.append(f"Potential {error_type}: {match.group(0)}")
+
+        if potential_issues:
+            revision_notes = "Potential issues detected:\n" + "\n".join(f"- {issue}" for issue in potential_issues)
+            return {
+                "has_errors": True,
+                "revision_notes": revision_notes,
+                "critique_response": revision_notes
+            }
+        else:
+            return {
+                "has_errors": False,
+                "revision_notes": "",
+                "critique_response": "No obvious patterns detected"
+            }
+
+    def _validate_revision_quality(self, original: str, revised: str) -> bool:
+        """
+        Validate that the revision maintains quality while fixing errors.
+
+        Args:
+            original: Original response
+            revised: Revised response
+
+        Returns:
+            True if revision is acceptable
+        """
+        try:
+            # Basic length check - revision shouldn't be drastically shorter
+            if len(revised) < len(original) * 0.5:
+                return False
+
+            # Check that revision isn't identical (no changes made)
+            if original.strip() == revised.strip():
+                return False
+
+            # Check for reasonable semantic similarity (placeholder)
+            # In practice, this could use embedding similarity
+            common_words = set(original.lower().split()) & set(revised.lower().split())
+            similarity_ratio = len(common_words) / max(len(original.split()), len(revised.split()))
+
+            return similarity_ratio > 0.3  # At least 30% word overlap
+
+        except Exception as e:
+            self.logger.error(f"Revision validation failed: {e}")
+            return False

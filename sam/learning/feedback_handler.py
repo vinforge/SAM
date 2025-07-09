@@ -374,12 +374,262 @@ class MEMOIRFeedbackHandler:
         except Exception as e:
             self.processing_stats['failed_edits'] += 1
             self.logger.error(f"Failed to create MEMOIR edit from feedback: {e}")
-            
+
             return {
                 'feedback_id': feedback_event.feedback_id,
                 'success': False,
                 'error': str(e),
                 'auto_processed': True
+            }
+
+    # SELF-REFLECT Integration (Phase 5C)
+
+    def process_autonomous_correction(self, uif: SAM_UIF) -> Dict[str, Any]:
+        """
+        Process autonomous corrections from SELF-REFLECT system.
+
+        This method is called by the CoordinatorEngine when the AutonomousFactualCorrectionSkill
+        completes with was_revised: True, automatically feeding corrections into MEMOIR.
+
+        Args:
+            uif: Universal Interface Format containing SELF-REFLECT results
+
+        Returns:
+            Processing result with MEMOIR edit information
+        """
+        try:
+            # Extract SELF-REFLECT results
+            was_revised = uif.intermediate_data.get("was_revised", False)
+            revision_notes = uif.intermediate_data.get("revision_notes", "")
+            final_response = uif.intermediate_data.get("final_response", "")
+            original_query = uif.intermediate_data.get("original_query", "")
+            initial_response = uif.intermediate_data.get("response_text", "")
+
+            if not was_revised or not revision_notes:
+                return {
+                    'success': False,
+                    'reason': 'No autonomous corrections to process',
+                    'was_revised': was_revised
+                }
+
+            self.logger.info("Processing autonomous correction from SELF-REFLECT")
+
+            # Parse revision notes for high-confidence factual corrections
+            corrections = self._parse_revision_notes(revision_notes)
+
+            if not corrections:
+                return {
+                    'success': False,
+                    'reason': 'No parseable corrections found in revision notes',
+                    'revision_notes': revision_notes
+                }
+
+            # Process each correction
+            memoir_results = []
+            for correction in corrections:
+                if correction['confidence'] >= 0.8:  # High confidence threshold
+                    memoir_result = self._create_memoir_edit_from_correction(
+                        correction, original_query, initial_response, final_response
+                    )
+                    memoir_results.append(memoir_result)
+
+            # Update statistics
+            successful_edits = sum(1 for result in memoir_results if result.get('success', False))
+            self.processing_stats['successful_edits'] += successful_edits
+            self.processing_stats['failed_edits'] += len(memoir_results) - successful_edits
+
+            self.logger.info(f"Processed {len(memoir_results)} autonomous corrections, {successful_edits} successful")
+
+            return {
+                'success': True,
+                'corrections_processed': len(corrections),
+                'memoir_edits_created': successful_edits,
+                'memoir_results': memoir_results,
+                'revision_notes': revision_notes
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to process autonomous correction: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def _parse_revision_notes(self, revision_notes: str) -> List[Dict[str, Any]]:
+        """
+        Parse revision notes to extract structured corrections.
+
+        Args:
+            revision_notes: Raw revision notes from critique step
+
+        Returns:
+            List of structured correction objects
+        """
+        corrections = []
+
+        try:
+            # Pattern 1: Bullet point corrections
+            bullet_pattern = r'[-•*]\s*(.+?)(?=\n[-•*]|\n\n|$)'
+            bullet_matches = re.findall(bullet_pattern, revision_notes, re.DOTALL)
+
+            for match in bullet_matches:
+                correction_text = match.strip()
+                if len(correction_text) > 10:  # Filter out very short items
+                    corrections.append({
+                        'text': correction_text,
+                        'type': 'bullet_correction',
+                        'confidence': self._assess_correction_confidence(correction_text)
+                    })
+
+            # Pattern 2: "Correction:" format
+            correction_pattern = r'Correction:\s*(.+?)(?=\nCorrection:|\n\n|$)'
+            correction_matches = re.findall(correction_pattern, revision_notes, re.DOTALL | re.IGNORECASE)
+
+            for match in correction_matches:
+                correction_text = match.strip()
+                corrections.append({
+                    'text': correction_text,
+                    'type': 'explicit_correction',
+                    'confidence': self._assess_correction_confidence(correction_text)
+                })
+
+            # Pattern 3: "X should be Y" format
+            should_be_pattern = r'(.+?)\s+should be\s+(.+?)(?=\.|,|\n|$)'
+            should_be_matches = re.findall(should_be_pattern, revision_notes, re.IGNORECASE)
+
+            for incorrect, correct in should_be_matches:
+                corrections.append({
+                    'text': f"{incorrect.strip()} should be {correct.strip()}",
+                    'type': 'should_be_correction',
+                    'incorrect': incorrect.strip(),
+                    'correct': correct.strip(),
+                    'confidence': 0.9  # High confidence for explicit corrections
+                })
+
+            return corrections
+
+        except Exception as e:
+            self.logger.error(f"Error parsing revision notes: {e}")
+            return []
+
+    def _assess_correction_confidence(self, correction_text: str) -> float:
+        """
+        Assess confidence level of a correction based on language patterns.
+
+        Args:
+            correction_text: Text of the correction
+
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        confidence = 0.5  # Base confidence
+
+        # High confidence indicators
+        high_confidence_words = ['incorrect', 'wrong', 'error', 'should be', 'actually', 'fact']
+        if any(word in correction_text.lower() for word in high_confidence_words):
+            confidence += 0.3
+
+        # Specific factual indicators
+        factual_indicators = ['date', 'year', 'number', 'name', 'location', 'capital', 'president']
+        if any(indicator in correction_text.lower() for indicator in factual_indicators):
+            confidence += 0.2
+
+        # Uncertainty indicators decrease confidence
+        uncertainty_words = ['might', 'possibly', 'perhaps', 'unclear', 'uncertain']
+        if any(word in correction_text.lower() for word in uncertainty_words):
+            confidence -= 0.2
+
+        return max(0.1, min(1.0, confidence))
+
+    def _create_memoir_edit_from_correction(
+        self,
+        correction: Dict[str, Any],
+        original_query: str,
+        initial_response: str,
+        final_response: str
+    ) -> Dict[str, Any]:
+        """
+        Create a MEMOIR edit from a parsed correction.
+
+        Args:
+            correction: Structured correction object
+            original_query: Original user query
+            initial_response: Initial response before correction
+            final_response: Final corrected response
+
+        Returns:
+            MEMOIR edit result
+        """
+        try:
+            # Get MEMOIR edit skill
+            memoir_skills = self.memoir_integration.get_memoir_skills()
+            if 'MEMOIR_EditSkill' not in memoir_skills:
+                return {
+                    'success': False,
+                    'error': 'MEMOIR_EditSkill not available'
+                }
+
+            edit_skill = self.memoir_integration.memoir_skills['MEMOIR_EditSkill']
+
+            # Create correction ID
+            correction_id = f"auto_correct_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hash(correction['text']) % 10000}"
+
+            # Prepare edit data
+            edit_prompt = original_query
+            correct_answer = final_response
+
+            # Create UIF for the edit
+            edit_uif = SAM_UIF(
+                input_query=f"Autonomous correction: {correction_id}",
+                intermediate_data={
+                    'edit_prompt': edit_prompt,
+                    'correct_answer': correct_answer,
+                    'edit_context': f"Autonomous SELF-REFLECT correction - {correction['type']}",
+                    'confidence_score': correction['confidence'],
+                    'edit_metadata': {
+                        'source': 'autonomous_self_reflect',
+                        'correction_id': correction_id,
+                        'correction_type': correction['type'],
+                        'correction_text': correction['text'],
+                        'original_response': initial_response,
+                        'corrected_response': final_response,
+                        'timestamp': datetime.now().isoformat(),
+                        'confidence': correction['confidence']
+                    }
+                }
+            )
+
+            # Execute the edit
+            result_uif = edit_skill.execute(edit_uif)
+
+            # Process results
+            if result_uif.intermediate_data.get('edit_success', False):
+                edit_id = result_uif.intermediate_data['edit_id']
+
+                self.logger.info(f"✅ Created MEMOIR edit {edit_id} from autonomous correction")
+
+                return {
+                    'success': True,
+                    'edit_id': edit_id,
+                    'correction_id': correction_id,
+                    'correction_type': correction['type'],
+                    'confidence': correction['confidence'],
+                    'correction_text': correction['text']
+                }
+            else:
+                error_msg = result_uif.intermediate_data.get('error', 'Unknown error')
+                return {
+                    'success': False,
+                    'error': f'MEMOIR edit failed: {error_msg}',
+                    'correction_id': correction_id
+                }
+
+        except Exception as e:
+            self.logger.error(f"Failed to create MEMOIR edit from autonomous correction: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'correction_text': correction.get('text', 'Unknown')
             }
     
     def get_feedback_statistics(self) -> Dict[str, Any]:
