@@ -1,8 +1,9 @@
 # SAM - Essential Dependencies
-# Streamlined for easy installation
+# Version-pinned for consistent behavior across all platforms
+# Last updated: December 2024 - Based on working installations
 
-# Core Web Framework (Required)
-streamlit>=1.28.0,<2.0.0
+# Core Web Framework (Required) - PINNED to working version
+streamlit==1.42.0
 flask>=2.3.0,<3.0.0
 
 # HTTP Requests (Required)

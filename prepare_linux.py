@@ -36,8 +36,8 @@ def install_essential_packages():
     """Install the essential packages needed for SAM."""
     print("\n📦 Installing essential packages for SAM...")
     
-    # Essential packages in order of importance
-    essential_packages = ["streamlit", "numpy", "pandas", "requests"]
+    # Essential packages in order of importance (version-pinned)
+    essential_packages = ["streamlit==1.42.0", "numpy>=1.21.0,<2.0.0", "pandas>=1.3.0,<3.0.0", "requests>=2.25.0,<3.0.0"]
     
     success_count = 0
     

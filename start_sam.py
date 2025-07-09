@@ -89,13 +89,13 @@ def check_dependencies():
 
     missing_packages = []
 
-    # Check essential packages
+    # Check essential packages (version-pinned for consistency)
     essential_packages = {
-        'streamlit': 'streamlit',
-        'numpy': 'numpy',
-        'pandas': 'pandas',
-        'requests': 'requests',
-        'cryptography': 'cryptography'
+        'streamlit': 'streamlit==1.42.0',  # Pinned to working version
+        'numpy': 'numpy>=1.21.0,<2.0.0',
+        'pandas': 'pandas>=1.3.0,<3.0.0',
+        'requests': 'requests>=2.25.0,<3.0.0',
+        'cryptography': 'cryptography>=41.0.0,<43.0.0'
     }
 
     print("🔍 Checking dependencies...")

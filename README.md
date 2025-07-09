@@ -75,6 +75,9 @@
 
 ## 📋 **Platform-Specific Installation Guides**
 
+> **🔒 Version Consistency**: All SAM installations use pinned dependency versions to ensure consistent behavior across different machines and prevent compatibility issues.
+
+
 ### 🐧 **Linux (Ubuntu/Debian) Installation**
 
 **Step 1: System Preparation**
@@ -247,6 +250,13 @@ python3 -m pip --version
 # Solution: Install development packages
 sudo apt install python3-dev build-essential libffi-dev libssl-dev
 python3 -m pip install --user streamlit numpy pandas requests cryptography
+```
+
+**Issue: Different behavior on different machines**
+```bash
+# Solution: Use version-pinned installation
+pip install -r requirements.txt
+# This ensures all machines use identical package versions
 ```
 
 ### Windows-Specific Issues

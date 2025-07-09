@@ -123,17 +123,32 @@ def install_dependencies():
     try:
         print_info("Installing core dependencies (this may take a moment)...")
 
-        # Essential packages for SAM to work
+        # Install from requirements.txt for version consistency
+        requirements_file = Path("requirements.txt")
+
+        if requirements_file.exists():
+            print_info("Installing from requirements.txt for version consistency...")
+            result = subprocess.run([
+                sys.executable, "-m", "pip", "install", "-r", "requirements.txt"
+            ], capture_output=True, text=True, timeout=600)
+
+            if result.returncode == 0:
+                print_success("Requirements installed successfully from requirements.txt")
+                return True
+            else:
+                print_warning("Requirements.txt installation failed, trying essential packages...")
+
+        # Fallback: Essential packages for SAM to work (version-pinned)
         essential_packages = [
-            "streamlit>=1.28.0",
-            "requests>=2.25.0",
-            "cryptography>=41.0.0",
-            "argon2-cffi>=23.1.0",
-            "pydantic>=2.0.0",
-            "python-dotenv>=1.0.0",
-            "numpy>=1.21.0",
-            "pandas>=1.3.0",
-            "plotly>=5.0.0"
+            "streamlit==1.42.0",  # Pinned to working version
+            "requests>=2.25.0,<3.0.0",
+            "cryptography>=41.0.0,<43.0.0",
+            "argon2-cffi>=23.1.0,<24.0.0",
+            "pydantic>=2.0.0,<3.0.0",
+            "python-dotenv>=1.0.0,<2.0.0",
+            "numpy>=1.21.0,<2.0.0",
+            "pandas>=1.3.0,<3.0.0",
+            "plotly>=5.0.0,<6.0.0"
         ]
 
         result = subprocess.run([

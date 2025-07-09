@@ -121,9 +121,9 @@ def install_python_packages():
     """Install required Python packages."""
     print("\n📦 Installing Python packages...")
 
-    # Essential packages for SAM
-    essential_packages = ["streamlit", "numpy", "pandas", "requests"]
-    additional_packages = ["cryptography", "argon2-cffi", "pydantic", "python-dotenv", "plotly"]
+    # Essential packages for SAM (version-pinned for consistency)
+    essential_packages = ["streamlit==1.42.0", "numpy>=1.21.0,<2.0.0", "pandas>=1.3.0,<3.0.0", "requests>=2.25.0,<3.0.0"]
+    additional_packages = ["cryptography>=41.0.0,<43.0.0", "argon2-cffi>=23.1.0,<24.0.0", "pydantic>=2.0.0,<3.0.0", "python-dotenv>=1.0.0,<2.0.0", "plotly>=5.0.0,<6.0.0"]
 
     # Try installing essential packages first
     print("🔄 Installing essential packages first...")
