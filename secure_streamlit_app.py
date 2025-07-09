@@ -1978,7 +1978,11 @@ def render_chat_interface():
                             })
 
                         else:
-                            raw_response = response_result
+                            # Ensure raw_response is always a string, not a tuple
+                            if isinstance(response_result, tuple):
+                                raw_response = response_result[0] if response_result else ""
+                            else:
+                                raw_response = response_result
 
                             # Process thoughts using the thought processor
                             try:
