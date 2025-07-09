@@ -95,9 +95,11 @@ python3 --version  # Should show Python 3.8+
 git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
-# Install Python dependencies
-python3 -m pip install --upgrade pip
-python3 -m pip install numpy streamlit pandas requests
+# Option A: Automatic installation (recommended)
+python3 install_linux_dependencies.py
+
+# Option B: Manual dependency installation
+python3 -m pip install --user streamlit numpy pandas requests cryptography
 
 # Run SAM setup
 python3 setup_sam.py
@@ -110,6 +112,17 @@ python3 start_sam.py
 - Open browser to: **http://localhost:8502**
 - Enter the master password you created during setup
 - Use your SAM Pro activation key from the setup output
+
+**🔧 If Installation Fails:**
+```bash
+# Use the specialized Linux installer
+python3 install_linux_dependencies.py
+
+# Or install manually with different methods:
+pip3 install --user streamlit numpy pandas requests cryptography
+# OR
+sudo python3 -m pip install streamlit numpy pandas requests cryptography
+```
 
 ### 🪟 **Windows Installation**
 
@@ -178,26 +191,49 @@ python3 setup_sam.py
 python3 start_sam.py
 ```
 
+**Issue: "Failed to install missing packages"**
+```bash
+# Solution 1: Use the specialized Linux installer
+python3 install_linux_dependencies.py
+
+# Solution 2: Manual installation with --user flag
+python3 -m pip install --user streamlit numpy pandas requests cryptography
+
+# Solution 3: Install system packages first
+sudo apt install python3-dev python3-pip build-essential
+python3 -m pip install --user streamlit numpy pandas requests cryptography
+```
+
 **Issue: "No module named 'numpy'" or "No module named 'streamlit'"**
 ```bash
-# Solution: Install missing dependencies
-python3 -m pip install numpy streamlit pandas requests
-# Then retry setup
-python3 setup_sam.py
+# Solution: Try multiple installation methods
+pip3 install --user streamlit numpy pandas requests cryptography
+# OR
+python3 -m pip install --user streamlit numpy pandas requests cryptography
+# OR (if you have sudo access)
+sudo python3 -m pip install streamlit numpy pandas requests cryptography
 ```
 
 **Issue: Permission denied errors**
 ```bash
-# Solution: Install packages for user only
-python3 -m pip install --user numpy streamlit pandas requests
+# Solution: Use --user flag for user-only installation
+python3 -m pip install --user streamlit numpy pandas requests cryptography
 ```
 
 **Issue: "pip: command not found"**
 ```bash
 # Solution: Install pip
+sudo apt update
 sudo apt install python3-pip
-# Or use alternative installation
-curl https://bootstrap.pypa.io/get-pip.py | python3
+# Verify installation
+python3 -m pip --version
+```
+
+**Issue: Build errors or compilation failures**
+```bash
+# Solution: Install development packages
+sudo apt install python3-dev build-essential libffi-dev libssl-dev
+python3 -m pip install --user streamlit numpy pandas requests cryptography
 ```
 
 ### Windows-Specific Issues

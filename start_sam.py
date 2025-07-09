@@ -84,17 +84,20 @@ def check_first_time_setup():
 
 def check_dependencies():
     """Check if required dependencies are available."""
+    import platform
+
     missing_packages = []
 
     # Check essential packages
     essential_packages = {
-        'streamlit': 'streamlit>=1.28.0',
-        'numpy': 'numpy>=1.21.0',
-        'pandas': 'pandas>=1.3.0',
-        'requests': 'requests>=2.25.0',
-        'cryptography': 'cryptography>=41.0.0'
+        'streamlit': 'streamlit',
+        'numpy': 'numpy',
+        'pandas': 'pandas',
+        'requests': 'requests',
+        'cryptography': 'cryptography'
     }
 
+    print("🔍 Checking dependencies...")
     for package_name, package_spec in essential_packages.items():
         try:
             __import__(package_name)
@@ -103,22 +106,95 @@ def check_dependencies():
             print(f"❌ {package_name} not found")
             missing_packages.append(package_spec)
 
-    # Install missing packages
+    # Install missing packages if any
     if missing_packages:
-        print(f"💡 Installing {len(missing_packages)} missing packages...")
+        print(f"\n💡 Installing {len(missing_packages)} missing packages...")
+
+        # Determine the correct Python command
+        system = platform.system()
+        python_cmd = sys.executable
+
+        # Try multiple installation methods
+        installation_success = False
+
+        # Method 1: Direct pip install
         try:
-            subprocess.run([
-                sys.executable, "-m", "pip", "install"
-            ] + missing_packages, check=True, capture_output=True, timeout=300)
-            print("✅ Missing packages installed successfully")
+            print("🔄 Attempting installation...")
+            result = subprocess.run([
+                python_cmd, "-m", "pip", "install", "--user"
+            ] + missing_packages,
+            capture_output=True, text=True, timeout=180)
+
+            if result.returncode == 0:
+                print("✅ Packages installed successfully!")
+                installation_success = True
+            else:
+                print(f"⚠️  Installation had issues: {result.stderr}")
+
         except subprocess.TimeoutExpired:
-            print("⚠️  Installation taking longer than expected")
-            print("💡 Please run manually: pip install streamlit numpy pandas requests cryptography")
-            return False
+            print("⚠️  Installation timeout")
         except Exception as e:
-            print("❌ Failed to install missing packages")
-            print(f"💡 Please run manually: pip install {' '.join(missing_packages)}")
-            print(f"💡 Or on Linux: python3 -m pip install {' '.join(missing_packages)}")
+            print(f"⚠️  Installation error: {e}")
+
+        # Method 2: Try without --user flag
+        if not installation_success:
+            try:
+                print("🔄 Trying alternative installation method...")
+                result = subprocess.run([
+                    python_cmd, "-m", "pip", "install"
+                ] + missing_packages,
+                capture_output=True, text=True, timeout=180)
+
+                if result.returncode == 0:
+                    print("✅ Packages installed successfully!")
+                    installation_success = True
+                else:
+                    print(f"⚠️  Alternative installation failed: {result.stderr}")
+
+            except Exception as e:
+                print(f"⚠️  Alternative installation error: {e}")
+
+        # If automatic installation failed, provide manual instructions
+        if not installation_success:
+            print("\n❌ Automatic installation failed")
+            print("📋 Please install dependencies manually:")
+            print()
+
+            if system == "Linux":
+                print("🐧 For Linux (Ubuntu/Debian):")
+                print("   sudo apt update")
+                print("   sudo apt install python3-pip")
+                print(f"   python3 -m pip install --user {' '.join(missing_packages)}")
+                print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
+            elif system == "Darwin":  # macOS
+                print("🍎 For macOS:")
+                print(f"   python3 -m pip install --user {' '.join(missing_packages)}")
+                print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
+            else:  # Windows
+                print("🪟 For Windows:")
+                print(f"   python -m pip install {' '.join(missing_packages)}")
+                print("   # Or try: pip install " + ' '.join(missing_packages))
+
+            print()
+            print("💡 After manual installation, run this script again:")
+            print(f"   {python_cmd} start_sam.py")
+            print()
+            return False
+
+        # Re-check packages after installation
+        print("\n🔍 Verifying installation...")
+        still_missing = []
+        for package_name in missing_packages:
+            try:
+                __import__(package_name)
+                print(f"✅ {package_name} now available")
+            except ImportError:
+                print(f"❌ {package_name} still missing")
+                still_missing.append(package_name)
+
+        if still_missing:
+            print(f"\n⚠️  Some packages still missing: {', '.join(still_missing)}")
+            print("💡 Please install them manually and try again")
             return False
 
     # Check security dependencies
