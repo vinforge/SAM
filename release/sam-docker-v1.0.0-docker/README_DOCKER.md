@@ -12,35 +12,15 @@
 
 ### One-Command Deployment
 
-#### **Windows (PowerShell)**
-```powershell
-# Download the latest release
-Invoke-WebRequest -Uri "https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz" -OutFile "sam-docker-latest.tar.gz"
-
-# Extract and start
-tar -xzf sam-docker-latest.tar.gz
-cd sam-docker-latest
-./quick_start.sh
-```
-
-#### **Linux/macOS (Terminal)**
 ```bash
 # Download the latest release
 wget https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz
-# OR use curl if wget is not available
-curl -L -o sam-docker-latest.tar.gz https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz
 
 # Extract and start
 tar -xzf sam-docker-latest.tar.gz
 cd sam-docker-latest
 ./quick_start.sh
 ```
-
-#### **Alternative: Manual Download**
-1. Visit: https://github.com/forge-1825/SAM/releases/latest
-2. Download `sam-docker-latest.tar.gz`
-3. Extract the archive
-4. Run `quick_start.sh` (or `quick_start.bat` on Windows)
 
 **That's it!** SAM will be available at:
 - **Main Interface**: http://localhost:8502

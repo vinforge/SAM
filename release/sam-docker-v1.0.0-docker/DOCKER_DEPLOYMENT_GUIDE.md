@@ -35,20 +35,6 @@ SAM Docker deployment provides:
 
 ### Software Requirements
 
-#### **Windows**
-1. **Install Docker Desktop**:
-   - Download from: https://docs.docker.com/desktop/windows/
-   - Run the installer and restart your computer
-   - Start Docker Desktop from Start Menu
-   - Docker Compose is included with Docker Desktop
-
-2. **Verify Installation** (PowerShell):
-   ```powershell
-   docker --version
-   docker-compose --version
-   ```
-
-#### **Linux**
 ```bash
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -63,59 +49,27 @@ docker --version
 docker-compose --version
 ```
 
-#### **macOS**
-1. **Install Docker Desktop**:
-   - Download from: https://docs.docker.com/desktop/mac/
-   - Drag Docker to Applications folder
-   - Start Docker Desktop
-   - Docker Compose is included with Docker Desktop
-
-2. **Verify Installation** (Terminal):
-   ```bash
-   docker --version
-   docker-compose --version
-   ```
-
 ## 🚀 Quick Start
 
-### 1. Download SAM Docker Release
+### 1. Clone and Setup
 
-#### **Windows (PowerShell)**
-```powershell
-# Download the latest release
-Invoke-WebRequest -Uri "https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz" -OutFile "sam-docker-latest.tar.gz"
-
-# Extract
-tar -xzf sam-docker-latest.tar.gz
-cd sam-docker-latest
-```
-
-#### **Linux/macOS (Terminal)**
 ```bash
-# Download the latest release
-wget https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz
-# OR: curl -L -o sam-docker-latest.tar.gz https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz
+# Clone SAM repository
+git clone https://github.com/forge-1825/SAM.git
+cd SAM
 
-# Extract
-tar -xzf sam-docker-latest.tar.gz
-cd sam-docker-latest
+# Make management script executable
+chmod +x docker/manage_sam.sh
 ```
 
-### 2. Start SAM
+### 2. Build and Start
 
-#### **Windows**
-```batch
-# Run the Windows batch file
-quick_start.bat
-
-# OR use PowerShell/WSL
-./quick_start.sh
-```
-
-#### **Linux/macOS**
 ```bash
-# Run the startup script
-./quick_start.sh
+# Build SAM Docker image
+./docker/manage_sam.sh build
+
+# Start all services
+./docker/manage_sam.sh start
 ```
 
 ### 3. Access SAM

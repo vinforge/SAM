@@ -23,8 +23,16 @@
 ### 🐳 Docker Container (Recommended for Most Users)
 **Quick, easy, and production-ready deployment**
 
+**Windows (PowerShell):**
+```powershell
+Invoke-WebRequest -Uri "https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz" -OutFile "sam-docker-latest.tar.gz"
+tar -xzf sam-docker-latest.tar.gz
+cd sam-docker-latest
+./quick_start.sh
+```
+
+**Linux/macOS:**
 ```bash
-# Download and start in 5 minutes
 wget https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz
 tar -xzf sam-docker-latest.tar.gz
 cd sam-docker-latest
