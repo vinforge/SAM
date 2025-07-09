@@ -1081,7 +1081,7 @@ def render_chat_document_upload():
                                 st.session_state[f"processed_{uploaded_file.name}"] = True
 
                                 # Add success message to chat history
-                                success_message = f"📄 **Document Uploaded**: {uploaded_file.name}\n\n✅ Successfully processed and added to my knowledge. You can now ask me questions about this document!"
+                                success_message = f"📄 **Document Uploaded**: {uploaded_file.name}\n\n✅ Successfully processed and added to my knowledge. What would you like to know about this document?"
 
                                 # Add to chat history
                                 if 'chat_history' not in st.session_state:
@@ -1097,51 +1097,9 @@ def render_chat_document_upload():
                                 # Show success notification
                                 st.success(f"✅ {uploaded_file.name} uploaded and processed successfully!")
 
-                                # Auto-generate discussion prompt with intelligent suggestions
-                                discussion_prompt = f"I just uploaded '{uploaded_file.name}'. Can you give me a brief summary of what this document contains?"
-
-                                # Add discussion prompt to chat
-                                st.session_state.chat_history.append({
-                                    "role": "user",
-                                    "content": discussion_prompt,
-                                    "auto_generated": True
-                                })
-
-                                # Generate response about the document
-                                with st.spinner("🤔 SAM is analyzing your document..."):
-                                    try:
-                                        # Use existing chat response generation
-                                        response = generate_secure_chat_response(discussion_prompt)
-
-                                        st.session_state.chat_history.append({
-                                            "role": "assistant",
-                                            "content": response,
-                                            "document_analysis": True,
-                                            "filename": uploaded_file.name
-                                        })
-
-                                        # Add helpful suggestions as a follow-up message
-                                        suggestions = generate_document_suggestions(uploaded_file.name, uploaded_file.type)
-                                        st.session_state.chat_history.append({
-                                            "role": "assistant",
-                                            "content": suggestions,
-                                            "document_suggestions": True,
-                                            "filename": uploaded_file.name
-                                        })
-
-                                    except Exception as e:
-                                        logger.error(f"Error generating document analysis: {e}")
-                                        fallback_response = f"I've successfully processed '{uploaded_file.name}' and it's now part of my knowledge base. Feel free to ask me any questions about its contents!"
-
-                                        st.session_state.chat_history.append({
-                                            "role": "assistant",
-                                            "content": fallback_response,
-                                            "document_analysis": True,
-                                            "filename": uploaded_file.name
-                                        })
-
-                                # Trigger rerun to show new messages
-                                st.rerun()
+                                # Document processing complete - SAM will wait for user questions
+                                # All background processing (knowledge consolidation, memory storage, etc.)
+                                # continues as normal, but no auto-generated prompts or responses
 
                             else:
                                 st.error(f"❌ Failed to process {uploaded_file.name}: {result.get('error', 'Unknown error')}")
