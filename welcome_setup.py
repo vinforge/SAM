@@ -168,11 +168,15 @@ def show_setup_complete_page():
                 response = requests.get('http://localhost:8502', timeout=2)
                 # If we get here, SAM is running - redirect
                 st.markdown("""
+                <meta http-equiv="refresh" content="1;url=http://localhost:8502">
                 <script>
-                window.location.href = 'http://localhost:8502';
+                setTimeout(function() {
+                    window.location.href = 'http://localhost:8502';
+                }, 1000);
                 </script>
                 """, unsafe_allow_html=True)
-                st.success("🚀 Redirecting to SAM main interface...")
+                st.success("🚀 **Redirecting to SAM main interface in 1 second...**")
+                st.info("🔗 **If redirect doesn't work, click here**: [Open SAM Chat Interface](http://localhost:8502)")
             except requests.exceptions.RequestException:
                 # SAM main interface is not running - start it automatically
                 st.info("🚀 **Starting SAM main interface automatically...**")
@@ -198,12 +202,17 @@ def show_setup_complete_page():
                             st.success("✅ **SAM main interface started successfully!**")
 
                             # Redirect to the main interface
+                            st.success("✅ **SAM main interface started successfully!**")
                             st.markdown("""
+                            <meta http-equiv="refresh" content="2;url=http://localhost:8502">
                             <script>
-                            window.location.href = 'http://localhost:8502';
+                            setTimeout(function() {
+                                window.location.href = 'http://localhost:8502';
+                            }, 2000);
                             </script>
                             """, unsafe_allow_html=True)
-                            st.success("🚀 Redirecting to SAM main interface...")
+                            st.success("🚀 **Redirecting to SAM main interface in 2 seconds...**")
+                            st.info("🔗 **If redirect doesn't work, click here**: [Open SAM Chat Interface](http://localhost:8502)")
 
                         except requests.exceptions.RequestException:
                             st.error("❌ **Failed to start SAM main interface**")
@@ -437,11 +446,15 @@ def show_setup_success(sam_pro_key):
                 response = requests.get('http://localhost:8502', timeout=2)
                 # If we get here, SAM is running - redirect
                 st.markdown("""
+                <meta http-equiv="refresh" content="1;url=http://localhost:8502">
                 <script>
-                window.location.href = 'http://localhost:8502';
+                setTimeout(function() {
+                    window.location.href = 'http://localhost:8502';
+                }, 1000);
                 </script>
                 """, unsafe_allow_html=True)
-                st.success("🚀 Redirecting to SAM main interface...")
+                st.success("🚀 **Redirecting to SAM main interface in 1 second...**")
+                st.info("🔗 **If redirect doesn't work, click here**: [Open SAM Chat Interface](http://localhost:8502)")
             except requests.exceptions.RequestException:
                 # SAM main interface is not running - start it automatically
                 st.info("🚀 **Starting SAM main interface automatically...**")
@@ -467,12 +480,17 @@ def show_setup_success(sam_pro_key):
                             st.success("✅ **SAM main interface started successfully!**")
 
                             # Redirect to the main interface
+                            st.success("✅ **SAM main interface started successfully!**")
                             st.markdown("""
+                            <meta http-equiv="refresh" content="2;url=http://localhost:8502">
                             <script>
-                            window.location.href = 'http://localhost:8502';
+                            setTimeout(function() {
+                                window.location.href = 'http://localhost:8502';
+                            }, 2000);
                             </script>
                             """, unsafe_allow_html=True)
-                            st.success("🚀 Redirecting to SAM main interface...")
+                            st.success("🚀 **Redirecting to SAM main interface in 2 seconds...**")
+                            st.info("🔗 **If redirect doesn't work, click here**: [Open SAM Chat Interface](http://localhost:8502)")
 
                         except requests.exceptions.RequestException:
                             st.error("❌ **Failed to start SAM main interface**")
