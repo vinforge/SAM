@@ -150,12 +150,14 @@ python3 -m pip install --user streamlit requests cryptography
 git clone https://github.com/forge-1825/SAM.git
 cd SAM
 
-# Run setup
+# Run setup (automatically uses pre-built packages on Windows)
 python setup_sam.py
 
 # Start SAM
 python start_sam.py
 ```
+
+> **💡 Windows Optimization**: SAM automatically uses `--only-binary=all` on Windows to prevent compilation issues and ensure faster, more reliable installations.
 
 **Step 3: Access SAM**
 - **First-time users**: Browser opens to **http://localhost:8503** (Welcome & Setup)
@@ -267,6 +269,13 @@ pip install -r requirements.txt
 
 **Issue: Antivirus blocking installation**
 - **Solution**: Temporarily disable antivirus or add SAM folder to exclusions
+
+**Issue: "Unknown compiler" or "metadata-generation-failed" errors**
+```cmd
+# Solution: Use pre-built packages (prevents compilation)
+python -m pip install --only-binary=all streamlit==1.42.0 numpy pandas requests cryptography
+# This is now automatic in SAM's installation scripts
+```
 
 ### macOS-Specific Issues
 

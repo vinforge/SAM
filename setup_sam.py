@@ -128,9 +128,14 @@ def install_dependencies():
 
         if requirements_file.exists():
             print_info("Installing from requirements.txt for version consistency...")
-            result = subprocess.run([
-                sys.executable, "-m", "pip", "install", "-r", "requirements.txt"
-            ], capture_output=True, text=True, timeout=600)
+
+            # Use --only-binary=all on Windows to prevent compilation issues
+            install_cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
+            if platform.system() == "Windows":
+                install_cmd.insert(-2, "--only-binary=all")
+                print_info("Using pre-built packages for Windows compatibility...")
+
+            result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=600)
 
             if result.returncode == 0:
                 print_success("Requirements installed successfully from requirements.txt")
@@ -151,9 +156,14 @@ def install_dependencies():
             "plotly>=5.0.0,<6.0.0"
         ]
 
-        result = subprocess.run([
-            sys.executable, "-m", "pip", "install"
-        ] + essential_packages, capture_output=True, text=True, timeout=600)
+        # Use --only-binary=all on Windows to prevent compilation issues
+        install_cmd = [sys.executable, "-m", "pip", "install"]
+        if platform.system() == "Windows":
+            install_cmd.append("--only-binary=all")
+            print_info("Using pre-built packages for Windows compatibility...")
+
+        install_cmd.extend(essential_packages)
+        result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=600)
 
         if result.returncode == 0:
             print_success("Core dependencies installed successfully")

@@ -118,13 +118,18 @@ def check_dependencies():
         # Try multiple installation methods
         installation_success = False
 
-        # Method 1: Direct pip install
+        # Method 1: Direct pip install with Windows compatibility
         try:
             print("🔄 Attempting installation...")
-            result = subprocess.run([
-                python_cmd, "-m", "pip", "install", "--user"
-            ] + missing_packages,
-            capture_output=True, text=True, timeout=180)
+            install_cmd = [python_cmd, "-m", "pip", "install", "--user"]
+
+            # Add --only-binary=all on Windows to prevent compilation issues
+            if system == "Windows":
+                install_cmd.append("--only-binary=all")
+                print("💡 Using pre-built packages for Windows compatibility...")
+
+            install_cmd.extend(missing_packages)
+            result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=180)
 
             if result.returncode == 0:
                 print("✅ Packages installed successfully!")
@@ -141,10 +146,14 @@ def check_dependencies():
         if not installation_success:
             try:
                 print("🔄 Trying alternative installation method...")
-                result = subprocess.run([
-                    python_cmd, "-m", "pip", "install"
-                ] + missing_packages,
-                capture_output=True, text=True, timeout=180)
+                install_cmd = [python_cmd, "-m", "pip", "install"]
+
+                # Add --only-binary=all on Windows to prevent compilation issues
+                if system == "Windows":
+                    install_cmd.append("--only-binary=all")
+
+                install_cmd.extend(missing_packages)
+                result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=180)
 
                 if result.returncode == 0:
                     print("✅ Packages installed successfully!")
@@ -197,8 +206,9 @@ def check_dependencies():
                     print("   # Or try: pip3 install --user " + ' '.join(missing_packages))
                 else:  # Windows
                     print("🪟 For Windows:")
-                    print(f"   python -m pip install {' '.join(missing_packages)}")
-                    print("   # Or try: pip install " + ' '.join(missing_packages))
+                    print(f"   python -m pip install --only-binary=all {' '.join(missing_packages)}")
+                    print("   # Or try: pip install --only-binary=all " + ' '.join(missing_packages))
+                    print("   # Note: --only-binary=all prevents compilation issues")
 
                 print()
                 print("💡 After manual installation, run this script again:")

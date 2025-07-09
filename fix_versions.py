@@ -66,9 +66,15 @@ def fix_streamlit_version():
         
         # Install specific working version
         print(f"🔄 Installing Streamlit {target_version}...")
-        subprocess.run([
-            sys.executable, "-m", "pip", "install", f"streamlit=={target_version}"
-        ], capture_output=True, check=True, timeout=120)
+        install_cmd = [sys.executable, "-m", "pip", "install"]
+
+        # Add --only-binary=all on Windows to prevent compilation issues
+        if platform.system() == "Windows":
+            install_cmd.append("--only-binary=all")
+            print("💡 Using pre-built package for Windows compatibility...")
+
+        install_cmd.append(f"streamlit=={target_version}")
+        subprocess.run(install_cmd, capture_output=True, check=True, timeout=120)
         
         print(f"✅ Streamlit fixed to version {target_version}")
         return True
@@ -139,9 +145,14 @@ def install_manual_packages():
     for package in packages:
         try:
             print(f"🔄 Installing {package}...")
-            subprocess.run([
-                sys.executable, "-m", "pip", "install", package
-            ], capture_output=True, check=True, timeout=60)
+            install_cmd = [sys.executable, "-m", "pip", "install"]
+
+            # Add --only-binary=all on Windows to prevent compilation issues
+            if platform.system() == "Windows":
+                install_cmd.append("--only-binary=all")
+
+            install_cmd.append(package)
+            subprocess.run(install_cmd, capture_output=True, check=True, timeout=60)
             
             print(f"✅ {package} installed")
             success_count += 1
