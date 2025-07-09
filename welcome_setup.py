@@ -147,7 +147,7 @@ def is_setup_complete():
 def show_setup_complete_page():
     """Show page for users who have already completed setup."""
     
-    st.markdown('<h1 class="main-header">🎉 Welcome Back to SAM!</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🎉 Welcome to SAM!</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Your setup is already complete</p>', unsafe_allow_html=True)
     
     st.success("✅ **Setup Complete!** Your SAM installation is ready to use.")
@@ -158,12 +158,22 @@ def show_setup_complete_page():
         st.markdown("### 🚀 Access SAM")
         
         if st.button("🧠 Open SAM Chat Interface", type="primary", use_container_width=True):
-            st.markdown("""
-            <script>
-            window.open('http://localhost:8502', '_blank');
-            </script>
-            """, unsafe_allow_html=True)
-            st.info("Opening SAM in a new tab...")
+            # Check if SAM main interface is running
+            import requests
+            try:
+                response = requests.get('http://localhost:8502', timeout=2)
+                # If we get here, SAM is running - redirect
+                st.markdown("""
+                <script>
+                window.location.href = 'http://localhost:8502';
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("🚀 Redirecting to SAM main interface...")
+            except requests.exceptions.RequestException:
+                # SAM main interface is not running
+                st.error("❌ SAM main interface is not running!")
+                st.warning("💡 **Please start SAM first**: Run `python start_sam.py` in another terminal")
+                st.info("🔗 **Manual Access**: Once SAM is running, visit [http://localhost:8502](http://localhost:8502)")
         
         st.markdown("---")
         
@@ -377,13 +387,22 @@ def show_setup_success(sam_pro_key):
     
     with col1:
         if st.button("🧠 Open SAM Chat", type="primary", use_container_width=True):
-            # Use JavaScript to redirect to SAM main interface
-            st.markdown("""
-            <script>
-            window.location.href = 'http://localhost:8502';
-            </script>
-            """, unsafe_allow_html=True)
-            st.success("🚀 Redirecting to SAM main interface...")
+            # Check if SAM main interface is running
+            import requests
+            try:
+                response = requests.get('http://localhost:8502', timeout=2)
+                # If we get here, SAM is running - redirect
+                st.markdown("""
+                <script>
+                window.location.href = 'http://localhost:8502';
+                </script>
+                """, unsafe_allow_html=True)
+                st.success("🚀 Redirecting to SAM main interface...")
+            except requests.exceptions.RequestException:
+                # SAM main interface is not running
+                st.error("❌ SAM main interface is not running!")
+                st.warning("💡 **Start SAM**: Run `python start_sam.py` in another terminal to start the main interface")
+                st.info("🔗 **Then visit**: [http://localhost:8502](http://localhost:8502) once SAM is running")
     
     with col2:
         if st.button("📋 Copy Activation Key", use_container_width=True):
@@ -391,9 +410,10 @@ def show_setup_success(sam_pro_key):
             st.text_area("Copy this key:", value=sam_pro_key, height=100)
             st.info("💾 Key ready to copy - save it securely!")
     
-    # Manual link as backup
+    # Manual link and startup instructions
     st.markdown("---")
     st.info("🔗 **Manual Access**: If the button doesn't work, open [http://localhost:8502](http://localhost:8502) in your browser")
+    st.warning("⚠️ **Important**: The main SAM interface (localhost:8502) must be running separately. If you get 'connection refused', run `python start_sam.py` in another terminal.")
 
     st.markdown("### 📚 What's Next?")
     st.markdown("""
