@@ -188,20 +188,7 @@ def show_welcome_setup_page():
 
     st.success("🎯 **New Installation Detected** - Complete the setup below to activate SAM")
     
-    # Welcome container
-    st.markdown("""
-    <div class="setup-container">
-        <h2>🧠 SAM - Synthetic Autonomous Mind</h2>
-        <p>You're about to experience the world's most advanced AI system with:</p>
-        <ul>
-            <li>🔒 <strong>Enterprise-grade security</strong> with zero-knowledge encryption</li>
-            <li>🧠 <strong>Human-like reasoning</strong> with Test-Time Training</li>
-            <li>🎨 <strong>Dream Canvas</strong> for cognitive visualization</li>
-            <li>🔬 <strong>Automated research</strong> discovery and analysis</li>
-            <li>📚 <strong>Lifelong learning</strong> with encrypted memory</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+
     
     # Setup steps
     st.markdown("### 📋 Setup Steps")
