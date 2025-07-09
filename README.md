@@ -18,6 +18,43 @@
 **⚡ FIRST AI with Active Reasoning Control** - Scientifically validated self-regulation (48.4% efficiency gains)
 **🎨 FIRST AI with Cognitive Synthesis** - Revolutionary "Dream Canvas" system with emergent insight generation
 
+## 🚀 Two Ways to Deploy SAM
+
+### 🐳 Docker Container (Recommended for Most Users)
+**Quick, easy, and production-ready deployment**
+
+```bash
+# Download and start in 5 minutes
+wget https://github.com/forge-1825/SAM/releases/latest/download/sam-docker-latest.tar.gz
+tar -xzf sam-docker-latest.tar.gz
+cd sam-docker-latest
+./quick_start.sh
+```
+
+**✅ Benefits**: One-command setup, isolated environment, automatic updates, production-ready
+**📋 Requirements**: Docker + Docker Compose
+**🎯 Best for**: Quick deployment, production use, cloud deployment
+
+[📖 Docker Deployment Guide](README_DOCKER.md) | [🐳 Download Docker Version](https://github.com/forge-1825/SAM/releases/latest)
+
+### 🐍 Traditional Python Installation
+**Full source code access and customization**
+
+```bash
+# Clone and install from source
+git clone https://github.com/forge-1825/SAM.git
+cd SAM
+python setup_sam.py
+```
+
+**✅ Benefits**: Full source access, easy customization, development-friendly
+**📋 Requirements**: Python 3.11+, manual dependency management
+**🎯 Best for**: Development, customization, learning the codebase
+
+[📖 Traditional Installation Guide](#installation) (below)
+
+---
+
 ## ✨ Revolutionary Features
 
 ### 🔬 **Task 27: Automated "Dream & Discover" Engine (NEW!)**

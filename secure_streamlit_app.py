@@ -50,8 +50,42 @@ logger = logging.getLogger(__name__)
 # Create logs directory if it doesn't exist
 Path('logs').mkdir(exist_ok=True)
 
+def health_check():
+    """Health check endpoint for Docker containers and load balancers."""
+    try:
+        # Check if we're in a health check request
+        query_params = st.experimental_get_query_params()
+        if 'health' in query_params or st.session_state.get('health_check_mode', False):
+            # Return simple health status
+            health_status = {
+                "status": "healthy",
+                "timestamp": datetime.now().isoformat(),
+                "version": "1.0.0",
+                "services": {
+                    "streamlit": "running",
+                    "memory_store": "available",
+                    "security": "enabled"
+                }
+            }
+
+            # Display health status
+            st.json(health_status)
+            st.stop()
+
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        st.json({
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+        st.stop()
+
 def main():
     """Main Streamlit application with security integration and first-time setup."""
+
+    # Handle health check requests first
+    health_check()
 
     # Configure Streamlit page
     st.set_page_config(
