@@ -109,9 +109,9 @@ python3 start_sam.py
 ```
 
 **Step 3: Access SAM**
-- Open browser to: **http://localhost:8502**
-- Enter the master password you created during setup
-- Use your SAM Pro activation key from the setup output
+- **First-time users**: Browser opens to **http://localhost:8503** (Welcome & Setup page)
+- **Existing users**: Browser opens to **http://localhost:8502** (Main SAM interface)
+- Complete the welcome setup, then access SAM at **http://localhost:8502**
 
 **🔧 If Installation Fails:**
 ```bash
@@ -144,8 +144,9 @@ python start_sam.py
 ```
 
 **Step 3: Access SAM**
-- Open browser to: **http://localhost:8502**
-- Enter your master password and activation key
+- **First-time users**: Browser opens to **http://localhost:8503** (Welcome & Setup)
+- **Existing users**: Browser opens to **http://localhost:8502** (Main interface)
+- Complete setup, then access SAM at **http://localhost:8502**
 
 ### 🍎 **macOS Installation**
 
@@ -175,8 +176,9 @@ python3 start_sam.py
 ```
 
 **Step 3: Access SAM**
-- Open browser to: **http://localhost:8502**
-- Enter your master password and activation key
+- **First-time users**: Browser opens to **http://localhost:8503** (Welcome & Setup)
+- **Existing users**: Browser opens to **http://localhost:8502** (Main interface)
+- Complete setup, then access SAM at **http://localhost:8502**
 
 ---
 

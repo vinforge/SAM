@@ -14,6 +14,7 @@ import sys
 import time
 import subprocess
 import webbrowser
+import json
 from pathlib import Path
 
 # Add current directory to Python path
@@ -211,39 +212,104 @@ def check_dependencies():
 
     return True
 
+def is_first_time_user():
+    """Check if this is a first-time user who needs setup."""
+    try:
+        # Check for security setup
+        from security import SecureStateManager
+        security_manager = SecureStateManager()
+
+        # If security setup is required, this is a first-time user
+        if security_manager.is_setup_required():
+            return True
+
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # Check setup status file
+    try:
+        setup_file = Path("setup_status.json")
+        if setup_file.exists():
+            with open(setup_file, 'r') as f:
+                status = json.load(f)
+
+            # Check if master password is created
+            if status.get('master_password_created', False):
+                return False
+
+    except Exception:
+        pass
+
+    # Check for keystore file
+    keystore_file = Path("security/keystore.json")
+    if keystore_file.exists():
+        return False
+
+    # If no indicators of setup, assume first-time user
+    return True
+
 def start_sam():
     """Start SAM using Streamlit."""
     try:
-        print("🚀 Starting SAM...")
-        
-        # Start SAM using streamlit run
-        cmd = [
-            sys.executable, "-m", "streamlit", "run", "secure_streamlit_app.py",
-            "--server.port", "8502",
-            "--server.address", "localhost", 
-            "--browser.gatherUsageStats", "false",
-            "--server.headless", "true"
-        ]
-        
-        print("🌐 Opening SAM in your browser...")
-        print("📱 Access SAM at: http://localhost:8502")
+        # Check if this is a first-time user
+        if is_first_time_user():
+            print("🎯 First-time user detected!")
+            print("🚀 Starting SAM Welcome & Setup page...")
+
+            # Start welcome setup page
+            cmd = [
+                sys.executable, "-m", "streamlit", "run", "welcome_setup.py",
+                "--server.port", "8503",
+                "--server.address", "localhost",
+                "--browser.gatherUsageStats", "false",
+                "--server.headless", "true"
+            ]
+
+            print("🌐 Opening SAM Welcome page in your browser...")
+            print("📱 Setup page: http://localhost:8503")
+            print("📋 After setup, access SAM at: http://localhost:8502")
+
+        else:
+            print("✅ Existing user detected")
+            print("🚀 Starting SAM main interface...")
+
+            # Start main SAM interface
+            cmd = [
+                sys.executable, "-m", "streamlit", "run", "secure_streamlit_app.py",
+                "--server.port", "8502",
+                "--server.address", "localhost",
+                "--browser.gatherUsageStats", "false",
+                "--server.headless", "true"
+            ]
+
+            print("🌐 Opening SAM in your browser...")
+            print("📱 Access SAM at: http://localhost:8502")
+
         print()
         print("🛑 Press Ctrl+C to stop SAM")
         print("=" * 60)
         print()
-        
+
         # Start the process
         process = subprocess.Popen(cmd)
         
         # Wait a moment for startup
         time.sleep(3)
-        
-        # Open browser
+
+        # Open browser to appropriate URL
         try:
-            webbrowser.open("http://localhost:8502")
+            if is_first_time_user():
+                webbrowser.open("http://localhost:8503")
+            else:
+                webbrowser.open("http://localhost:8502")
         except:
             print("⚠️  Could not open browser automatically")
-            print("🌐 Please open: http://localhost:8502")
+            if is_first_time_user():
+                print("🌐 Please open: http://localhost:8503")
+            else:
+                print("🌐 Please open: http://localhost:8502")
         
         # Wait for the process
         process.wait()
@@ -263,7 +329,10 @@ def start_sam():
         print("🔧 Troubleshooting:")
         print("• Make sure you're in the SAM directory")
         print("• Try: pip install streamlit")
-        print("• Check that secure_streamlit_app.py exists")
+        print("• Check that secure_streamlit_app.py and welcome_setup.py exist")
+        print("💡 Manual start options:")
+        print("  First-time: streamlit run welcome_setup.py --server.port 8503")
+        print("  Existing: streamlit run secure_streamlit_app.py --server.port 8502")
         return False
 
 def main():
