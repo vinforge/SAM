@@ -222,10 +222,15 @@ python start_sam.py
 ```
 
 ### **✅ What Happens Automatically:**
-- **First-time detection**: System checks for existing setup
-- **Welcome page**: Opens at localhost:8503 for new users
-- **Setup completion**: Creates master password and SAM Pro key
-- **Automatic routing**: Existing users go directly to localhost:8502
+- **Smart detection**: Distinguishes between technical setup and user setup
+- **Welcome page**: Opens at localhost:8503 after setup_sam.py
+- **Setup completion**: Creates master password via welcome page
+- **Automatic routing**: Only routes to localhost:8502 after welcome completion
+
+### **🔍 Setup Detection Logic:**
+- **setup_sam.py completed** → Technical files created, but user needs welcome page
+- **Welcome page completed** → Master password created, route to main interface
+- **Key indicator**: `master_password_created: true` in setup_status.json
 
 ---
 

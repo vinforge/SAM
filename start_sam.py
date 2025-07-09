@@ -247,73 +247,83 @@ def check_dependencies():
     return True
 
 def is_first_time_user():
-    """Check if this is a first-time user who needs setup."""
+    """Check if this is a first-time user who needs welcome setup."""
     print("🔍 Checking user setup status...")
 
-    # Check multiple indicators of completed setup
+    # The key distinction: setup_sam.py creates technical files,
+    # but welcome page creates the master password and completes user setup
+
     setup_indicators = []
 
-    # 1. Check for security setup
-    try:
-        from security import SecureStateManager
-        security_manager = SecureStateManager()
-
-        # If security setup is required, this is a first-time user
-        if security_manager.is_setup_required():
-            setup_indicators.append("Security setup required")
-        else:
-            setup_indicators.append("Security system configured")
-
-    except ImportError:
-        setup_indicators.append("Security module not available")
-    except Exception as e:
-        setup_indicators.append(f"Security check failed: {e}")
-
-    # 2. Check setup status file
+    # 1. PRIMARY CHECK: Has user completed welcome page setup?
     setup_file = Path("setup_status.json")
     if setup_file.exists():
         try:
             with open(setup_file, 'r') as f:
                 status = json.load(f)
 
-            # Check if master password is created
+            # Check if master password was created via welcome page
             if status.get('master_password_created', False):
-                setup_indicators.append("Master password created")
-                print("✅ Setup status: Master password found")
+                setup_indicators.append("✅ Master password created via welcome page")
+                print("✅ Setup status: Welcome page setup completed")
                 return False
             else:
-                setup_indicators.append("Setup status file exists but incomplete")
+                setup_indicators.append("⚠️  Setup status file exists but no master password")
 
         except Exception as e:
-            setup_indicators.append(f"Setup status file corrupted: {e}")
+            setup_indicators.append(f"❌ Setup status file corrupted: {e}")
     else:
-        setup_indicators.append("No setup status file")
+        setup_indicators.append("📝 No setup status file (welcome page not completed)")
 
-    # 3. Check for keystore file
+    # 2. SECONDARY CHECK: Security keystore from welcome page
     keystore_file = Path("security/keystore.json")
     if keystore_file.exists():
-        setup_indicators.append("Keystore file exists")
-        print("✅ Setup status: Security keystore found")
-        return False
-    else:
-        setup_indicators.append("No keystore file")
+        try:
+            with open(keystore_file, 'r') as f:
+                keystore_data = json.load(f)
 
-    # 4. Check for SAM Pro key file
+            # Check if this was created by welcome page (has password_hash)
+            if keystore_data.get('password_hash'):
+                setup_indicators.append("✅ Welcome page security setup found")
+                print("✅ Setup status: Welcome page security completed")
+                return False
+            else:
+                setup_indicators.append("⚠️  Keystore exists but no password hash (technical setup only)")
+
+        except Exception as e:
+            setup_indicators.append(f"❌ Keystore file corrupted: {e}")
+    else:
+        setup_indicators.append("📝 No keystore file")
+
+    # 3. Check if setup_sam.py was run (technical setup)
     sam_pro_file = Path("sam_pro_key.txt")
     if sam_pro_file.exists():
-        setup_indicators.append("SAM Pro key file exists")
-        print("✅ Setup status: SAM Pro key found")
-        return False
+        setup_indicators.append("🔧 Technical setup completed (setup_sam.py)")
     else:
-        setup_indicators.append("No SAM Pro key file")
+        setup_indicators.append("📝 No technical setup")
+
+    # 4. Check security module status
+    try:
+        from security import SecureStateManager
+        security_manager = SecureStateManager()
+
+        if security_manager.is_setup_required():
+            setup_indicators.append("🔧 Security system needs initialization")
+        else:
+            setup_indicators.append("🔧 Security system initialized")
+
+    except ImportError:
+        setup_indicators.append("⚠️  Security module not available")
+    except Exception as e:
+        setup_indicators.append(f"❌ Security check failed: {e}")
 
     # Log all indicators for debugging
     print("🔍 Setup indicators found:")
     for indicator in setup_indicators:
         print(f"   • {indicator}")
 
-    # If no indicators of completed setup, this is a first-time user
-    print("🎯 Result: First-time user detected")
+    # Decision logic: If no master password from welcome page, show welcome page
+    print("🎯 Result: First-time user - needs welcome page setup")
     return True
 
 def start_sam():
