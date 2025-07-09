@@ -160,6 +160,10 @@ def show_setup_complete_page():
         if st.button("🧠 Open SAM Chat Interface", type="primary", use_container_width=True):
             # Check if SAM main interface is running
             import requests
+            import subprocess
+            import sys
+            import time
+
             try:
                 response = requests.get('http://localhost:8502', timeout=2)
                 # If we get here, SAM is running - redirect
@@ -170,10 +174,46 @@ def show_setup_complete_page():
                 """, unsafe_allow_html=True)
                 st.success("🚀 Redirecting to SAM main interface...")
             except requests.exceptions.RequestException:
-                # SAM main interface is not running
-                st.error("❌ SAM main interface is not running!")
-                st.warning("💡 **Please start SAM first**: Run `python start_sam.py` in another terminal")
-                st.info("🔗 **Manual Access**: Once SAM is running, visit [http://localhost:8502](http://localhost:8502)")
+                # SAM main interface is not running - start it automatically
+                st.info("🚀 **Starting SAM main interface automatically...**")
+
+                try:
+                    # Start the main SAM interface
+                    with st.spinner("Starting SAM main interface..."):
+                        # Start secure_streamlit_app.py on port 8502
+                        process = subprocess.Popen([
+                            sys.executable, "-m", "streamlit", "run", "secure_streamlit_app.py",
+                            "--server.port", "8502",
+                            "--server.address", "localhost",
+                            "--browser.gatherUsageStats", "false",
+                            "--server.headless", "true"
+                        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                        # Wait a moment for startup
+                        time.sleep(3)
+
+                        # Check if it started successfully
+                        try:
+                            response = requests.get('http://localhost:8502', timeout=5)
+                            st.success("✅ **SAM main interface started successfully!**")
+
+                            # Redirect to the main interface
+                            st.markdown("""
+                            <script>
+                            window.location.href = 'http://localhost:8502';
+                            </script>
+                            """, unsafe_allow_html=True)
+                            st.success("🚀 Redirecting to SAM main interface...")
+
+                        except requests.exceptions.RequestException:
+                            st.error("❌ **Failed to start SAM main interface**")
+                            st.warning("💡 **Manual start required**: Run `python start_sam.py` in another terminal")
+                            st.info("🔗 **Then visit**: [http://localhost:8502](http://localhost:8502)")
+
+                except Exception as e:
+                    st.error(f"❌ **Error starting SAM**: {e}")
+                    st.warning("💡 **Manual start required**: Run `python start_sam.py` in another terminal")
+                    st.info("🔗 **Then visit**: [http://localhost:8502](http://localhost:8502)")
         
         st.markdown("---")
         
@@ -389,6 +429,10 @@ def show_setup_success(sam_pro_key):
         if st.button("🧠 Open SAM Chat", type="primary", use_container_width=True):
             # Check if SAM main interface is running
             import requests
+            import subprocess
+            import sys
+            import time
+
             try:
                 response = requests.get('http://localhost:8502', timeout=2)
                 # If we get here, SAM is running - redirect
@@ -399,10 +443,46 @@ def show_setup_success(sam_pro_key):
                 """, unsafe_allow_html=True)
                 st.success("🚀 Redirecting to SAM main interface...")
             except requests.exceptions.RequestException:
-                # SAM main interface is not running
-                st.error("❌ SAM main interface is not running!")
-                st.warning("💡 **Start SAM**: Run `python start_sam.py` in another terminal to start the main interface")
-                st.info("🔗 **Then visit**: [http://localhost:8502](http://localhost:8502) once SAM is running")
+                # SAM main interface is not running - start it automatically
+                st.info("🚀 **Starting SAM main interface automatically...**")
+
+                try:
+                    # Start the main SAM interface
+                    with st.spinner("Starting SAM main interface..."):
+                        # Start secure_streamlit_app.py on port 8502
+                        process = subprocess.Popen([
+                            sys.executable, "-m", "streamlit", "run", "secure_streamlit_app.py",
+                            "--server.port", "8502",
+                            "--server.address", "localhost",
+                            "--browser.gatherUsageStats", "false",
+                            "--server.headless", "true"
+                        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                        # Wait a moment for startup
+                        time.sleep(3)
+
+                        # Check if it started successfully
+                        try:
+                            response = requests.get('http://localhost:8502', timeout=5)
+                            st.success("✅ **SAM main interface started successfully!**")
+
+                            # Redirect to the main interface
+                            st.markdown("""
+                            <script>
+                            window.location.href = 'http://localhost:8502';
+                            </script>
+                            """, unsafe_allow_html=True)
+                            st.success("🚀 Redirecting to SAM main interface...")
+
+                        except requests.exceptions.RequestException:
+                            st.error("❌ **Failed to start SAM main interface**")
+                            st.warning("💡 **Manual start required**: Run `python start_sam.py` in another terminal")
+                            st.info("🔗 **Then visit**: [http://localhost:8502](http://localhost:8502)")
+
+                except Exception as e:
+                    st.error(f"❌ **Error starting SAM**: {e}")
+                    st.warning("💡 **Manual start required**: Run `python start_sam.py` in another terminal")
+                    st.info("🔗 **Then visit**: [http://localhost:8502](http://localhost:8502)")
     
     with col2:
         if st.button("📋 Copy Activation Key", use_container_width=True):
@@ -413,7 +493,7 @@ def show_setup_success(sam_pro_key):
     # Manual link and startup instructions
     st.markdown("---")
     st.info("🔗 **Manual Access**: If the button doesn't work, open [http://localhost:8502](http://localhost:8502) in your browser")
-    st.warning("⚠️ **Important**: The main SAM interface (localhost:8502) must be running separately. If you get 'connection refused', run `python start_sam.py` in another terminal.")
+    st.success("✨ **Auto-Start**: The 'Open SAM Chat' button will automatically start the main interface if it's not running!")
 
     st.markdown("### 📚 What's Next?")
     st.markdown("""
