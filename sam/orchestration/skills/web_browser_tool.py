@@ -483,7 +483,7 @@ class AgentZeroWebBrowserTool(BaseSkillModule):
             
             # Clean up text
             lines = (line.strip() for line in text.splitlines())
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            chunks = (phrase.strip() for line in lines for phrase in str(line).split("  "))
             text = ' '.join(chunk for chunk in chunks if chunk)
             
             return text
