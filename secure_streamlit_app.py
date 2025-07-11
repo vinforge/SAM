@@ -1228,8 +1228,17 @@ def render_conversation_history_sidebar():
 
                         st.session_state['archived_threads'].insert(0, archived_thread.to_dict())
 
-                        # Clear chat history
+                        # Clear chat history and conversation context
                         st.session_state.chat_history = []
+                        st.session_state.conversation_history = ""
+
+                        # Clear any conversation metadata that might interfere
+                        if 'conversation_archived' in st.session_state:
+                            del st.session_state['conversation_archived']
+                        if 'conversation_resumed' in st.session_state:
+                            del st.session_state['conversation_resumed']
+                        if 'last_relevance_check' in st.session_state:
+                            del st.session_state['last_relevance_check']
 
                         st.success(f"✅ Started new chat! Previous conversation archived as: '{archived_thread.title}'")
                         st.rerun()
@@ -7863,6 +7872,8 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
 
         # Phase -2: Conversational Buffer Management (Task 30 Phase 1)
         conversation_history = ""
+        session_manager = None
+        session_id = None
         try:
             from sam.session.state_manager import get_session_manager
 
@@ -7877,16 +7888,17 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
                 st.session_state['session_id'] = session_id
                 logger.info(f"🗣️ Created new conversation session: {session_id}")
 
-            # Add user turn to conversation buffer (use original prompt for history)
-            session_manager.add_turn(session_id, 'user', prompt)
-
-            # Get formatted conversation history
+            # CRITICAL FIX: Get conversation history BEFORE adding current prompt
+            # This ensures that new chats start with empty history
             conversation_history = session_manager.format_conversation_history(session_id, max_turns=8)
-            logger.info(f"🔍 DEBUG: Formatted conversation history ({len(conversation_history)} chars): '{conversation_history}'")
+            logger.info(f"🔍 DEBUG: Formatted conversation history BEFORE adding current prompt ({len(conversation_history)} chars): '{conversation_history}'")
 
             # Store in session state for use in prompt template
             st.session_state['conversation_history'] = conversation_history
             logger.info(f"🔍 DEBUG: Stored conversation history in session state")
+
+            # Now add user turn to conversation buffer for future context
+            session_manager.add_turn(session_id, 'user', prompt)
 
             logger.info(f"🗣️ Conversational buffer updated for session: {session_id}")
 
