@@ -2065,26 +2065,117 @@ def render_chat_interface():
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button(f"📋 Summarize", key=f"summarize_{i}_{message.get('filename', 'doc')}"):
-                        summary_prompt = generate_enhanced_summary_prompt(message.get('filename', 'the uploaded document'))
-                        st.session_state.chat_history.append({"role": "user", "content": summary_prompt})
+                        with st.spinner("🔍 Generating comprehensive summary..."):
+                            summary_prompt = generate_enhanced_summary_prompt(message.get('filename', 'the uploaded document'))
+
+                            # Add user prompt to chat history
+                            st.session_state.chat_history.append({
+                                "role": "user",
+                                "content": f"📋 Summarize: {message.get('filename', 'the uploaded document')}"
+                            })
+
+                            # Generate actual response using SAM's capabilities
+                            try:
+                                response = generate_response_with_conversation_buffer(summary_prompt, force_local=True)
+
+                                # Add SAM's response to chat history
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": response,
+                                    "document_analysis": True,
+                                    "analysis_type": "summary",
+                                    "filename": message.get('filename', 'Unknown')
+                                })
+
+                            except Exception as e:
+                                logger.error(f"Error generating summary: {e}")
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": f"I apologize, but I encountered an error while generating the summary. Please try again or ask me directly about the document."
+                                })
                         st.rerun()
 
                 with col2:
                     if st.button(f"❓ Key Questions", key=f"questions_{i}_{message.get('filename', 'doc')}"):
-                        questions_prompt = generate_enhanced_questions_prompt(message.get('filename', 'the uploaded document'))
-                        st.session_state.chat_history.append({"role": "user", "content": questions_prompt})
+                        with st.spinner("🤔 Generating strategic questions..."):
+                            questions_prompt = generate_enhanced_questions_prompt(message.get('filename', 'the uploaded document'))
+
+                            # Add user prompt to chat history
+                            st.session_state.chat_history.append({
+                                "role": "user",
+                                "content": f"❓ Key Questions: {message.get('filename', 'the uploaded document')}"
+                            })
+
+                            # Generate actual response using SAM's capabilities
+                            try:
+                                response = generate_response_with_conversation_buffer(questions_prompt, force_local=True)
+
+                                # Add SAM's response to chat history
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": response,
+                                    "document_analysis": True,
+                                    "analysis_type": "questions",
+                                    "filename": message.get('filename', 'Unknown')
+                                })
+
+                            except Exception as e:
+                                logger.error(f"Error generating questions: {e}")
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": f"I apologize, but I encountered an error while generating questions. Please try again or ask me directly about the document."
+                                })
                         st.rerun()
 
                 with col3:
                     if st.button(f"🔍 Deep Analysis", key=f"analysis_{i}_{message.get('filename', 'doc')}"):
-                        analysis_prompt = generate_enhanced_analysis_prompt(message.get('filename', 'the uploaded document'))
-                        st.session_state.chat_history.append({"role": "user", "content": analysis_prompt})
+                        with st.spinner("🧠 Conducting deep analysis..."):
+                            analysis_prompt = generate_enhanced_analysis_prompt(message.get('filename', 'the uploaded document'))
+
+                            # Add user prompt to chat history
+                            st.session_state.chat_history.append({
+                                "role": "user",
+                                "content": f"🔍 Deep Analysis: {message.get('filename', 'the uploaded document')}"
+                            })
+
+                            # Generate actual response using SAM's capabilities
+                            try:
+                                response = generate_response_with_conversation_buffer(analysis_prompt, force_local=True)
+
+                                # Add SAM's response to chat history
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": response,
+                                    "document_analysis": True,
+                                    "analysis_type": "deep_analysis",
+                                    "filename": message.get('filename', 'Unknown')
+                                })
+
+                            except Exception as e:
+                                logger.error(f"Error generating analysis: {e}")
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": f"I apologize, but I encountered an error while generating the analysis. Please try again or ask me directly about the document."
+                                })
                         st.rerun()
 
             # Check if this is a document analysis response
             elif message.get("document_analysis"):
-                # Special formatting for document analysis responses
-                st.info(f"📊 **Document Analysis**: {message.get('filename', 'Unknown')}")
+                # Enhanced formatting for different analysis types
+                analysis_type = message.get("analysis_type", "analysis")
+                filename = message.get('filename', 'Unknown')
+
+                # Different icons and colors for different analysis types
+                if analysis_type == "summary":
+                    st.success(f"📋 **Document Summary**: {filename}")
+                elif analysis_type == "questions":
+                    st.info(f"❓ **Strategic Questions**: {filename}")
+                elif analysis_type == "deep_analysis":
+                    st.warning(f"🔍 **Deep Analysis**: {filename}")
+                else:
+                    st.info(f"📊 **Document Analysis**: {filename}")
+
+                # Render the analysis content with enhanced formatting
                 st.markdown(message["content"])
 
             # Check if this is a document suggestions message
