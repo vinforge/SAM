@@ -81,6 +81,248 @@ def health_check():
         })
         st.stop()
 
+def generate_enhanced_summary_prompt(filename: str) -> str:
+    """Generate enhanced summary prompt based on document type and SAM's capabilities."""
+
+    # Detect document type from filename
+    file_ext = Path(filename).suffix.lower() if filename else ""
+
+    # Base prompt with SAM's synthesis approach
+    base_prompt = f"""Please provide a comprehensive synthesis summary of the document '{filename}' using your advanced document analysis capabilities.
+
+🎯 **SYNTHESIS APPROACH** (not extraction):
+- Analyze the document's core themes and contributions
+- Synthesize information into a coherent narrative in your own words
+- Remove formatting artifacts and create flowing, readable content
+- Focus on insights and implications rather than just facts
+
+📊 **STRUCTURED OUTPUT**:
+## Executive Summary (30-second read)
+- Key finding or main message
+- Primary value proposition
+
+## Core Analysis (2-minute read)
+- Main problem/topic addressed
+- Key methodology or approach
+- Primary results and implications
+- Main conclusions
+
+## Detailed Insights (5-minute read)
+- Comprehensive analysis of findings
+- Detailed implications and recommendations
+- Limitations and considerations
+- Future directions or next steps
+
+🔍 **DOCUMENT-SPECIFIC ANALYSIS**:"""
+
+    # Add document-type specific instructions
+    if file_ext in ['.pdf', '.docx']:
+        if 'research' in filename.lower() or 'paper' in filename.lower() or 'study' in filename.lower():
+            base_prompt += """
+- **Research Paper Focus**: Methodology, findings, statistical significance, limitations
+- **Academic Standards**: Scholarly tone, proper context, research implications
+- **Citation Context**: How this fits into broader research landscape"""
+        elif 'proposal' in filename.lower() or 'plan' in filename.lower():
+            base_prompt += """
+- **Proposal Focus**: Objectives, methodology, timeline, budget implications
+- **Strategic Analysis**: Feasibility, risks, success factors
+- **Implementation Insights**: Practical considerations and next steps"""
+        elif 'report' in filename.lower() or 'analysis' in filename.lower():
+            base_prompt += """
+- **Report Focus**: Key findings, data insights, recommendations
+- **Business Context**: Strategic implications, operational impact
+- **Actionable Insights**: Specific recommendations and implementation guidance"""
+        else:
+            base_prompt += """
+- **Document Analysis**: Structure, key sections, main arguments
+- **Content Synthesis**: Core messages, supporting evidence
+- **Practical Applications**: How this information can be used"""
+
+    elif file_ext in ['.md', '.txt']:
+        base_prompt += """
+- **Text Analysis**: Main themes, key concepts, logical flow
+- **Content Structure**: Organization, hierarchy, relationships
+- **Knowledge Extraction**: Actionable insights and takeaways"""
+
+    else:
+        base_prompt += """
+- **Content Analysis**: Main themes, structure, key information
+- **Synthesis Focus**: Core messages and practical implications"""
+
+    base_prompt += """
+
+💡 **LEVERAGE YOUR CAPABILITIES**:
+- Use your knowledge consolidation to connect concepts
+- Apply semantic understanding for deeper insights
+- Provide confidence indicators where appropriate
+- Include relevant context from your knowledge base"""
+
+    return base_prompt
+
+def generate_enhanced_questions_prompt(filename: str) -> str:
+    """Generate enhanced key questions prompt based on document analysis."""
+
+    file_ext = Path(filename).suffix.lower() if filename else ""
+
+    base_prompt = f"""Based on your analysis of '{filename}', generate the most strategic and insightful questions that would unlock the document's full value.
+
+🎯 **QUESTION CATEGORIES**:
+
+## 🔍 **Clarification Questions** (Understanding)
+- What are the key concepts that need deeper explanation?
+- Which assumptions or methodologies should be questioned?
+- What context or background would enhance understanding?
+
+## 💡 **Insight Questions** (Analysis)
+- What are the broader implications of the main findings?
+- How do these findings connect to current trends or challenges?
+- What patterns or relationships emerge from the data?
+
+## 🚀 **Application Questions** (Implementation)
+- How can these insights be practically applied?
+- What are the next logical steps or follow-up actions?
+- What resources or conditions are needed for implementation?
+
+## ⚠️ **Critical Questions** (Evaluation)
+- What are the potential limitations or risks?
+- What alternative perspectives should be considered?
+- How reliable or generalizable are the conclusions?"""
+
+    # Add document-type specific questions
+    if file_ext in ['.pdf', '.docx']:
+        if 'research' in filename.lower() or 'paper' in filename.lower():
+            base_prompt += """
+
+## 📚 **Research-Specific Questions**:
+- How does this research contribute to the existing knowledge base?
+- What are the statistical significance and effect sizes?
+- What future research directions does this suggest?
+- How could the methodology be improved or extended?"""
+
+        elif 'proposal' in filename.lower() or 'plan' in filename.lower():
+            base_prompt += """
+
+## 📋 **Proposal-Specific Questions**:
+- What are the success metrics and evaluation criteria?
+- What are the potential risks and mitigation strategies?
+- How does this align with organizational goals and resources?
+- What are the dependencies and critical path items?"""
+
+        elif 'report' in filename.lower() or 'analysis' in filename.lower():
+            base_prompt += """
+
+## 📊 **Report-Specific Questions**:
+- What trends or patterns emerge from the data?
+- What are the strategic implications for decision-making?
+- Which recommendations have the highest impact potential?
+- What additional data or analysis would be valuable?"""
+
+    base_prompt += """
+
+🎯 **QUESTION QUALITY CRITERIA**:
+- **Strategic**: Focus on high-impact, decision-relevant questions
+- **Specific**: Avoid generic questions; tailor to document content
+- **Actionable**: Questions that lead to concrete insights or actions
+- **Progressive**: Build from basic understanding to advanced analysis
+
+📝 **FORMAT**: Present 8-12 questions organized by category, with brief rationale for why each question is important for maximizing the document's value."""
+
+    return base_prompt
+
+def generate_enhanced_analysis_prompt(filename: str) -> str:
+    """Generate enhanced deep analysis prompt leveraging SAM's full analytical capabilities."""
+
+    file_ext = Path(filename).suffix.lower() if filename else ""
+
+    base_prompt = f"""Conduct a comprehensive deep analysis of '{filename}' using your advanced analytical capabilities and knowledge synthesis.
+
+🧠 **ANALYTICAL FRAMEWORK**:
+
+## 📊 **Structural Analysis**
+- **Document Architecture**: Organization, flow, key sections
+- **Content Hierarchy**: Main themes, supporting arguments, evidence
+- **Information Density**: Key insights per section, critical passages
+
+## 🔍 **Content Deep Dive**
+- **Core Concepts**: Fundamental ideas and their relationships
+- **Methodology/Approach**: How conclusions were reached
+- **Evidence Quality**: Strength and reliability of supporting data
+- **Logical Consistency**: Argument flow and reasoning validity
+
+## 💡 **Insight Synthesis**
+- **Key Discoveries**: Most significant findings or revelations
+- **Hidden Patterns**: Subtle connections and implications
+- **Knowledge Gaps**: What's missing or needs further exploration
+- **Contradictions**: Any conflicting information or perspectives
+
+## 🎯 **Strategic Implications**
+- **Immediate Applications**: How to use this information now
+- **Long-term Impact**: Broader implications and future considerations
+- **Decision Support**: How this informs strategic choices
+- **Risk Assessment**: Potential challenges or limitations"""
+
+    # Add document-type specific analysis
+    if file_ext in ['.pdf', '.docx']:
+        if 'research' in filename.lower() or 'paper' in filename.lower():
+            base_prompt += """
+
+## 🔬 **Research Analysis**:
+- **Methodology Evaluation**: Strengths/weaknesses of research design
+- **Statistical Rigor**: Significance, effect sizes, confidence intervals
+- **Reproducibility**: Can results be replicated or validated?
+- **Research Impact**: Contribution to field, citation potential
+- **Future Research**: Logical next steps and research questions"""
+
+        elif 'proposal' in filename.lower() or 'plan' in filename.lower():
+            base_prompt += """
+
+## 📋 **Proposal Analysis**:
+- **Feasibility Assessment**: Technical, financial, operational viability
+- **Resource Requirements**: Personnel, budget, timeline analysis
+- **Risk Matrix**: Probability and impact of potential issues
+- **Success Factors**: Critical elements for successful implementation
+- **ROI Projection**: Expected returns and value creation"""
+
+        elif 'technical' in filename.lower() or 'spec' in filename.lower():
+            base_prompt += """
+
+## ⚙️ **Technical Analysis**:
+- **Technical Feasibility**: Implementation complexity and requirements
+- **Architecture Review**: System design, scalability, maintainability
+- **Performance Implications**: Speed, efficiency, resource usage
+- **Integration Challenges**: Compatibility with existing systems
+- **Security Considerations**: Vulnerabilities and protection measures"""
+
+    base_prompt += """
+
+## 🔗 **Contextual Integration**
+- **Industry Context**: How this fits within broader industry trends
+- **Competitive Landscape**: Advantages, disadvantages, positioning
+- **Regulatory Considerations**: Compliance, legal, ethical implications
+- **Technology Trends**: Alignment with emerging technologies
+
+## 📈 **Actionable Recommendations**
+- **Immediate Actions**: What to do in the next 30 days
+- **Medium-term Strategy**: 3-6 month implementation plan
+- **Long-term Vision**: 1-2 year strategic direction
+- **Resource Allocation**: Priority areas for investment
+- **Success Metrics**: How to measure progress and impact
+
+🎯 **ANALYSIS DEPTH**:
+- **Quantitative**: Use specific data, metrics, and measurements where available
+- **Qualitative**: Assess subjective factors, opinions, and interpretations
+- **Comparative**: Benchmark against standards, competitors, or alternatives
+- **Predictive**: Forecast trends, outcomes, and future scenarios
+
+💡 **LEVERAGE YOUR CAPABILITIES**:
+- Apply your knowledge consolidation for cross-domain insights
+- Use semantic understanding to identify subtle relationships
+- Provide confidence levels for different conclusions
+- Connect to relevant information from your knowledge base
+- Identify opportunities for further research or analysis"""
+
+    return base_prompt
+
 def main():
     """Main Streamlit application with security integration and first-time setup."""
 
@@ -1819,23 +2061,23 @@ def render_chat_interface():
                 st.success(f"📄 **Document Uploaded**: {message.get('filename', 'Unknown')}")
                 st.markdown("✅ Successfully processed and added to my knowledge. You can now ask me questions about this document!")
 
-                # Add quick action buttons for document discussion
+                # Add enhanced quick action buttons for document discussion
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button(f"📋 Summarize", key=f"summarize_{i}_{message.get('filename', 'doc')}"):
-                        summary_prompt = f"Please provide a comprehensive summary of the document '{message.get('filename', 'the uploaded document')}'."
+                        summary_prompt = generate_enhanced_summary_prompt(message.get('filename', 'the uploaded document'))
                         st.session_state.chat_history.append({"role": "user", "content": summary_prompt})
                         st.rerun()
 
                 with col2:
                     if st.button(f"❓ Key Questions", key=f"questions_{i}_{message.get('filename', 'doc')}"):
-                        questions_prompt = f"What are the most important questions I should ask about '{message.get('filename', 'the uploaded document')}'?"
+                        questions_prompt = generate_enhanced_questions_prompt(message.get('filename', 'the uploaded document'))
                         st.session_state.chat_history.append({"role": "user", "content": questions_prompt})
                         st.rerun()
 
                 with col3:
                     if st.button(f"🔍 Deep Analysis", key=f"analysis_{i}_{message.get('filename', 'doc')}"):
-                        analysis_prompt = f"Please provide a detailed analysis of '{message.get('filename', 'the uploaded document')}', including key insights, implications, and recommendations."
+                        analysis_prompt = generate_enhanced_analysis_prompt(message.get('filename', 'the uploaded document'))
                         st.session_state.chat_history.append({"role": "user", "content": analysis_prompt})
                         st.rerun()
 
