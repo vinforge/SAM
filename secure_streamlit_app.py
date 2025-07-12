@@ -2108,15 +2108,34 @@ def render_chat_interface():
 
                             # Generate actual response using SAM's capabilities
                             try:
-                                response = generate_response_with_conversation_buffer(summary_prompt, force_local=True)
+                                raw_response = generate_response_with_conversation_buffer(summary_prompt, force_local=True)
 
-                                # Add SAM's response to chat history
+                                # Process thoughts using the thought processor (same as regular chat)
+                                try:
+                                    from utils.thought_processor import get_thought_processor
+                                    thought_processor = get_thought_processor()
+                                    processed = thought_processor.process_response(raw_response)
+
+                                    # Store clean content without thoughts
+                                    clean_response = processed.visible_content
+                                    has_thoughts = processed.has_thoughts
+                                    thought_blocks = processed.thought_blocks if processed.has_thoughts else []
+
+                                except ImportError:
+                                    # Fallback if thought processor is not available
+                                    clean_response = raw_response
+                                    has_thoughts = False
+                                    thought_blocks = []
+
+                                # Add SAM's clean response to chat history
                                 st.session_state.chat_history.append({
                                     "role": "assistant",
-                                    "content": response,
+                                    "content": clean_response,
                                     "document_analysis": True,
                                     "analysis_type": "summary",
-                                    "filename": message.get('filename', 'Unknown')
+                                    "filename": message.get('filename', 'Unknown'),
+                                    "has_thoughts": has_thoughts,
+                                    "thought_blocks": thought_blocks
                                 })
 
                             except Exception as e:
@@ -2140,15 +2159,34 @@ def render_chat_interface():
 
                             # Generate actual response using SAM's capabilities
                             try:
-                                response = generate_response_with_conversation_buffer(questions_prompt, force_local=True)
+                                raw_response = generate_response_with_conversation_buffer(questions_prompt, force_local=True)
 
-                                # Add SAM's response to chat history
+                                # Process thoughts using the thought processor (same as regular chat)
+                                try:
+                                    from utils.thought_processor import get_thought_processor
+                                    thought_processor = get_thought_processor()
+                                    processed = thought_processor.process_response(raw_response)
+
+                                    # Store clean content without thoughts
+                                    clean_response = processed.visible_content
+                                    has_thoughts = processed.has_thoughts
+                                    thought_blocks = processed.thought_blocks if processed.has_thoughts else []
+
+                                except ImportError:
+                                    # Fallback if thought processor is not available
+                                    clean_response = raw_response
+                                    has_thoughts = False
+                                    thought_blocks = []
+
+                                # Add SAM's clean response to chat history
                                 st.session_state.chat_history.append({
                                     "role": "assistant",
-                                    "content": response,
+                                    "content": clean_response,
                                     "document_analysis": True,
                                     "analysis_type": "questions",
-                                    "filename": message.get('filename', 'Unknown')
+                                    "filename": message.get('filename', 'Unknown'),
+                                    "has_thoughts": has_thoughts,
+                                    "thought_blocks": thought_blocks
                                 })
 
                             except Exception as e:
@@ -2172,15 +2210,34 @@ def render_chat_interface():
 
                             # Generate actual response using SAM's capabilities
                             try:
-                                response = generate_response_with_conversation_buffer(analysis_prompt, force_local=True)
+                                raw_response = generate_response_with_conversation_buffer(analysis_prompt, force_local=True)
 
-                                # Add SAM's response to chat history
+                                # Process thoughts using the thought processor (same as regular chat)
+                                try:
+                                    from utils.thought_processor import get_thought_processor
+                                    thought_processor = get_thought_processor()
+                                    processed = thought_processor.process_response(raw_response)
+
+                                    # Store clean content without thoughts
+                                    clean_response = processed.visible_content
+                                    has_thoughts = processed.has_thoughts
+                                    thought_blocks = processed.thought_blocks if processed.has_thoughts else []
+
+                                except ImportError:
+                                    # Fallback if thought processor is not available
+                                    clean_response = raw_response
+                                    has_thoughts = False
+                                    thought_blocks = []
+
+                                # Add SAM's clean response to chat history
                                 st.session_state.chat_history.append({
                                     "role": "assistant",
-                                    "content": response,
+                                    "content": clean_response,
                                     "document_analysis": True,
                                     "analysis_type": "deep_analysis",
-                                    "filename": message.get('filename', 'Unknown')
+                                    "filename": message.get('filename', 'Unknown'),
+                                    "has_thoughts": has_thoughts,
+                                    "thought_blocks": thought_blocks
                                 })
 
                             except Exception as e:
@@ -2209,6 +2266,25 @@ def render_chat_interface():
 
                 # Render the analysis content with enhanced formatting
                 st.markdown(message["content"])
+
+                # Add thought dropdown if thoughts are present (same as regular chat)
+                if message.get("has_thoughts") and message.get("thought_blocks"):
+                    thought_blocks = message.get("thought_blocks", [])
+                    total_tokens = sum(getattr(block, 'token_count', 0) for block in thought_blocks)
+
+                    with st.expander(f"🧠 SAM's Thoughts ({total_tokens} tokens)", expanded=False):
+                        for i, thought_block in enumerate(thought_blocks):
+                            st.markdown(f"**Thought {i+1}:**")
+                            # Handle both object and dict formats for thought blocks
+                            if hasattr(thought_block, 'content'):
+                                st.markdown(thought_block.content)
+                            elif isinstance(thought_block, dict):
+                                st.markdown(thought_block.get('content', str(thought_block)))
+                            else:
+                                st.markdown(str(thought_block))
+
+                            if i < len(thought_blocks) - 1:
+                                st.divider()
 
             # Check if this is a document suggestions message
             elif message.get("document_suggestions"):
