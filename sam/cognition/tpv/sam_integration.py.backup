@@ -6,8 +6,6 @@ Integrates TPV monitoring into SAM's secure response generation pipeline.
 """
 
 import logging
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import time
 import requests
 import json
@@ -248,7 +246,11 @@ class SAMTPVIntegration:
             default_params.update(ollama_params)
 
         # Make Ollama API call
-        response = create_legacy_ollama_client().generate(prompt)
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json=default_params,
+            timeout=180  # Extended timeout for complex reasoning tasks
+        )
 
         if response.status_code != 200:
             raise Exception(f"Ollama API error: {response.status_code}")
@@ -399,7 +401,11 @@ class SAMTPVIntegration:
             default_params.update(ollama_params)
         
         # Make Ollama API call
-        response = create_legacy_ollama_client().generate(prompt)
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json=default_params,
+            timeout=180  # Extended timeout for complex reasoning tasks
+        )
         
         if response.status_code != 200:
             raise Exception(f"Ollama API error: {response.status_code}")

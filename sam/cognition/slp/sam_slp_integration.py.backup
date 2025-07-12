@@ -7,8 +7,6 @@ with SAM's existing reasoning pipeline for seamless program capture and executio
 """
 
 import logging
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import time
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -312,7 +310,11 @@ class SAMSLPIntegration:
                 }
             }
 
-            response = create_legacy_ollama_client().generate(prompt)
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=ollama_payload,
+                timeout=60  # Increased timeout to 60 seconds for better reliability
+            )
 
             if response.status_code == 200:
                 result = response.json()

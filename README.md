@@ -90,6 +90,14 @@ python setup_sam.py
 - **Interactive Visualization:** Explore AI cognitive processes through interactive maps
 - **Research Integration:** Direct research triggering from synthesized insights
 
+### 🧪 **SAM Model Foundry & Evaluation Suite (ADVANCED - For Developers/Researchers)**
+- **Pluggable Model Architecture:** Seamlessly integrate any AI model (Llama, Claude, GPT, etc.)
+- **Automated Benchmarking:** 30-prompt comprehensive evaluation across 10 categories
+- **LLM-as-a-Judge Scoring:** Objective quality assessment with structured rubrics
+- **Model Leaderboard:** Data-driven comparison with cost-benefit analysis
+- **One-Command Evaluation:** Complete model comparison pipeline in minutes
+- **Note:** This is an advanced feature for AI researchers and developers. Regular chat users can skip this section.
+
 ### 🔒 **Enterprise-Grade Security (SAM Secure Enclave)**
 - **Zero-Knowledge Encryption:** AES-256-GCM with Argon2id key derivation
 - **Military-Grade Protection:** Complete data privacy with <5ms encryption overhead
@@ -482,6 +490,93 @@ python3 start_sam.py
 4. Export/import memory collections with full encryption
 5. Monitor SLP cognitive automation and efficiency gains
 
+### 🧪 **SAM Model Foundry & Evaluation Suite**
+The Model Foundry transforms SAM into a model-agnostic platform for rapid AI model integration and evaluation.
+
+#### **Quick Model Evaluation**
+```bash
+# Evaluate multiple models across all categories
+python scripts/run_model_evaluation.py --models transformer,llama31-8b
+
+# Score results with LLM-as-a-Judge
+python scripts/score_evaluation_results.py evaluation_results/run_latest.jsonl
+
+# Generate comprehensive leaderboard
+python scripts/generate_leaderboard_report.py
+```
+
+#### **Adding New Models**
+1. **Create Model Wrapper**: Copy `sam/models/wrappers/template.py`
+2. **Implement Methods**: Fill in model-specific loading and generation code
+3. **Test Integration**: Run `python scripts/test_model_foundry.py`
+4. **Evaluate Performance**: Use benchmark suite to assess capabilities
+
+#### **Benchmark Categories**
+- **📝 Question Answering**: Factual accuracy and comprehension
+- **🧠 Reasoning**: Multi-step logical problem solving
+- **💻 Code Generation**: Programming task completion
+- **📊 Summarization**: Content distillation and clarity
+- **🔧 Tool Use**: Function calling and parameter extraction
+- **📚 Long Context**: Needle-in-haystack information retrieval
+- **🛡️ Safety**: Appropriate refusal of harmful requests
+- **🎨 Creativity**: Original content generation
+- **📈 Analysis**: Comparative and analytical reasoning
+- **📋 Instruction Following**: Format and constraint adherence
+
+#### **Model Leaderboard Features**
+- **🏆 Performance Rankings**: Quality, speed, and efficiency metrics
+- **💰 Cost-Benefit Analysis**: Performance-per-dollar calculations
+- **📊 Category Breakdown**: Detailed performance by benchmark type
+- **🔍 Model Profiles**: Individual strengths and use case recommendations
+- **📈 Trend Analysis**: Performance evolution over time
+
+## 🧪 **Model Foundry Quick Start (Advanced Users Only)**
+
+**⚠️ Note:** This section is for AI researchers, model developers, and advanced users who need to evaluate multiple AI models. **Regular chat users can skip this section** - SAM works great out of the box for daily conversations.
+
+The SAM Model Foundry enables rapid AI model integration and evaluation. Here's how to get started:
+
+### **Evaluate Current Models**
+```bash
+# Compare transformer and hybrid models
+python scripts/run_model_evaluation.py --models transformer,hybrid
+
+# Score results (uses mock scoring without API keys)
+python scripts/score_evaluation_results.py
+
+# Generate comprehensive leaderboard
+python scripts/generate_leaderboard_report.py
+```
+
+### **Add a New Model**
+```bash
+# 1. Copy the template
+cp sam/models/wrappers/template.py sam/models/wrappers/my_model_wrapper.py
+
+# 2. Implement the required methods (see template for details)
+
+# 3. Test integration
+python scripts/test_model_foundry.py
+
+# 4. Evaluate performance
+python scripts/run_model_evaluation.py --models my-model
+```
+
+### **Quick Model Comparison**
+```bash
+# Test specific capabilities
+python scripts/run_model_evaluation.py --models transformer --categories qa,reasoning
+
+# Full evaluation with all categories
+python scripts/run_model_evaluation.py --models all
+
+# Generate final report
+python scripts/generate_leaderboard_report.py --output MY_LEADERBOARD.md
+```
+
+**📚 Complete Documentation**: See `sam/models/README.md` for detailed integration guide
+**🚀 Quick Reference**: See `scripts/MODEL_FOUNDRY_QUICK_REFERENCE.md` for commands
+
 ## 🔧 Configuration
 
 ### Local LLM Setup (Recommended)
@@ -547,7 +642,15 @@ SAM/
 │   ├── state/                  # State management & vetting
 │   ├── web_retrieval/          # Research tools (ArXiv, etc.)
 │   ├── vetting/                # Content analysis & security
-│   └── cognition/              # SLP, TPV, table processing
+│   ├── cognition/              # SLP, TPV, table processing
+│   ├── models/                 # Model Foundry & Evaluation Suite
+│   │   ├── wrappers/           # Model integration templates
+│   │   └── sam_hybrid_model.py # HGRN-2 hybrid architecture
+│   ├── benchmarks/             # Evaluation framework
+│   │   ├── core_benchmark_v1.jsonl # 30-prompt test suite
+│   │   └── benchmark_config.py # Scoring and configuration
+│   ├── config/                 # Dynamic configuration system
+│   └── core/                   # Model interface and client
 ├── 🧪 tests/                    # Comprehensive test suite
 └── 🗂️ scripts/                  # Deployment & utility scripts
 ```
@@ -621,6 +724,15 @@ SAM created the **FIRST AI cognitive synthesis system**:
 - **Interactive visualization** of AI cognitive processes
 - **Memory clustering** with advanced pattern discovery
 - **Research integration** directly from synthesized insights
+
+### **🧪 Model Foundry & Evaluation Suite (For Researchers/Developers)**
+SAM pioneered the **FIRST comprehensive AI model evaluation platform**:
+- **Pluggable architecture** - integrate any AI model in <1 day
+- **Automated benchmarking** with 30-prompt comprehensive test suite
+- **LLM-as-a-Judge scoring** for objective quality assessment
+- **Data-driven model selection** with cost-benefit analysis
+- **One-command evaluation** pipeline for rapid model comparison
+- **Target Users:** AI researchers, model developers, enterprise teams evaluating models
 
 ### **🔒 Enterprise-Grade Security**
 SAM established the **FIRST zero-knowledge AI architecture**:

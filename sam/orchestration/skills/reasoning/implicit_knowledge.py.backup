@@ -96,22 +96,37 @@ class ImplicitKnowledgeSkill(BaseSkillModule):
         try:
             import requests
             
-            # Use SAM unified model interface
-            from sam.core.sam_model_client import get_sam_model_client
-            
-            sam_client = get_sam_model_client()
-            
-            def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
-                """Generate response using SAM's unified model interface."""
-                try:
-                    return sam_client.generate(
-                        prompt=prompt,
-                        temperature=temperature,
-                        max_tokens=max_tokens
-                    )
-                except Exception as e:
-                    logger.warning(f"SAM model generation failed: {e}")
-                    return ""
+            class OllamaInterface:
+                def __init__(self):
+                    self.base_url = "http://localhost:11434"
+                    self.model_name = "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M"
+                
+                def generate(self, prompt: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
+                    """Generate response using Ollama API."""
+                    try:
+                        response = requests.post(
+                            f"{self.base_url}/api/generate",
+                            json={
+                                "model": self.model_name,
+                                "prompt": prompt,
+                                "stream": False,
+                                "options": {
+                                    "temperature": temperature,
+                                    "top_p": 0.9,
+                                    "max_tokens": max_tokens
+                                }
+                            },
+                            timeout=30
+                        )
+                        
+                        if response.status_code == 200:
+                            return response.json().get('response', '').strip()
+                        else:
+                            raise Exception(f"Ollama API error: {response.status_code}")
+                    
+                    except Exception as e:
+                        logger.warning(f"Ollama generation failed: {e}")
+                        return ""
             
             return OllamaInterface()
             

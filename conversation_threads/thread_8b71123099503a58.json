@@ -1,0 +1,51 @@
+{
+  "thread_id": "thread_8b71123099503a58",
+  "title": "<think>\nOkay, the user wants me to generate a concise tit...",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search the Internet for the latest knowledge on Metasploit",
+      "timestamp": "2025-07-09T19:14:17.573505",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "I apologize, but I encountered an error while processing your request: 'tuple' object has no attribute 'split'",
+      "timestamp": "2025-07-09T19:14:17.574437",
+      "metadata": {}
+    },
+    {
+      "role": "user",
+      "content": "Find online for the latest knowledge on Metasploit",
+      "timestamp": "2025-07-09T19:15:07.403300",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "I apologize, but I encountered an error while processing your request: 'tuple' object has no attribute 'split'",
+      "timestamp": "2025-07-09T19:15:07.406470",
+      "metadata": {}
+    }
+  ],
+  "created_at": "2025-07-09T19:14:17.573505",
+  "last_updated": "2025-07-09T22:00:37.682025",
+  "message_count": 4,
+  "topic_keywords": [
+    "user",
+    "latest",
+    "knowledge",
+    "metasploit",
+    "assistant",
+    "apologize",
+    "encountered",
+    "error",
+    "while",
+    "processing"
+  ],
+  "embedding_summary": null,
+  "metadata": {
+    "title_generation_method": "auto_generated",
+    "archival_timestamp": "2025-07-09T22:00:37.682026",
+    "archival_reason": "contextual_relevance_break"
+  }
+}

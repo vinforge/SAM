@@ -3,8 +3,6 @@ SAM Web UI - Flask-based web interface for multimodal agent interaction
 """
 
 import os
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import json
 import logging
 import subprocess
@@ -157,7 +155,19 @@ def initialize_sam():
                         else:
                             enhanced_prompt = prompt
 
-                        response = create_legacy_ollama_client().generate(prompt)
+                        response = requests.post(
+                            f"{self.base_url}/api/generate",
+                            json={
+                                "model": self.model_name,
+                                "prompt": enhanced_prompt,
+                                "stream": False,
+                                "options": {
+                                    "temperature": temperature,
+                                    "num_predict": max_tokens
+                                }
+                            },
+                            timeout=120  # Increased timeout for document queries
+                        )
                         if response.status_code == 200:
                             result = response.json().get("response", "No response generated")
                             logger.info(f"✅ REAL Ollama model generated {len(result)} character response")

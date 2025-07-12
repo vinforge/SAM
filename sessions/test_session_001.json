@@ -1,31 +1,13 @@
 {
   "session_id": "test_session_001",
   "user_id": "test_user",
-  "created_at": "2025-07-05T09:39:43.203741",
-  "last_activity": "2025-07-05T09:41:22.166708",
+  "created_at": "2025-07-11T13:41:29.814652",
+  "last_activity": "2025-07-11T13:41:50.566759",
   "conversational_buffer": [
     {
       "role": "user",
-      "content": "I want to teach you something new: The secret is Blue Lamps will unlock the door",
-      "timestamp": "2025-07-05T09:39:43.203982",
-      "metadata": {}
-    },
-    {
-      "role": "assistant",
-      "content": "Thank you for teaching me! I have learned that the secret is Blue Lamps will unlock the door.",
-      "timestamp": "2025-07-05T09:39:43.204156",
-      "metadata": {}
-    },
-    {
-      "role": "user",
-      "content": "what secret will unlock the door?",
-      "timestamp": "2025-07-05T09:39:43.204280",
-      "metadata": {}
-    },
-    {
-      "role": "user",
-      "content": "what secret will unlock the door?",
-      "timestamp": "2025-07-05T09:41:22.166689",
+      "content": "What is quantum computing?",
+      "timestamp": "2025-07-11T13:41:50.566747",
       "metadata": {}
     }
   ],

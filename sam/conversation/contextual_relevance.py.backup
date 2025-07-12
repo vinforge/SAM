@@ -13,8 +13,6 @@ Version: 1.0.0
 """
 
 import logging
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import json
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
@@ -1232,7 +1230,11 @@ Title:"""
                 }
             }
 
-            response = create_legacy_ollama_client().generate(prompt)
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=ollama_payload,
+                timeout=30
+            )
 
             if response.status_code == 200:
                 result = response.json()

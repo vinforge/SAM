@@ -1,0 +1,46 @@
+{
+  "thread_id": "thread_b42279a2321e3659",
+  "title": "<think>\nOkay, user wants a concise title for a conversati...",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is machine learning?",
+      "timestamp": "2025-07-11T13:41:29.814927",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "Machine learning is a subset of AI...",
+      "timestamp": "2025-07-11T13:41:29.815060",
+      "metadata": {}
+    },
+    {
+      "role": "user",
+      "content": "Can you give me examples?",
+      "timestamp": "2025-07-11T13:41:29.815158",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "Sure! Examples include...",
+      "timestamp": "2025-07-11T13:41:29.815248",
+      "metadata": {}
+    }
+  ],
+  "created_at": "2025-07-11T13:41:29.814927",
+  "last_updated": "2025-07-11T13:41:50.564821",
+  "message_count": 4,
+  "topic_keywords": [
+    "user",
+    "machine",
+    "learning",
+    "assistant",
+    "examples"
+  ],
+  "embedding_summary": null,
+  "metadata": {
+    "title_generation_method": "auto_generated",
+    "archival_timestamp": "2025-07-11T13:41:50.564823",
+    "archival_reason": "contextual_relevance_break"
+  }
+}

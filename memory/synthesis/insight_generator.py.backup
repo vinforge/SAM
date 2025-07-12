@@ -6,8 +6,6 @@ during SAM's cognitive consolidation process.
 """
 
 import logging
-
-from sam.core.sam_model_client import create_ollama_compatible_client
 import json
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional
@@ -156,8 +154,79 @@ class InsightGenerator:
             return None
 
     def _create_ollama_client(self):
-        """Create SAM-compatible client."""
-        return create_ollama_compatible_client()
+        """Create an Ollama client compatible with SAM's setup."""
+        import requests
+
+        class OllamaClient:
+            def __init__(self):
+                self.base_url = "http://localhost:11434"
+                self.model_name = "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M"
+
+            def generate(self, prompt, temperature=0.7, max_tokens=200, stop_sequences=None):
+                """Generate text using Ollama API with retry logic."""
+                max_retries = 2
+
+                for attempt in range(max_retries + 1):
+                    try:
+                        logger.info(f"Ollama generate attempt {attempt + 1}/{max_retries + 1} - prompt length: {len(prompt)}, temp: {temperature}, max_tokens: {max_tokens}")
+
+                        payload = {
+                            "model": self.model_name,
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": temperature,
+                                "max_tokens": max_tokens,
+                                "top_p": 0.9
+                            }
+                        }
+
+                        logger.info(f"Sending request to Ollama at {self.base_url}/api/generate")
+                        response = requests.post(
+                            f"{self.base_url}/api/generate",
+                            json=payload,
+                            timeout=180  # 3 minutes timeout
+                        )
+
+                        logger.info(f"Ollama response status: {response.status_code}")
+                        if response.status_code == 200:
+                            result = response.json().get("response", "")
+                            logger.info(f"Ollama returned response length: {len(result)}")
+                            return result.strip()
+                        else:
+                            logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+                            if attempt < max_retries:
+                                logger.info(f"Retrying in 5 seconds... (attempt {attempt + 1}/{max_retries + 1})")
+                                import time
+                                time.sleep(5)
+                                continue
+                            return None
+
+                    except requests.exceptions.Timeout as e:
+                        logger.error(f"Ollama timeout on attempt {attempt + 1}: {e}")
+                        if attempt < max_retries:
+                            logger.info(f"Retrying in 10 seconds... (attempt {attempt + 1}/{max_retries + 1})")
+                            import time
+                            time.sleep(10)
+                            continue
+                        logger.error("All retry attempts failed due to timeout")
+                        return None
+
+                    except Exception as e:
+                        logger.error(f"Error calling Ollama on attempt {attempt + 1}: {e}")
+                        if attempt < max_retries:
+                            logger.info(f"Retrying in 5 seconds... (attempt {attempt + 1}/{max_retries + 1})")
+                            import time
+                            time.sleep(5)
+                            continue
+                        import traceback
+                        logger.error(f"Final attempt failed. Traceback: {traceback.format_exc()}")
+                        return None
+
+                # Should never reach here, but just in case
+                return None
+
+        return OllamaClient()
     
     def _clean_insight_text(self, raw_text: str) -> str:
         """Clean and format the generated insight text."""

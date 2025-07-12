@@ -1474,6 +1474,25 @@ def render_conversation_history_sidebar():
                         st.session_state.chat_history = []
                         st.session_state.conversation_history = ""
 
+                        # ENHANCED CONTEXT ISOLATION: Clear recent document uploads for true new chat
+                        if 'recent_document_uploads' in st.session_state:
+                            # Archive current uploads before clearing
+                            archived_uploads = st.session_state.get('archived_document_uploads', [])
+                            current_uploads = st.session_state.get('recent_document_uploads', [])
+
+                            # Add timestamp to archived uploads
+                            from datetime import datetime
+                            for upload in current_uploads:
+                                upload['archived_timestamp'] = datetime.now().isoformat()
+                                upload['archived_with_conversation'] = archived_thread.title if 'archived_thread' in locals() else "Manual New Chat"
+
+                            archived_uploads.extend(current_uploads)
+                            st.session_state.archived_document_uploads = archived_uploads[-50:]  # Keep last 50 archived uploads
+
+                            # Clear recent uploads for new chat isolation
+                            st.session_state.recent_document_uploads = []
+                            logger.info(f"📋 Archived {len(current_uploads)} document uploads and cleared recent uploads for new chat")
+
                         # Clear any conversation metadata that might interfere
                         if 'conversation_archived' in st.session_state:
                             del st.session_state['conversation_archived']
@@ -1481,6 +1500,19 @@ def render_conversation_history_sidebar():
                             del st.session_state['conversation_resumed']
                         if 'last_relevance_check' in st.session_state:
                             del st.session_state['last_relevance_check']
+
+                        # Clear selected document context
+                        if 'selected_document' in st.session_state:
+                            del st.session_state['selected_document']
+
+                        # Clear any cached context that might bleed into new chat
+                        context_keys_to_clear = [
+                            'last_search_context', 'last_memory_results', 'cached_document_context',
+                            'web_search_escalation', 'last_escalation_context'
+                        ]
+                        for key in context_keys_to_clear:
+                            if key in st.session_state:
+                                del st.session_state[key]
 
                         st.success(f"✅ Started new chat! Previous conversation archived as: '{archived_thread.title}'")
                         st.rerun()
@@ -7872,6 +7904,29 @@ def create_web_search_escalation_message(assessment, original_query: str) -> str
 
     return escalation_message, escalation_id
 
+def extract_key_terms_from_conversation(conversation_history: str) -> list:
+    """Extract key terms from conversation history for context-aware search."""
+    try:
+        import re
+
+        # Remove common stop words and extract meaningful terms
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'}
+
+        # Extract words (3+ characters) and filter out stop words
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', conversation_history.lower())
+        key_terms = [word for word in words if word not in stop_words]
+
+        # Count frequency and return most common terms
+        from collections import Counter
+        term_counts = Counter(key_terms)
+
+        # Return top 10 most frequent terms
+        return [term for term, count in term_counts.most_common(10)]
+
+    except Exception as e:
+        logger.warning(f"Error extracting key terms from conversation: {e}")
+        return []
+
 def search_unified_memory(query: str, max_results: int = 5) -> list:
     """Enhanced search across all memory stores with specific focus on uploaded documents."""
     try:
@@ -8557,22 +8612,105 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
         except Exception as e:
             logger.warning(f"Enhanced SLP response generation failed, continuing with standard flow: {e}")
 
-        # Phase 8.1: Enhanced document-aware search across all knowledge sources
-        # Check if this is a document-specific discussion
-        selected_document = st.session_state.get('selected_document', '')
-        if selected_document:
-            # Prioritize content from the selected document
-            memory_results = search_unified_memory(
-                query=f"{prompt} filename:{selected_document}",
-                max_results=10
-            )
-            # Also get general context
-            general_results = search_unified_memory(query=prompt, max_results=3)
-            # Combine results, prioritizing document-specific content
-            all_results = memory_results + [r for r in general_results if r not in memory_results]
-            memory_results = all_results[:8]  # Limit total results
-        else:
-            memory_results = search_unified_memory(query=prompt, max_results=5)
+        # Phase 8.1: ENHANCED CONTEXT PRIORITIZATION SYSTEM
+        # Implements proper information source weighting as requested by user
+        memory_results = []
+        context_sources = []
+
+        # PRIORITY 1: Recently uploaded documents (highest weight)
+        uploaded_doc_results = []
+        try:
+            # Check for recently uploaded documents in current session
+            recent_uploads = st.session_state.get('recent_document_uploads', [])
+            if recent_uploads:
+                logger.info(f"🔍 PRIORITY 1: Searching {len(recent_uploads)} recently uploaded documents")
+                for doc_info in recent_uploads[-3:]:  # Last 3 uploads
+                    doc_filename = doc_info.get('filename', '')
+                    if doc_filename:
+                        doc_results = search_unified_memory(
+                            query=f"{prompt} filename:{doc_filename}",
+                            max_results=5
+                        )
+                        uploaded_doc_results.extend(doc_results)
+                        if doc_results:
+                            logger.info(f"📄 Found {len(doc_results)} results from uploaded document: {doc_filename}")
+
+                # Boost scores for uploaded documents
+                for result in uploaded_doc_results:
+                    result.similarity_score *= 1.5  # 50% boost for uploaded docs
+                    result.priority_source = "uploaded_document"
+
+                context_sources.append(f"Recently uploaded documents ({len(uploaded_doc_results)} results)")
+        except Exception as e:
+            logger.warning(f"Error searching uploaded documents: {e}")
+
+        # PRIORITY 2: Current chat context (second highest weight)
+        chat_context_results = []
+        try:
+            if conversation_history and conversation_history.strip():
+                # Extract key terms from conversation history for context-aware search
+                chat_terms = extract_key_terms_from_conversation(conversation_history)
+                if chat_terms:
+                    chat_query = f"{prompt} {' '.join(chat_terms[:5])}"
+                    chat_context_results = search_unified_memory(query=chat_query, max_results=3)
+                    for result in chat_context_results:
+                        result.similarity_score *= 1.3  # 30% boost for chat context
+                        result.priority_source = "chat_context"
+                    logger.info(f"💬 Found {len(chat_context_results)} results from chat context")
+                    context_sources.append(f"Current chat context ({len(chat_context_results)} results)")
+        except Exception as e:
+            logger.warning(f"Error searching chat context: {e}")
+
+        # PRIORITY 3: Vector datastore knowledge (standard weight)
+        vector_results = []
+        try:
+            # Check if this is a document-specific discussion
+            selected_document = st.session_state.get('selected_document', '')
+            if selected_document:
+                vector_results = search_unified_memory(
+                    query=f"{prompt} filename:{selected_document}",
+                    max_results=5
+                )
+                logger.info(f"📚 Found {len(vector_results)} results from selected document: {selected_document}")
+            else:
+                vector_results = search_unified_memory(query=prompt, max_results=5)
+                logger.info(f"📚 Found {len(vector_results)} results from vector datastore")
+
+            for result in vector_results:
+                result.priority_source = "vector_datastore"
+            context_sources.append(f"Vector datastore ({len(vector_results)} results)")
+        except Exception as e:
+            logger.warning(f"Error searching vector datastore: {e}")
+
+        # Combine all results with proper prioritization
+        all_memory_results = uploaded_doc_results + chat_context_results + vector_results
+
+        # Remove duplicates while preserving priority order
+        seen_content = set()
+        memory_results = []
+        for result in all_memory_results:
+            content_hash = hash(result.chunk.content[:200])  # Use first 200 chars as identifier
+            if content_hash not in seen_content:
+                seen_content.add(content_hash)
+                memory_results.append(result)
+
+        # Sort by priority source and similarity score
+        priority_order = {"uploaded_document": 0, "chat_context": 1, "vector_datastore": 2}
+        memory_results.sort(key=lambda x: (
+            priority_order.get(getattr(x, 'priority_source', 'vector_datastore'), 2),
+            -x.similarity_score
+        ))
+
+        # Limit total results but ensure representation from each source
+        memory_results = memory_results[:8]
+
+        # Log enhanced context prioritization results
+        logger.info(f"🎯 ENHANCED CONTEXT PRIORITIZATION RESULTS for '{prompt}':")
+        logger.info(f"   📄 Recently uploaded documents: {len(uploaded_doc_results)} results")
+        logger.info(f"   💬 Current chat context: {len(chat_context_results)} results")
+        logger.info(f"   📚 Vector datastore: {len(vector_results)} results")
+        logger.info(f"   🔗 Total unique results: {len(memory_results)} (after deduplication)")
+        logger.info(f"   📊 Context sources: {', '.join(context_sources)}")
 
         logger.info(f"Unified search for '{prompt}' returned {len(memory_results)} results")
 
@@ -9763,6 +9901,35 @@ def process_secure_document(uploaded_file) -> dict:
             total_chunks = 1  # Base memory chunk
             if consolidation_result:
                 total_chunks += consolidation_result.get('content_blocks', 0)
+
+            # TRACK RECENT UPLOADS FOR CONTEXT PRIORITIZATION
+            try:
+                from datetime import datetime
+
+                # Initialize recent uploads tracking if not exists
+                if 'recent_document_uploads' not in st.session_state:
+                    st.session_state.recent_document_uploads = []
+
+                # Add this upload to recent uploads
+                upload_info = {
+                    'filename': uploaded_file.name,
+                    'upload_timestamp': datetime.now().isoformat(),
+                    'file_size': len(content),
+                    'file_type': uploaded_file.type,
+                    'secure_chunk_id': secure_chunk_id,
+                    'knowledge_consolidated': bool(consolidation_result)
+                }
+
+                st.session_state.recent_document_uploads.append(upload_info)
+
+                # Keep only last 10 uploads to prevent memory bloat
+                if len(st.session_state.recent_document_uploads) > 10:
+                    st.session_state.recent_document_uploads = st.session_state.recent_document_uploads[-10:]
+
+                logger.info(f"📋 Tracked upload: {uploaded_file.name} (total recent uploads: {len(st.session_state.recent_document_uploads)})")
+
+            except Exception as e:
+                logger.warning(f"Failed to track recent upload: {e}")
 
             return {
                 'success': True,

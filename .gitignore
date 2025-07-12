@@ -196,3 +196,21 @@ sam_pro_registration.py
 SAM_PRO_KEY_DISTRIBUTION_GUIDE.md
 config/key_distribution.json
 config/key_distribution.json.template
+
+# SAM Model Foundry & Evaluation Suite (ADVANCED FEATURE - NOT FOR REGULAR USERS)
+# This is a sophisticated system for AI researchers and model developers
+# Regular chat users don't need these files
+sam/models/
+sam/benchmarks/
+sam/config/
+scripts/run_model_evaluation.py
+scripts/score_evaluation_results.py
+scripts/generate_leaderboard_report.py
+scripts/test_model_foundry.py
+scripts/MODEL_FOUNDRY_QUICK_REFERENCE.md
+evaluation_results/
+MODEL_LEADERBOARD.md
+DEMO_LEADERBOARD.md
+PHASE_1_COMPLETION_SUMMARY.md
+ProjectEngineSwap.md
+SAMinDocker/

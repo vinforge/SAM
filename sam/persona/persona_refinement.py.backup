@@ -13,8 +13,6 @@ Version: 1.0.0
 """
 
 import logging
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import json
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
@@ -190,7 +188,20 @@ Refine the draft into its final form that better reflects your persona and relat
             import requests
             
             # Use Ollama for refinement
-            response = create_legacy_ollama_client().generate(prompt)
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                    "prompt": refinement_prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": self.config['refinement_temperature'],
+                        "top_p": 0.9,
+                        "max_tokens": self.config['max_refinement_tokens']
+                    }
+                },
+                timeout=60
+            )
             
             if response.status_code == 200:
                 response_data = response.json()

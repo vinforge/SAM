@@ -7,8 +7,6 @@ and adaptive execution capabilities.
 """
 
 import time
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -157,7 +155,11 @@ class ProgramExecutor:
 
             timeout = config.get('timeout_seconds', 30)
 
-            response = create_legacy_ollama_client().generate(prompt)
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=ollama_payload,
+                timeout=timeout
+            )
 
             if response.status_code == 200:
                 response_data = response.json()

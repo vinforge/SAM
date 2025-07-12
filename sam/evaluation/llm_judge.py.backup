@@ -13,8 +13,6 @@ Version: 1.0.0
 """
 
 import logging
-
-from sam.core.sam_model_client import create_legacy_ollama_client
 import json
 import requests
 from typing import Dict, List, Optional, Any, Tuple
