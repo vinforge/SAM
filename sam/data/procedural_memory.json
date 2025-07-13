@@ -1,0 +1,74 @@
+{
+  "procedures": {
+    "proc_10be7899": {
+      "id": "proc_10be7899",
+      "name": "Production Deployment Workflow",
+      "description": "Safe deployment process for web applications with testing and monitoring",
+      "tags": [
+        "deployment",
+        "production",
+        "testing",
+        "kubernetes"
+      ],
+      "steps": [
+        {
+          "step_number": 1,
+          "description": "Run all tests",
+          "details": "Execute: npm test && npm run test:integration",
+          "expected_outcome": "All tests pass with no failures",
+          "estimated_duration": "5 minutes",
+          "prerequisites": [
+            "Code reviewed",
+            "Tests written"
+          ],
+          "tools_required": [
+            "Node.js",
+            "npm"
+          ],
+          "verification_criteria": null
+        },
+        {
+          "step_number": 2,
+          "description": "Build production version",
+          "details": "Create optimized build: npm run build:production",
+          "expected_outcome": "Build completes without errors",
+          "estimated_duration": "3 minutes",
+          "prerequisites": [],
+          "tools_required": [],
+          "verification_criteria": null
+        },
+        {
+          "step_number": 3,
+          "description": "Deploy to production",
+          "details": "Deploy using: kubectl apply -f deployment.yaml",
+          "expected_outcome": "New version live on production",
+          "estimated_duration": "5 minutes",
+          "prerequisites": [],
+          "tools_required": [
+            "kubectl",
+            "Docker"
+          ],
+          "verification_criteria": null
+        }
+      ],
+      "category": "technical",
+      "difficulty_level": "intermediate",
+      "estimated_total_time": "15 minutes",
+      "version": 1.0,
+      "parameters": {
+        "app_name": "web-application",
+        "environment": "production",
+        "namespace": "default"
+      },
+      "created_date": "2025-07-13 12:55:15.097263",
+      "last_modified": "2025-07-13 12:55:15.097273",
+      "last_executed": null,
+      "execution_count": 0
+    }
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "last_saved": "2025-07-13T12:55:15.097276",
+    "total_procedures": 1
+  }
+}

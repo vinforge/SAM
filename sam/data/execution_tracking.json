@@ -1,0 +1,48 @@
+{
+  "active_executions": {
+    "exec_001277df": {
+      "execution_id": "exec_001277df",
+      "procedure_id": "proc_10be7899",
+      "procedure_name": "Production Deployment Workflow",
+      "user_id": "demo_user",
+      "status": "ExecutionStatus.IN_PROGRESS",
+      "started_at": "2025-07-13T13:01:45.564486",
+      "completed_at": null,
+      "total_duration_seconds": null,
+      "current_step": 2,
+      "steps": {
+        "1": {
+          "step_number": 1,
+          "status": "StepStatus.COMPLETED",
+          "started_at": null,
+          "completed_at": "2025-07-13T13:01:45.565135",
+          "duration_seconds": 0,
+          "user_notes": "Tests passed successfully",
+          "issues_encountered": [],
+          "verification_result": null
+        },
+        "2": {
+          "step_number": 2,
+          "status": "StepStatus.IN_PROGRESS",
+          "started_at": "2025-07-13T13:01:45.565308",
+          "completed_at": null,
+          "duration_seconds": null,
+          "user_notes": "Building application",
+          "issues_encountered": [],
+          "verification_result": null
+        }
+      },
+      "user_parameters": {},
+      "overall_notes": "",
+      "success_rating": null,
+      "difficulty_rating": null
+    }
+  },
+  "completed_executions": [],
+  "metadata": {
+    "version": "2.0.0",
+    "last_saved": "2025-07-13T13:01:45.565309",
+    "total_active": 1,
+    "total_completed": 0
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "user_actions": [
+    {
+      "timestamp": "2025-07-13T12:51:48.077259",
+      "action_type": "query",
+      "content": "How do I backup the database?",
+      "context": {
+        "session_id": "test_session",
+        "user_id": "test_user",
+        "operating_system": "Linux"
+      },
+      "session_id": "test_session"
+    },
+    {
+      "timestamp": "2025-07-13T12:53:39.981249",
+      "action_type": "query",
+      "content": "Hello, how can you help me today?",
+      "context": {
+        "session_id": "test_session",
+        "user_id": "test_user",
+        "operating_system": "Linux"
+      },
+      "session_id": "test_session"
+    },
+    {
+      "timestamp": "2025-07-13T12:53:49.218046",
+      "action_type": "query",
+      "content": "How do I deploy code to production?",
+      "context": {
+        "session_id": "test",
+        "user_id": "test_user"
+      },
+      "session_id": "test"
+    },
+    {
+      "timestamp": "2025-07-13T12:54:01.354559",
+      "action_type": "query",
+      "content": "How do I deploy code to production?",
+      "context": {
+        "session_id": "test",
+        "user_id": "test_user"
+      },
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T12:54:01.354733",
+      "action_type": "procedure_execution",
+      "content": "deployment",
+      "context": {},
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T13:01:33.634099",
+      "action_type": "query",
+      "content": "How do I deploy my application to production?",
+      "context": {},
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T13:01:45.565494",
+      "action_type": "query",
+      "content": "How do I deploy to production?",
+      "context": {},
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T13:01:45.565717",
+      "action_type": "procedure_execution",
+      "content": "Production Deployment",
+      "context": {
+        "category": "technical"
+      },
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T13:01:45.565893",
+      "action_type": "query",
+      "content": "Steps for production deployment",
+      "context": {},
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T13:01:45.566069",
+      "action_type": "procedure_execution",
+      "content": "Production Deployment",
+      "context": {
+        "category": "technical"
+      },
+      "session_id": "default"
+    },
+    {
+      "timestamp": "2025-07-13T13:01:57.883229",
+      "action_type": "query",
+      "content": "How do I deploy my app safely?",
+      "context": {},
+      "session_id": "default"
+    }
+  ],
+  "detected_patterns": [],
+  "active_suggestions": [],
+  "dismissed_suggestions": [],
+  "metadata": {
+    "version": "2.0.0",
+    "last_saved": "2025-07-13T13:01:57.883482",
+    "total_actions": 11,
+    "total_patterns": 0
+  }
+}
