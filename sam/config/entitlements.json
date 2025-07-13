@@ -1,6 +1,25 @@
 {
   "version": "1.1",
   "features": {
+    "procedural_memory": {
+      "enabled": false,
+      "required_tier": "free",
+      "description": "Revolutionary Procedural Memory Engine - Create, manage, and execute multi-step procedures with AI guidance, execution tracking, and proactive suggestions",
+      "ui_label": "Procedural Memory Engine",
+      "production_ready": true,
+      "opt_in": true,
+      "default_enabled": false,
+      "beta": true,
+      "world_first": true,
+      "capabilities": [
+        "Create step-by-step procedures",
+        "Intelligent query routing (95% accuracy)",
+        "Real-time execution tracking",
+        "Proactive workflow suggestions",
+        "Knowledge enrichment",
+        "Behavioral pattern analysis"
+      ]
+    },
     "table_to_code_expert": {
       "enabled": true,
       "required_tier": "free",

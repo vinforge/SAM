@@ -207,6 +207,139 @@ class FeatureManager:
         self._cache_timestamp = 0
         self.logger.debug("Feature cache cleared")
 
+    def is_feature_enabled(self, feature_name: str) -> bool:
+        """Check if a feature is enabled (considering opt-in status)"""
+        try:
+            # First check if feature is available
+            if not self.is_feature_available(feature_name):
+                return False
+
+            features = self._get_features_config()
+            feature_config = features.get(feature_name, {})
+
+            # Check if feature requires opt-in
+            if feature_config.get("opt_in", False):
+                # Load user preferences for opt-in features
+                state = self.validator._load_state()
+                user_features = state.get("enabled_features", {})
+                return user_features.get(feature_name, feature_config.get("default_enabled", False))
+
+            # Non-opt-in features are enabled if available
+            return feature_config.get("enabled", True)
+
+        except Exception as e:
+            self.logger.error(f"Error checking if feature is enabled: {e}")
+            return False
+
+    def enable_feature(self, feature_name: str) -> Dict[str, Any]:
+        """Enable an opt-in feature for the user"""
+        try:
+            # Check if feature is available
+            if not self.is_feature_available(feature_name):
+                return {
+                    "success": False,
+                    "message": f"Feature '{feature_name}' is not available"
+                }
+
+            features = self._get_features_config()
+            feature_config = features.get(feature_name, {})
+
+            # Check if feature supports opt-in
+            if not feature_config.get("opt_in", False):
+                return {
+                    "success": False,
+                    "message": f"Feature '{feature_name}' does not support opt-in"
+                }
+
+            # Load current state
+            state = self.validator._load_state()
+            user_features = state.get("enabled_features", {})
+
+            # Enable the feature
+            user_features[feature_name] = True
+            state["enabled_features"] = user_features
+
+            # Save state
+            success = self.validator._save_state(state)
+
+            if success:
+                self.logger.info(f"Feature '{feature_name}' enabled for user")
+                return {
+                    "success": True,
+                    "message": f"Feature '{feature_config.get('ui_label', feature_name)}' enabled successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Failed to save feature preferences"
+                }
+
+        except Exception as e:
+            self.logger.error(f"Error enabling feature: {e}")
+            return {
+                "success": False,
+                "message": f"Error enabling feature: {e}"
+            }
+
+    def disable_feature(self, feature_name: str) -> Dict[str, Any]:
+        """Disable an opt-in feature for the user"""
+        try:
+            # Load current state
+            state = self.validator._load_state()
+            user_features = state.get("enabled_features", {})
+
+            # Disable the feature
+            user_features[feature_name] = False
+            state["enabled_features"] = user_features
+
+            # Save state
+            success = self.validator._save_state(state)
+
+            if success:
+                self.logger.info(f"Feature '{feature_name}' disabled for user")
+                return {
+                    "success": True,
+                    "message": f"Feature disabled successfully"
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Failed to save feature preferences"
+                }
+
+        except Exception as e:
+            self.logger.error(f"Error disabling feature: {e}")
+            return {
+                "success": False,
+                "message": f"Error disabling feature: {e}"
+            }
+
+    def get_opt_in_features(self) -> List[Dict[str, Any]]:
+        """Get all available opt-in features"""
+        try:
+            features = self._get_features_config()
+            opt_in_features = []
+
+            for feature_name, feature_config in features.items():
+                if (feature_config.get("opt_in", False) and
+                    self.is_feature_available(feature_name)):
+
+                    opt_in_features.append({
+                        "name": feature_name,
+                        "ui_label": feature_config.get("ui_label", feature_name),
+                        "description": feature_config.get("description", ""),
+                        "enabled": self.is_feature_enabled(feature_name),
+                        "beta": feature_config.get("beta", False),
+                        "capabilities": feature_config.get("capabilities", []),
+                        "required_tier": feature_config.get("required_tier", "free")
+                    })
+
+            return opt_in_features
+
+        except Exception as e:
+            self.logger.error(f"Error getting opt-in features: {e}")
+            return []
+
 # Global feature manager instance
 _feature_manager = None
 
@@ -222,6 +355,10 @@ def is_feature_available(feature_name: str) -> bool:
     """Check if a feature is available"""
     return get_feature_manager().is_feature_available(feature_name)
 
+def is_feature_enabled(feature_name: str) -> bool:
+    """Check if a feature is enabled"""
+    return get_feature_manager().is_feature_enabled(feature_name)
+
 def is_pro_unlocked() -> bool:
     """Check if SAM Pro is unlocked"""
     return get_feature_manager().is_pro_unlocked()
@@ -229,3 +366,15 @@ def is_pro_unlocked() -> bool:
 def validate_activation_key(key: str) -> Dict[str, Any]:
     """Validate an activation key"""
     return get_feature_manager().validate_key(key)
+
+def enable_feature(feature_name: str) -> Dict[str, Any]:
+    """Enable an opt-in feature"""
+    return get_feature_manager().enable_feature(feature_name)
+
+def disable_feature(feature_name: str) -> Dict[str, Any]:
+    """Disable an opt-in feature"""
+    return get_feature_manager().disable_feature(feature_name)
+
+def get_opt_in_features() -> List[Dict[str, Any]]:
+    """Get all available opt-in features"""
+    return get_feature_manager().get_opt_in_features()

@@ -334,6 +334,16 @@ def main():
         initial_sidebar_state="expanded"
     )
 
+    # Hide Streamlit's Deploy button
+    st.markdown("""
+    <style>
+        /* Hide Deploy button */
+        .stDeployButton {
+            display: none;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Handle health check requests after page config
     health_check()
 
@@ -472,13 +482,6 @@ def render_main_sam_application():
     # Main title
     st.title("🧠 SAM - Secure AI Assistant")
     st.markdown("*Your personal AI assistant with enterprise-grade security*")
-
-    # Quick navigation to Memory Control Center
-    col1, col2, col3 = st.columns([2, 1, 2])
-    with col2:
-        if st.button("🎛️ Memory Control Center", use_container_width=True, help="Switch to advanced Memory Control Center"):
-            st.session_state.show_memory_control_center = True
-            st.rerun()
 
     st.markdown("---")
 
@@ -883,6 +886,75 @@ def render_messages_from_sam_alert():
         </div>
         """, unsafe_allow_html=True)
 
+def render_opt_in_features_section():
+    """Render opt-in features toggle section."""
+    try:
+        from sam.entitlements.feature_manager import get_opt_in_features, enable_feature, disable_feature
+
+        st.header("🧠 Beta Features")
+        st.markdown("*Enable cutting-edge features that are ready for early access*")
+
+        # Get available opt-in features
+        opt_in_features = get_opt_in_features()
+
+        if opt_in_features:
+            for feature in opt_in_features:
+                with st.container():
+                    col1, col2 = st.columns([3, 1])
+
+                    with col1:
+                        # Feature header with beta badge
+                        header_text = f"**{feature['ui_label']}**"
+                        if feature.get('beta', False):
+                            header_text += " 🧪"
+                        st.markdown(header_text)
+
+                        # Description
+                        st.markdown(f"*{feature['description']}*")
+
+                        # Capabilities
+                        if feature.get('capabilities'):
+                            with st.expander("✨ Capabilities", expanded=False):
+                                for capability in feature['capabilities']:
+                                    st.markdown(f"• {capability}")
+
+                    with col2:
+                        # Toggle button
+                        current_state = feature['enabled']
+
+                        if st.button(
+                            "✅ Enabled" if current_state else "⚪ Enable",
+                            key=f"toggle_{feature['name']}",
+                            type="secondary" if current_state else "primary",
+                            use_container_width=True
+                        ):
+                            if current_state:
+                                # Disable feature
+                                result = disable_feature(feature['name'])
+                                if result['success']:
+                                    st.success(f"✅ {feature['ui_label']} disabled")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {result['message']}")
+                            else:
+                                # Enable feature
+                                result = enable_feature(feature['name'])
+                                if result['success']:
+                                    st.success(f"🎉 {feature['ui_label']} enabled!")
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ {result['message']}")
+
+                    st.markdown("---")
+        else:
+            st.info("🔧 No opt-in features available at this time")
+
+    except ImportError:
+        st.warning("⚠️ Feature management system not available")
+    except Exception as e:
+        st.error(f"❌ Error loading opt-in features: {e}")
+
 def render_sam_pro_sidebar():
     """Render SAM Pro activation sidebar with key entry (preserving 100% of existing functionality)."""
     with st.sidebar:
@@ -900,25 +972,6 @@ def render_sam_pro_sidebar():
             if is_pro_unlocked:
                 # Show activated status
                 st.success("✅ **SAM Pro Activated**")
-                st.markdown("🎉 **Premium features unlocked!**")
-
-                # Show activated features
-                with st.expander("🚀 Activated Features", expanded=False):
-                    st.markdown("""
-                    **🧠 Enhanced Cognitive Features:**
-                    • TPV Active Reasoning Control
-                    • Advanced SLP Pattern Learning
-                    • MEMOIR Lifelong Learning
-                    • Dream Canvas Visualization
-                    • Cognitive Automation Engine
-                    • Cognitive Distillation Engine
-
-                    **🔧 Advanced Tools:**
-                    • Enhanced Memory Analytics
-                    • Advanced Query Processing
-                    • Premium Web Retrieval
-                    • Extended Context Windows
-                    """)
 
                 # Show activation details
                 try:
@@ -1003,6 +1056,10 @@ def render_sam_pro_sidebar():
             st.warning("⚠️ SAM Pro activation system not available")
         except Exception as e:
             st.error(f"❌ Error loading activation system: {e}")
+
+        # Opt-in Features Section (NEW)
+        st.markdown("---")
+        render_opt_in_features_section()
 
         # Separator
         st.markdown("---")
@@ -2407,7 +2464,8 @@ def render_chat_interface():
                                     st.error(f"❌ Web search failed: {search_result['error']}")
                                     # Fall back to normal response generation
 
-                        response_result = generate_response_with_conversation_buffer(prompt, force_local=force_local)
+                        # Enhanced response generation with procedural memory integration
+                        response_result = generate_enhanced_response_with_procedural_memory(prompt, force_local=force_local)
 
                         # Debug logging for escalation detection (preserving 100% of functionality)
                         logger.info(f"🔍 Response result type: {type(response_result)}")
@@ -2948,6 +3006,7 @@ def render_integrated_memory_control_center():
             "🔍 Memory Browser",
             "✏️ Memory Editor",
             "🕸️ Memory Graph",
+            "🧠 Procedures",
             "💻 Command Interface",
             "📁 Bulk Ingestion",
             "🔑 API Key Manager",
@@ -3007,6 +3066,31 @@ def render_integrated_memory_control_center():
             render_memory_editor_integrated()
         elif memory_page == "🕸️ Memory Graph":
             render_memory_graph_integrated()
+        elif memory_page == "🧠 Procedures":
+            # Check if procedural memory feature is enabled
+            try:
+                from sam.entitlements.feature_manager import is_feature_enabled
+
+                if is_feature_enabled('procedural_memory'):
+                    render_procedural_memory_integrated()
+                else:
+                    st.info("🧠 **Procedural Memory Engine**")
+                    st.markdown("*This feature is currently disabled. Enable it in the sidebar to access advanced procedural intelligence.*")
+
+                    # Show feature benefits
+                    st.markdown("""
+                    **🚀 What you'll get with Procedural Memory:**
+                    • Create step-by-step procedures for complex tasks
+                    • Intelligent query routing with 95% accuracy
+                    • Real-time execution tracking and progress monitoring
+                    • Proactive workflow suggestions based on your patterns
+                    • Knowledge-enriched procedures with contextual guidance
+
+                    **Enable this feature in the sidebar to unlock SAM's procedural intelligence!**
+                    """)
+            except ImportError:
+                st.error("❌ Feature management system not available")
+                render_procedural_memory_integrated()
         elif memory_page == "💻 Command Interface":
             render_command_interface_integrated()
         elif memory_page == "📁 Bulk Ingestion":
@@ -3038,23 +3122,9 @@ def render_integrated_memory_control_center():
 
 def render_basic_memory_interface():
     """Render the basic memory management interface."""
-    # Memory Control Center Access
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        if st.button("🎛️ Memory Control Center", use_container_width=True, help="Switch to Memory Control Center with dropdown menu"):
-            st.session_state.show_memory_control_center = True
-            st.success("🎛️ **Switching to Memory Control Center...**")
-            st.rerun()
-
-    with col2:
-        st.info("💡 **Tip:** Click to access the full Memory Control Center interface.")
-
-    st.markdown("---")
-
     # Basic Memory Interface (existing functionality)
     st.subheader("🔍 Basic Memory Search")
-    st.markdown("*For advanced memory management, use the Memory Control Center above*")
+    st.markdown("*For advanced memory management, use the Memory Control Center in the sidebar*")
     search_query = st.text_input("Search your encrypted memories...")
     
     if search_query:
@@ -8397,6 +8467,35 @@ def generate_draft_response(prompt: str, force_local: bool = False) -> str:
             if learning_response:
                 return learning_response
 
+        # Phase -0.5: Procedural Memory Integration (NEW - Opt-in Feature)
+        procedural_context = {}
+        try:
+            from sam.entitlements.feature_manager import is_feature_enabled
+
+            if is_feature_enabled('procedural_memory'):
+                from sam.chat.procedural_chat_handler import get_procedural_chat_handler
+
+                procedural_handler = get_procedural_chat_handler()
+                user_context = {
+                    'session_id': st.session_state.get('session_id', 'default'),
+                    'user_id': 'default',
+                    'operating_system': 'Unknown'
+                }
+
+                # Process query through procedural memory
+                procedural_result = procedural_handler.process_user_query(prompt, user_context)
+
+                if procedural_result.get('has_procedural_context'):
+                    procedural_context = {
+                        'context': procedural_result.get('procedural_context', ''),
+                        'response_type': procedural_result.get('response_type'),
+                        'follow_up_actions': procedural_result.get('follow_up_actions', [])
+                    }
+                    logger.info(f"🧠 Procedural Memory: Enhanced response with {len(procedural_context['context'])} chars of context")
+
+        except Exception as e:
+            logger.debug(f"Procedural memory integration not available or disabled: {e}")
+
         # Phase -0.25: MEMOIR Knowledge Retrieval (ENABLED BY DEFAULT for lifelong learning)
         memoir_context = {}
         try:
@@ -9044,8 +9143,13 @@ If the information isn't sufficient, say so clearly. Always be concise but thoro
                                 correction_part = content.split('User Correction:')[-1].strip()
                                 user_prompt_parts.append(f"• {correction_part}")
 
+                # Add Procedural Memory context if available (NEW - Opt-in Feature)
+                if procedural_context.get('context'):
+                    user_prompt_parts.append(f"\n--- PROCEDURAL GUIDANCE ---\n{procedural_context['context']}\n--- END OF PROCEDURAL GUIDANCE ---")
+                    user_prompt_parts.append("\nNote: I found relevant step-by-step procedures for your request. Use this guidance to provide detailed, actionable instructions.")
+
                 user_prompt_parts.append(f"\n--- KNOWLEDGE BASE CONTEXT ---\n{context}\n--- END OF KNOWLEDGE BASE CONTEXT ---")
-                user_prompt_parts.append("\nPlease provide a helpful answer based on the conversation history, available information, and learned knowledge.")
+                user_prompt_parts.append("\nPlease provide a helpful answer based on the conversation history, available information, learned knowledge, and any procedural guidance.")
 
                 user_prompt = "\n".join(user_prompt_parts)
 
@@ -12688,6 +12792,99 @@ def simulate_self_reflect_for_demo(response_text: str, query: str):
     except Exception as e:
         logger.debug(f"SELF-REFLECT simulation error: {e}")
 
+def generate_enhanced_response_with_procedural_memory(prompt: str, force_local: bool = False):
+    """Enhanced response generation with procedural memory integration."""
+    try:
+        # Step 1: Check if procedural memory feature is enabled
+        from sam.entitlements.feature_manager import is_feature_enabled
+
+        if not is_feature_enabled('procedural_memory'):
+            # Feature not enabled - fall back to normal processing
+            logger.debug("Procedural memory feature not enabled, using standard response generation")
+            return generate_response_with_conversation_buffer(prompt, force_local=force_local)
+
+        # Step 2: Check if procedural memory integration is available
+        from sam.chat.procedural_chat_handler import get_procedural_chat_handler
+
+        procedural_handler = get_procedural_chat_handler()
+
+        # Step 2: Process query through procedural chat handler
+        user_context = {
+            'session_id': st.session_state.get('session_id', 'default'),
+            'chat_history_length': len(st.session_state.get('chat_history', [])),
+            'force_local': force_local
+        }
+
+        processing_result = procedural_handler.process_user_query(prompt, user_context)
+
+        # Step 3: Handle based on processing result
+        if processing_result.get('response_type') == 'procedural_guidance':
+            # Procedural memory found - enhance the prompt
+            enhanced_prompt = processing_result.get('suggested_prompt_enhancement', prompt)
+
+            # Show procedural context in an expander for transparency
+            if processing_result.get('has_procedural_context'):
+                with st.expander("🧠 **SAM's Procedural Memory** (Click to view)", expanded=False):
+                    st.markdown(processing_result['procedural_context'])
+
+            # Generate response with enhanced context
+            return generate_response_with_conversation_buffer(enhanced_prompt, force_local=force_local)
+
+        elif processing_result.get('response_type') == 'procedural_not_found':
+            # No procedures found - offer to create one
+            suggested_response = processing_result.get('suggested_response', '')
+
+            # Show suggestion in an info box
+            st.info("🧠 **Procedural Memory**: " + suggested_response)
+
+            # Generate normal response
+            return generate_response_with_conversation_buffer(prompt, force_local=force_local)
+
+        else:
+            # General chat or factual query - proceed normally
+            return generate_response_with_conversation_buffer(prompt, force_local=force_local)
+
+    except ImportError:
+        # Procedural memory not available - fall back to normal processing
+        logger.info("Procedural memory not available, using standard response generation")
+        return generate_response_with_conversation_buffer(prompt, force_local=force_local)
+
+    except Exception as e:
+        # Error in procedural processing - fall back to normal processing
+        logger.error(f"Error in procedural memory integration: {e}")
+        return generate_response_with_conversation_buffer(prompt, force_local=force_local)
+
+def render_procedural_memory_integrated():
+    """Render the Procedural Memory interface integrated into Memory Control Center."""
+    try:
+        from ui.procedural_memory_ui import render_procedural_memory_ui
+        render_procedural_memory_ui()
+    except ImportError as e:
+        st.error("❌ Procedural Memory UI not available")
+        st.info("💡 **Installation Required**: The Procedural Memory feature requires additional components.")
+        st.code(f"Import error: {e}")
+
+        # Fallback basic interface
+        st.subheader("🧠 Procedural Memory (Basic Mode)")
+        st.markdown("""
+        **Procedural Memory** allows you to create, store, and manage multi-step procedures and workflows.
+
+        **Features:**
+        - Create step-by-step procedures and "how-to" guides
+        - Organize procedures with categories and tags
+        - Track usage and execution statistics
+        - Search and filter procedures
+        - Secure encrypted storage
+
+        **Status:** UI components are being loaded...
+        """)
+
+        if st.button("🔄 Retry Loading Procedural Memory"):
+            st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Error loading Procedural Memory: {e}")
+        logger.error(f"Procedural Memory rendering error: {e}")
 
 
 if __name__ == "__main__":
