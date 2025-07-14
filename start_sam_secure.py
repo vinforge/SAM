@@ -225,7 +225,7 @@ def launch_secure_streamlit():
         print(f"🌐 Starting SAM at: http://localhost:{port}")
         # Launch secure Streamlit app
         subprocess.run([
-            sys.executable, "-m", "streamlit", "run",
+            "streamlit", "run",
             "secure_streamlit_app.py",
             f"--server.port={port}",
             "--server.address=localhost",
@@ -263,7 +263,7 @@ def launch_memory_ui():
     try:
         # Launch secure streamlit app which includes memory center
         subprocess.run([
-            sys.executable, "-m", "streamlit", "run",
+            "streamlit", "run",
             "secure_streamlit_app.py",
             "--server.port=8502",
             "--server.address=localhost",
@@ -289,7 +289,7 @@ def launch_full_suite():
         # Launch Secure Streamlit FIRST (primary authentication interface with integrated memory center)
         print("\n📱 Starting Secure Streamlit App (Primary Interface with Memory Center)...")
         streamlit_process = subprocess.Popen([
-            sys.executable, "-m", "streamlit", "run",
+            "streamlit", "run",
             "secure_streamlit_app.py",
             "--server.port=8502",
             "--server.address=localhost",
@@ -315,17 +315,17 @@ def launch_full_suite():
         print("\n🌐 Available interfaces:")
         print("  • 🔑 Secure SAM Interface: http://localhost:8502 (OPENS AUTOMATICALLY)")
         print("  • 🌐 Secure Web UI: http://localhost:5001")
-        print("  • 🧠 Memory Control Center: http://localhost:8501 (requires auth)")
+        print("  • 🧠 Memory Control Center: Integrated into SAM interface (sidebar button)")
         print("\n🎯 **SAM Pro Activation:**")
         print("  • Look for '🔑 SAM Pro Activation' in the sidebar after authentication")
         print("  • Enter your activation key to unlock premium features")
         print("  • Premium features include TPV Active Reasoning, Dream Canvas, and more")
         print("\n🔑 **Need an Activation Key?**")
-        print("  • Register with: python register_sam_pro.py")
-        print("  • This starts the registration interface at localhost:8503")
-        print("  • Keys are delivered automatically via email")
-        print("\n💡 **Tip**: After authentication, use the navigation buttons in the")
-        print("    SAM sidebar to easily access the Memory Control Center and Web UI.")
+        print("  • Use the integrated registration in SAM sidebar")
+        print("  • Or run: python simple_sam_pro_key.py")
+        print("  • Keys are generated instantly for immediate use")
+        print("\n💡 **Tip**: After authentication, look for the '🎛️ Memory Control Center'")
+        print("    button in the SAM sidebar for advanced memory management.")
         print("\n⚠️  Press Ctrl+C to stop all services")
         
         # Wait for processes
