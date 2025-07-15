@@ -384,20 +384,28 @@ class EnhancedChunker:
 
     def _create_chunk(self, content: str, chunk_type: ChunkType, metadata: Dict[str, Any],
                      source_location: str, chunk_id: int, list_level: int) -> EnhancedChunk:
-        """Create an enhanced chunk with priority scoring."""
-        
+        """Create an enhanced chunk with priority scoring and quality assessment."""
+
         # Calculate priority score based on type and content
         priority_score = self._calculate_priority_score(content, chunk_type)
-        
-        # Add chunk metadata
+
+        # Phase 3A: Assess chunk quality for superficiality detection
+        quality_assessment = self.assess_chunk_quality(content)
+
+        # Add chunk metadata including quality assessment
         metadata.update({
             'chunk_id': chunk_id,
             'word_count': len(content.split()),
             'char_count': len(content),
             'has_capabilities': self._contains_capabilities(content),
             'has_requirements': self._contains_requirements(content),
+            # Phase 3A: Add superficiality flag to metadata
+            'is_superficial': quality_assessment['is_superficial'],
+            'quality_confidence': quality_assessment['confidence_score'],
+            'superficiality_reasons': quality_assessment['superficiality_reasons'],
+            'quality_assessment_method': quality_assessment['assessment_method']
         })
-        
+
         return EnhancedChunk(
             content=content,
             chunk_type=chunk_type,
@@ -895,12 +903,15 @@ class EnhancedChunker:
                               section_title: str = None, hierarchy_level: int = 0,
                               page_number: int = None, section_name: str = None,
                               chunk_id: int = 0) -> EnhancedChunk:
-        """Create an advanced chunk with all metadata."""
+        """Create an advanced chunk with all metadata and quality assessment."""
 
         # Calculate priority score
         priority_score = self._calculate_priority_score(content, chunk_type)
 
-        # Enhanced metadata
+        # Phase 3A: Assess chunk quality for superficiality detection
+        quality_assessment = self.assess_chunk_quality(content)
+
+        # Enhanced metadata including quality assessment
         metadata = {
             'chunk_id': chunk_id,
             'word_count': len(content.split()),
@@ -909,6 +920,11 @@ class EnhancedChunker:
             'has_requirements': self._contains_requirements(content),
             'section_type': self._classify_section_type(section_title) if section_title else 'unknown',
             'hierarchy_level': hierarchy_level,
+            # Phase 3A: Add superficiality flag to metadata
+            'is_superficial': quality_assessment['is_superficial'],
+            'quality_confidence': quality_assessment['confidence_score'],
+            'superficiality_reasons': quality_assessment['superficiality_reasons'],
+            'quality_assessment_method': quality_assessment['assessment_method']
         }
 
         if page_number:
@@ -989,3 +1005,132 @@ class EnhancedChunker:
             return ChunkType.NUMBERED_LIST
         else:
             return ChunkType.NARRATIVE
+
+    def assess_chunk_quality(self, content: str) -> Dict[str, Any]:
+        """
+        Assess chunk quality to detect superficial "master key" content.
+
+        This method implements Phase 3A of the Master Verifier system to prevent
+        superficial content from being prioritized in SAM's knowledge base.
+
+        Args:
+            content: The text content of the chunk to assess
+
+        Returns:
+            Dict containing quality assessment with 'is_superficial' flag
+        """
+        try:
+            # Clean and normalize content for analysis
+            clean_content = content.strip()
+            word_count = len(clean_content.split())
+
+            # Master key phrases that indicate superficial content
+            master_key_phrases = [
+                # Generic AI responses
+                "i understand", "i can help", "i'd be happy to", "let me help",
+                "here's what i can tell you", "based on the information provided",
+                "i don't have specific information", "i cannot provide specific details",
+
+                # Vague qualifiers
+                "generally speaking", "in most cases", "typically", "usually",
+                "it depends", "this varies", "there are many factors",
+
+                # Non-committal language
+                "might be", "could be", "may be", "possibly", "potentially",
+                "it's important to note", "keep in mind", "consider that",
+
+                # Circular reasoning
+                "as mentioned", "as discussed", "as noted above", "as previously stated",
+                "this relates to", "in connection with", "regarding this matter",
+
+                # Filler content
+                "for more information", "please consult", "refer to documentation",
+                "contact your", "speak with", "additional details can be found"
+            ]
+
+            # Check for superficiality indicators
+            is_superficial = False
+            superficiality_reasons = []
+
+            # 1. Length-based assessment (very short content is often superficial)
+            if word_count < 10:
+                is_superficial = True
+                superficiality_reasons.append(f"too_short (only {word_count} words)")
+
+            # 2. Master key phrase detection
+            content_lower = clean_content.lower()
+            found_phrases = []
+            for phrase in master_key_phrases:
+                if phrase in content_lower:
+                    found_phrases.append(phrase)
+
+            # If multiple master key phrases found, likely superficial
+            if len(found_phrases) >= 2:
+                is_superficial = True
+                superficiality_reasons.append(f"master_key_phrases ({len(found_phrases)} found)")
+
+            # 3. High ratio of generic words to specific content
+            generic_words = [
+                "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+                "by", "from", "up", "about", "into", "through", "during", "before",
+                "after", "above", "below", "between", "among", "this", "that", "these",
+                "those", "can", "will", "would", "could", "should", "may", "might"
+            ]
+
+            words = clean_content.lower().split()
+            if word_count > 0:
+                generic_ratio = sum(1 for word in words if word in generic_words) / word_count
+                if generic_ratio > 0.7 and word_count > 5:  # More than 70% generic words
+                    is_superficial = True
+                    superficiality_reasons.append(f"high_generic_ratio ({generic_ratio:.2f})")
+
+            # 4. Repetitive patterns (same word/phrase repeated multiple times)
+            if word_count > 10:
+                word_freq = {}
+                for word in words:
+                    if len(word) > 3:  # Only count meaningful words
+                        word_freq[word] = word_freq.get(word, 0) + 1
+
+                max_repetition = max(word_freq.values()) if word_freq else 0
+                if max_repetition > word_count * 0.3:  # Same word appears >30% of the time
+                    is_superficial = True
+                    superficiality_reasons.append(f"repetitive_content (max_word_freq: {max_repetition})")
+
+            # 5. Lack of specific information (too many vague terms)
+            vague_terms = [
+                "something", "anything", "everything", "nothing", "somewhere", "anywhere",
+                "somehow", "various", "different", "multiple", "several", "many", "some",
+                "certain", "particular", "specific", "general", "overall", "comprehensive"
+            ]
+
+            vague_count = sum(1 for word in words if word in vague_terms)
+            if word_count > 0 and vague_count / word_count > 0.2:  # More than 20% vague terms
+                is_superficial = True
+                superficiality_reasons.append(f"high_vague_terms ({vague_count}/{word_count})")
+
+            # Calculate confidence score for the assessment
+            confidence_score = 0.8 if is_superficial else 0.9
+            if len(superficiality_reasons) > 2:
+                confidence_score = 0.95  # High confidence if multiple indicators
+
+            return {
+                'is_superficial': is_superficial,
+                'confidence_score': confidence_score,
+                'word_count': word_count,
+                'superficiality_reasons': superficiality_reasons,
+                'found_master_phrases': found_phrases[:3],  # Limit to first 3 for brevity
+                'assessment_method': 'heuristic_analysis'
+            }
+
+        except Exception as e:
+            logger.error(f"Error in chunk quality assessment: {e}")
+            # Default to non-superficial if assessment fails
+            return {
+                'is_superficial': False,
+                'confidence_score': 0.5,
+                'word_count': len(content.split()) if content else 0,
+                'superficiality_reasons': [],
+                'found_master_phrases': [],
+                'assessment_method': 'error_fallback',
+                'error': str(e)
+            }
