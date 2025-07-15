@@ -19,6 +19,7 @@ from sam.core.model_interface import (
     GenerationRequest, GenerationResponse,
     ModelManager
 )
+from sam.reasoning.prompt_steerer import get_prompt_steerer, PromptSteerer
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ class SAMModelClient:
         """Initialize the SAM model client."""
         self._manager: Optional[ModelManager] = None
         self._initialized = False
+        self._prompt_steerer: Optional[PromptSteerer] = None
+        self._reasoning_style_enabled = True
         
     def _ensure_initialized(self):
         """Ensure the model manager is initialized."""
@@ -40,6 +43,15 @@ class SAMModelClient:
             except Exception as e:
                 logger.error(f"❌ Failed to initialize SAM Model Client: {e}")
                 raise
+
+        # Initialize prompt steerer if not already done
+        if self._prompt_steerer is None and self._reasoning_style_enabled:
+            try:
+                self._prompt_steerer = get_prompt_steerer()
+                logger.info("✅ Prompt Steerer initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to initialize Prompt Steerer: {e}")
+                self._reasoning_style_enabled = False
     
     def generate(self, prompt: str, temperature: float = 0.7, max_tokens: int = 500, 
                  top_p: float = 0.9, stop_sequences: Optional[list] = None) -> str:
@@ -111,7 +123,68 @@ class SAMModelClient:
         )
         
         return self._manager.generate(request)
-    
+
+    def generate_with_reasoning_style(self, prompt: str, reasoning_style: str = "default",
+                                    strength: float = 1.0, temperature: float = 0.7,
+                                    max_tokens: int = 500, top_p: float = 0.9,
+                                    stop_sequences: Optional[list] = None) -> str:
+        """
+        Generate text with reasoning style steering applied.
+
+        Args:
+            prompt: Input text prompt
+            reasoning_style: Name of reasoning style to apply ("default", "researcher_style", etc.)
+            strength: Steering strength (0.1 to 3.0)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            top_p: Top-p sampling parameter
+            stop_sequences: List of sequences to stop generation
+
+        Returns:
+            Generated text string with reasoning style applied
+        """
+        self._ensure_initialized()
+
+        # Apply reasoning style steering if enabled
+        enhanced_prompt = prompt
+        if self._reasoning_style_enabled and self._prompt_steerer and reasoning_style != "default":
+            try:
+                enhanced_prompt = self._prompt_steerer.apply_style(prompt, reasoning_style, strength)
+                logger.debug(f"Applied reasoning style '{reasoning_style}' with strength {strength}")
+            except Exception as e:
+                logger.warning(f"Failed to apply reasoning style: {e}")
+                enhanced_prompt = prompt  # Fallback to original prompt
+
+        # Generate with enhanced prompt
+        return self.generate(
+            prompt=enhanced_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            stop_sequences=stop_sequences
+        )
+
+    def get_available_reasoning_styles(self) -> list:
+        """Get list of available reasoning styles."""
+        self._ensure_initialized()
+        if self._prompt_steerer:
+            return self._prompt_steerer.get_available_styles()
+        return []
+
+    def get_reasoning_style_info(self, style_name: str) -> Optional[Dict[str, Any]]:
+        """Get information about a specific reasoning style."""
+        self._ensure_initialized()
+        if self._prompt_steerer:
+            return self._prompt_steerer.get_style_info(style_name)
+        return None
+
+    def enable_reasoning_styles(self, enabled: bool = True):
+        """Enable or disable reasoning style steering."""
+        self._reasoning_style_enabled = enabled
+        if enabled and self._prompt_steerer is None:
+            self._ensure_initialized()  # This will try to initialize the steerer
+        logger.info(f"Reasoning style steering {'enabled' if enabled else 'disabled'}")
+
     def get_model_status(self) -> Dict[str, Any]:
         """Get current model status and performance metrics."""
         self._ensure_initialized()
