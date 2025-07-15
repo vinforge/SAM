@@ -84,5 +84,12 @@
     "clarity": "Clarity score ({score:.2f}) indicates information comprehensibility",
     "relevance": "Relevance score ({score:.2f}) shows contextual importance",
     "credibility": "Credibility score ({score:.2f}) reflects source reliability"
+  },
+  "reasoning_style_config": {
+    "default_reasoning_style": "step_by_step_reasoning",
+    "default_strength": 1.0,
+    "auto_adapt": true,
+    "description": "Balanced step-by-step reasoning for general knowledge work",
+    "fallback_style": "creative_explorer"
   }
 }

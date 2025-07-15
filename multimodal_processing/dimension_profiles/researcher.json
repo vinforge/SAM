@@ -86,5 +86,12 @@
     "methodology": "Methodology score ({score:.2f}) shows experimental rigor",
     "impact": "Impact score ({score:.2f}) suggests significant research contribution",
     "reproducibility": "Reproducibility ({score:.2f}) indicates methodological transparency"
+  },
+  "reasoning_style_config": {
+    "default_reasoning_style": "researcher_style",
+    "default_strength": 1.2,
+    "auto_adapt": true,
+    "description": "Research-focused analytical reasoning with methodological rigor",
+    "fallback_style": "step_by_step_reasoning"
   }
 }

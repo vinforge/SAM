@@ -85,5 +85,12 @@
     "risk": "Risk assessment ({score:.2f}) shows potential business exposure",
     "roi_potential": "ROI potential ({score:.2f}) suggests financial return opportunity",
     "scalability": "Scalability ({score:.2f}) indicates growth and expansion potential"
+  },
+  "reasoning_style_config": {
+    "default_reasoning_style": "step_by_step_reasoning",
+    "default_strength": 1.0,
+    "auto_adapt": true,
+    "description": "Systematic step-by-step analysis for business decision-making",
+    "fallback_style": "researcher_style"
   }
 }

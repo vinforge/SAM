@@ -85,5 +85,12 @@
     "precedent": "Precedent relevance ({score:.2f}) shows case law applicability",
     "contractual_impact": "Contractual impact ({score:.2f}) indicates agreement implications",
     "ethical_considerations": "Ethical considerations ({score:.2f}) reflect professional responsibility"
+  },
+  "reasoning_style_config": {
+    "default_reasoning_style": "researcher_style",
+    "default_strength": 1.3,
+    "auto_adapt": true,
+    "description": "Rigorous analytical reasoning for legal analysis and compliance",
+    "fallback_style": "step_by_step_reasoning"
   }
 }
