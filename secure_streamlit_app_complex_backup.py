@@ -3866,9 +3866,9 @@ def submit_secure_feedback(message_index: int, feedback_type: str, correction_te
         logger.error(f"Failed to submit feedback: {e}")
 
 def perform_secure_web_search(query: str) -> Dict[str, Any]:
-    """Perform secure web search using SOF v2 enhanced routing or fallback to Intelligent Web System."""
+    """Perform secure web search using enhanced multi-layer fallback system."""
     try:
-        logger.info(f"Starting secure web search for: {query}")
+        logger.info(f"🔍 Starting enhanced web search for: {query}")
 
         # Step 1: Try SOF v2 enhanced routing first
         try:
@@ -3933,43 +3933,80 @@ def perform_secure_web_search(query: str) -> Dict[str, Any]:
         except Exception as sof_error:
             logger.warning(f"⚠️ SOF v2 web search failed: {sof_error}")
 
-        # Step 2: Fallback to Intelligent Web System
-        logger.info(f"Using fallback Intelligent Web System for: {query}")
-        web_system = get_intelligent_web_system()
+        # Step 2: Try the Intelligent Web System
+        try:
+            web_system = get_intelligent_web_system()
+            logger.info(f"✅ Intelligent Web System initialized successfully")
 
-        # Step 3: Process query through intelligent routing
-        result = web_system.process_query(query)
+            # Process query through intelligent routing
+            result = web_system.process_query(query)
+            logger.info(f"📊 Web system result: success={result.get('success')}, tool={result.get('tool_used')}")
 
-        if result['success']:
-            # Step 4: Format and enhance the result
-            formatted_response = format_intelligent_web_result(result, query)
+            if result['success']:
+                # Format and enhance the result
+                formatted_response = format_intelligent_web_result(result, query)
 
-            # Step 5: Save to quarantine for vetting
-            save_intelligent_web_to_quarantine(result, query)
+                # Save to quarantine for vetting
+                save_intelligent_web_to_quarantine(result, query)
 
-            # Step 6: Generate AI-enhanced response
-            web_response = generate_intelligent_web_response(query, result)
+                # Generate AI-enhanced response
+                web_response = generate_intelligent_web_response(query, result)
 
-            return {
-                'success': True,
-                'error': None,
-                'response': web_response,
-                'sources': extract_sources_from_result(result),
-                'content_count': count_content_items(result),
-                'method': 'intelligent_web_system',
-                'tool_used': result.get('tool_used', 'unknown'),
-                'routing_info': result.get('routing_decision', {})
-            }
+                logger.info(f"✅ Intelligent web search successful using {result.get('tool_used', 'unknown')}")
+                return {
+                    'success': True,
+                    'error': None,
+                    'response': web_response,
+                    'sources': extract_sources_from_result(result),
+                    'content_count': count_content_items(result),
+                    'method': 'intelligent_web_system',
+                    'tool_used': result.get('tool_used', 'unknown'),
+                    'routing_info': result.get('routing_decision', {})
+                }
+            else:
+                logger.warning(f"⚠️ Intelligent web system failed: {result.get('error')}")
+
+        except Exception as e:
+            logger.error(f"❌ Intelligent web system error: {e}")
+
+        # Step 3: Fallback to enhanced RSS search
+        logger.info(f"🔄 Falling back to enhanced RSS search")
+        rss_result = perform_enhanced_rss_search(query)
+
+        if rss_result['success']:
+            logger.info(f"✅ RSS fallback successful")
+            return rss_result
         else:
-            # Fallback to original RSS method if intelligent system fails
-            logger.warning(f"Intelligent web system failed: {result.get('error')}, falling back to RSS")
-            return perform_rss_fallback_search(query)
+            logger.warning(f"⚠️ RSS fallback also failed: {rss_result.get('error')}")
 
-    except Exception as e:
-        logger.error(f"Secure web search failed: {e}")
+        # Step 4: Final fallback to simple web search
+        logger.info(f"🔄 Falling back to simple web search")
+        simple_result = perform_simple_web_search(query)
+
+        if simple_result['success']:
+            logger.info(f"✅ Simple web search successful")
+            return simple_result
+        else:
+            logger.error(f"❌ All web search methods failed")
+
+        # If all methods fail, return a helpful error
         return {
             'success': False,
-            'error': str(e),
+            'error': 'All web search methods failed - please check internet connectivity and try again',
+            'response': None,
+            'debug_info': {
+                'sof_v2_attempted': True,
+                'intelligent_system_attempted': True,
+                'rss_fallback_attempted': True,
+                'simple_search_attempted': True
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Critical web search error: {e}")
+        return {
+            'success': False,
+            'error': f"Critical web search error: {str(e)}",
             'response': None
         }
 
@@ -7084,840 +7121,74 @@ def search_unified_memory(query: str, max_results: int = 5) -> list:
 
 def generate_secure_response(prompt: str, force_local: bool = False,
                            enable_tracing: bool = False, trace_id: str = None) -> str:
-    """Generate a secure response using SAM's capabilities with SLP, Phase 8 confidence assessment and TPV monitoring."""
-
-    # Initialize tracing if enabled
-    trace_logger = None
-    if enable_tracing:
-        try:
-            from sam.cognition.trace_logger import get_trace_logger, log_event, EventType, Severity
-            trace_logger = get_trace_logger()
-
-            if not trace_id:
-                trace_id = trace_logger.start_trace(
-                    query=prompt,
-                    user_id=getattr(st.session_state, 'user_id', None),
-                    session_id=getattr(st.session_state, 'session_id', None)
-                )
-
-            # Log the start of response generation
-            log_event(
-                trace_id=trace_id,
-                source_module="SecureResponseGenerator",
-                event_type=EventType.START,
-                severity=Severity.INFO,
-                message=f"Starting secure response generation for query: {prompt[:50]}{'...' if len(prompt) > 50 else ''}",
-                payload={
-                    'query_length': len(prompt),
-                    'force_local': force_local,
-                    'session_authenticated': bool(st.session_state.get('security_manager'))
-                }
-            )
-        except ImportError:
-            logger.warning("Trace logging not available")
-            enable_tracing = False
-
+    """Generate a secure response using SAM's capabilities with document access."""
+    
     try:
-        # Phase 0: Initialize SLP integration if available
-        slp_integration = None
-        try:
-            from sam.cognition.slp import get_slp_integration
-            slp_integration = get_slp_integration()
-            logger.info("🧠 SLP integration available for pattern learning")
-        except Exception as e:
-            logger.warning(f"SLP integration not available: {e}")
-
-        # Phase 1: Initialize TPV integration if available
-        tpv_enabled_response = None
-        try:
-            from sam.cognition.tpv import sam_tpv_integration, UserProfile
-
-            # Initialize TPV integration if not already done
-            if not sam_tpv_integration.is_initialized:
-                sam_tpv_integration.initialize()
-
-            # Determine user profile (could be enhanced with actual user profiling)
-            user_profile = UserProfile.GENERAL  # Default profile for now
-
-            # Connect SLP to TPV if both are available
-            if slp_integration:
-                slp_integration.tpv_integration = sam_tpv_integration
-
-        except Exception as e:
-            logger.warning(f"TPV integration not available: {e}")
-            sam_tpv_integration = None
-
-        # Phase 0.5: Initialize SOF v2 Dynamic Agent Architecture if available
-        sof_integration = None
-        try:
-            from sam.orchestration import is_sof_enabled, get_sof_integration
-
-            if is_sof_enabled():
-                sof_integration = get_sof_integration()
-                logger.info("🤖 SOF v2 Dynamic Agent Architecture available")
-
-                # Try SOF v2 processing first for mathematical and tool-based queries
-                if sof_integration and sof_integration._initialized:
-                    # Check if this is a mathematical query that should use CalculatorTool
-                    import re
-                    math_pattern = r'[\d\+\-\*\/\(\)\.\s]+'
-                    if re.search(r'\d+\s*[\+\-\*\/]\s*\d+', prompt):
-                        logger.info(f"🧮 Detected mathematical query, routing to SOF v2: '{prompt}'")
-
-                        # Trace SOF v2 routing decision
-                        if enable_tracing and trace_logger:
-                            log_event(
-                                trace_id=trace_id,
-                                source_module="SOF_v2_Router",
-                                event_type=EventType.DECISION,
-                                severity=Severity.INFO,
-                                message="Mathematical query detected, routing to SOF v2 with CalculatorTool",
-                                payload={
-                                    'query_type': 'mathematical',
-                                    'detected_pattern': math_pattern,
-                                    'routing_target': 'CalculatorTool'
-                                }
-                            )
-
-                        try:
-                            sof_result = sof_integration.process_query(
-                                query=prompt,
-                                user_id=getattr(st.session_state, 'user_id', None),
-                                session_id=getattr(st.session_state, 'session_id', None),
-                                use_dynamic_planning=True
-                            )
-
-                            if sof_result.get('success') and sof_result.get('response'):
-                                logger.info(f"✅ SOF v2 successfully processed mathematical query")
-
-                                # Trace successful SOF v2 execution
-                                if enable_tracing and trace_logger:
-                                    log_event(
-                                        trace_id=trace_id,
-                                        source_module="SOF_v2_Executor",
-                                        event_type=EventType.TOOL_CALL,
-                                        severity=Severity.INFO,
-                                        message="SOF v2 successfully processed mathematical query",
-                                        payload={
-                                            'success': True,
-                                            'response_length': len(sof_result.get('response', '')),
-                                            'tool_used': 'CalculatorTool'
-                                        }
-                                    )
-
-                                return sof_result['response']
-                            else:
-                                logger.warning(f"⚠️ SOF v2 processing failed, falling back to standard: {sof_result.get('error', 'Unknown error')}")
-
-                                # Trace SOF v2 failure
-                                if enable_tracing and trace_logger:
-                                    log_event(
-                                        trace_id=trace_id,
-                                        source_module="SOF_v2_Executor",
-                                        event_type=EventType.ERROR,
-                                        severity=Severity.WARNING,
-                                        message="SOF v2 processing failed, falling back to standard processing",
-                                        payload={
-                                            'success': False,
-                                            'error': sof_result.get('error', 'Unknown error'),
-                                            'fallback_action': 'standard_processing'
-                                        }
-                                    )
-
-                        except Exception as sof_error:
-                            logger.warning(f"⚠️ SOF v2 execution failed: {sof_error}")
-
-                            # Trace SOF v2 exception
-                            if enable_tracing and trace_logger:
-                                log_event(
-                                    trace_id=trace_id,
-                                    source_module="SOF_v2_Executor",
-                                    event_type=EventType.ERROR,
-                                    severity=Severity.ERROR,
-                                    message=f"SOF v2 execution failed with exception: {str(sof_error)}",
-                                    payload={
-                                        'exception_type': type(sof_error).__name__,
-                                        'exception_message': str(sof_error),
-                                        'fallback_action': 'standard_processing'
-                                    }
-                                )
-
-                    # Check if this is a financial data query that should use FinancialDataTool
-                    elif any(indicator in prompt.lower() for indicator in ['market cap', 'market capitalization', 'stock price', 'share price', 'financial data', 'revenue', 'earnings', 'valuation', 'worth']):
-                        logger.info(f"📊 Detected financial data query, routing to SOF v2: '{prompt}'")
-
-                        try:
-                            sof_result = sof_integration.process_query(
-                                query=prompt,
-                                user_id=getattr(st.session_state, 'user_id', None),
-                                session_id=getattr(st.session_state, 'session_id', None),
-                                use_dynamic_planning=True
-                            )
-
-                            if sof_result.get('success') and sof_result.get('response'):
-                                logger.info(f"✅ SOF v2 successfully processed financial data query")
-                                return sof_result['response']
-                            else:
-                                logger.warning(f"⚠️ SOF v2 processing failed, falling back to standard: {sof_result.get('error', 'Unknown error')}")
-                        except Exception as sof_error:
-                            logger.warning(f"⚠️ SOF v2 execution failed: {sof_error}")
-
-                    # Check for conflict-related queries (triggers Goal & Motivation Engine)
-                    elif any(keyword in prompt.lower() for keyword in ['conflict', 'conflicting', 'contradictory', 'inconsistent', 'different', 'disagree', 'mismatch', 'discrepancy']):
-                        logger.info(f"⚔️ Detected conflict-related query, routing to SOF v2 for goal generation: '{prompt[:50]}...'")
-
-                        try:
-                            sof_result = sof_integration.process_query(
-                                query=prompt,
-                                user_id=getattr(st.session_state, 'user_id', None),
-                                session_id=getattr(st.session_state, 'session_id', None),
-                                use_dynamic_planning=True
-                            )
-
-                            if sof_result.get('success') and sof_result.get('response'):
-                                logger.info(f"✅ SOF v2 successfully processed conflict query with goal generation")
-                                return sof_result['response']
-                            else:
-                                logger.info(f"📋 SOF v2 deferred conflict query to standard processing: {sof_result.get('error', 'No error')}")
-                        except Exception as sof_error:
-                            logger.warning(f"⚠️ SOF v2 execution failed for conflict query: {sof_error}")
-
-                    # Check for other tool-requiring queries (web search, complex analysis)
-                    elif any(keyword in prompt.lower() for keyword in ['search', 'find', 'latest', 'current', 'news', 'recent']):
-                        logger.info(f"🌐 Detected potential web search query, considering SOF v2: '{prompt[:50]}...'")
-
-                        try:
-                            sof_result = sof_integration.process_query(
-                                query=prompt,
-                                user_id=getattr(st.session_state, 'user_id', None),
-                                session_id=getattr(st.session_state, 'session_id', None),
-                                use_dynamic_planning=True
-                            )
-
-                            if sof_result.get('success') and sof_result.get('response'):
-                                logger.info(f"✅ SOF v2 successfully processed web search query")
-                                return sof_result['response']
-                            else:
-                                logger.info(f"📋 SOF v2 deferred to standard processing: {sof_result.get('error', 'No error')}")
-                        except Exception as sof_error:
-                            logger.warning(f"⚠️ SOF v2 execution failed: {sof_error}")
-
-                    # Check for complex reasoning queries that benefit from SOF v2
-                    elif any(keyword in prompt.lower() for keyword in ['analyze', 'compare', 'evaluate', 'assess', 'determine', 'investigate', 'research', 'explain why', 'how does', 'what causes']):
-                        logger.info(f"🧠 Detected complex reasoning query, routing to SOF v2: '{prompt[:50]}...'")
-
-                        try:
-                            sof_result = sof_integration.process_query(
-                                query=prompt,
-                                user_id=getattr(st.session_state, 'user_id', None),
-                                session_id=getattr(st.session_state, 'session_id', None),
-                                use_dynamic_planning=True
-                            )
-
-                            if sof_result.get('success') and sof_result.get('response'):
-                                logger.info(f"✅ SOF v2 successfully processed complex reasoning query")
-                                return sof_result['response']
-                            else:
-                                logger.info(f"📋 SOF v2 deferred complex reasoning to standard processing: {sof_result.get('error', 'No error')}")
-                        except Exception as sof_error:
-                            logger.warning(f"⚠️ SOF v2 execution failed for complex reasoning: {sof_error}")
-
-                    # For all other queries, try SOF v2 with dynamic planning as a general enhancement
-                    else:
-                        logger.info(f"🎯 Routing general query to SOF v2 for enhanced processing: '{prompt[:50]}...'")
-
-                        try:
-                            sof_result = sof_integration.process_query(
-                                query=prompt,
-                                user_id=getattr(st.session_state, 'user_id', None),
-                                session_id=getattr(st.session_state, 'session_id', None),
-                                use_dynamic_planning=True
-                            )
-
-                            if sof_result.get('success') and sof_result.get('response'):
-                                logger.info(f"✅ SOF v2 successfully processed general query")
-                                return sof_result['response']
-                            else:
-                                logger.info(f"📋 SOF v2 deferred general query to standard processing: {sof_result.get('error', 'No error')}")
-                        except Exception as sof_error:
-                            logger.warning(f"⚠️ SOF v2 execution failed for general query: {sof_error}")
-                else:
-                    logger.warning("🤖 SOF v2 available but not initialized")
-            else:
-                logger.info("🤖 SOF v2 disabled in configuration")
-
-        except Exception as e:
-            logger.warning(f"SOF v2 integration not available: {e}")
-
-        # Phase 0.6: Enhanced Mathematical Query Detection (works independently of SOF v2)
-        import re
-        math_pattern = r'\d+\s*[\+\-\*\/]\s*\d+'
-        if re.search(math_pattern, prompt):
-            logger.info(f"🧮 Detected mathematical query: '{prompt}'")
-
-            try:
-                # Enhanced mathematical expression extraction
-                # Look for mathematical expressions in the query
-                # First try to find complete mathematical expressions
-                complete_expression_matches = re.findall(r'\d+(?:\s*[\+\-\*\/]\s*\d+)+', prompt)
-
-                # Also look for expressions with parentheses
-                paren_expression_matches = re.findall(r'\([^)]*\d+(?:\s*[\+\-\*\/]\s*\d+)+[^)]*\)', prompt)
-
-                # Combine all matches
-                expression_matches = complete_expression_matches + paren_expression_matches
-
-                # If no complete expressions found, fall back to the old method
-                if not expression_matches:
-                    expression_matches = re.findall(r'[\d\+\-\*\/\(\)\.\s]+', prompt)
-
-                # Find the most likely mathematical expression
-                best_expression = None
-                for match in expression_matches:
-                    cleaned = match.strip()
-                    # Must contain at least one operator and be valid
-                    if re.search(r'\d+\s*[\+\-\*\/]\s*\d+', cleaned) and re.match(r'^[\d\+\-\*\/\(\)\.\s]+$', cleaned):
-                        best_expression = cleaned
-                        break
-
-                if best_expression:
-                    try:
-                        # Safe evaluation of mathematical expression
-                        result = eval(best_expression)
-                        logger.info(f"✅ Mathematical calculation: {best_expression} = {result}")
-
-                        # Enhanced response with more context
-                        return f"""🧮 **Mathematical Calculation**
-
-**Question:** {prompt}
-**Expression:** {best_expression}
-**Result:** {result}
-
-I calculated this using SAM's built-in mathematical processor. I can handle:
-• Basic arithmetic: +, -, *, /
-• Parentheses for order of operations
-• Decimal numbers
-• More complex functions (ask me about sin, cos, log, sqrt, etc.)
-
-Is there anything else you'd like me to calculate?"""
-
-                    except Exception as calc_error:
-                        logger.warning(f"❌ Mathematical calculation failed: {calc_error}")
-                        return f"""🧮 **Mathematical Calculation**
-
-**Question:** {prompt}
-**Expression detected:** `{best_expression}`
-
-I encountered an error while calculating: {calc_error}
-
-This might be due to:
-• Invalid mathematical syntax
-• Division by zero
-• Unsupported operations
-
-Please check the expression and try again, or ask me to help with the calculation in a different way."""
-                else:
-                    logger.warning(f"❌ Could not extract valid mathematical expression from: {prompt}")
-
-            except Exception as e:
-                logger.warning(f"❌ Mathematical expression processing failed: {e}")
-                # Continue with normal processing
-
-        # Phase 8.1: Perform unified search across all knowledge sources
-        memory_results = search_unified_memory(query=prompt, max_results=5)
-
-        logger.info(f"Unified search for '{prompt}' returned {len(memory_results)} results")
-
-        # Phase 7B: Implement Core Execution Switch (Task 1b)
-        # This is the architectural switch specified in task3.md
-        if slp_integration and slp_integration.enabled:
-            try:
-                # Prepare context for SLP
-                slp_context = {
-                    'memory_results': memory_results,
-                    'sources': [r.chunk.source for r in memory_results],
-                    'session_state': getattr(st.session_state, 'user_profile', 'general'),
-                    'force_local': force_local,
-                    'has_tpv': sam_tpv_integration is not None
-                }
-
-                # Phase 7B: Find and Decide Logic
-                matched_program, confidence = slp_integration.program_manager.find_matching_program(
-                    prompt, slp_context, getattr(st.session_state, 'user_profile', 'general')
-                )
-
-                # Phase 7B: Core Execution Switch Implementation
-                if confidence > slp_integration.program_manager.execution_threshold:
-                    # UI NOTIFICATION: "Using Cognitive Program #123..."
-                    program_id_short = matched_program.id[:8] + "..." if len(matched_program.id) > 8 else matched_program.id
-                    logger.info(f"🧠 Using Cognitive Program #{program_id_short} (confidence: {confidence:.2f})")
-
-                    # Execute with the matched program
-                    execution_result = slp_integration.program_manager.execute_program(
-                        matched_program, prompt, slp_context
-                    )
-
-                    if execution_result.success:
-                        # Store SLP metadata for UI display
-                        if 'slp_session_data' not in st.session_state:
-                            st.session_state.slp_session_data = {}
-
-                        st.session_state.slp_session_data['last_response'] = {
-                            'used_program': True,
-                            'program_id': matched_program.id,
-                            'program_confidence': matched_program.confidence_score,
-                            'signature_match_confidence': confidence,
-                            'execution_time_ms': execution_result.execution_time_ms,
-                            'quality_score': execution_result.quality_score,
-                            'token_count': execution_result.token_count,
-                            'program_usage_count': matched_program.usage_count + 1
-                        }
-
-                        logger.info(f"✅ Cognitive Program executed successfully in {execution_result.execution_time_ms:.0f}ms")
-                        return execution_result.response
-                    else:
-                        logger.warning(f"❌ Cognitive Program execution failed, falling back to standard reasoning")
-                        # Fall through to standard reasoning
-                else:
-                    # UI NOTIFICATION: "Reasoning from scratch..."
-                    logger.info(f"🔍 Reasoning from scratch (confidence {confidence:.2f} below threshold {slp_integration.program_manager.execution_threshold:.2f})")
-
-                    # Generate standard response and consider program capture
-                    def fallback_generator(query, context):
-                        logger.info(f"🔧 [SLP] Fallback generator called for query: '{query[:50]}...'")
-                        result = _generate_standard_secure_response(query, context, sam_tpv_integration, user_profile)
-                        logger.info(f"🔧 [SLP] Fallback generator result type: {type(result)}")
-                        # Handle tuple return for web search escalation
-                        if isinstance(result, tuple) and len(result) == 2:
-                            logger.info(f"🔧 [SLP] Detected web search escalation tuple")
-                            # This is a web search escalation (escalation_message, escalation_id)
-                            return result[0]  # Return just the escalation message for SLP
-                        logger.info(f"🔧 [SLP] Returning standard response, length: {len(str(result))}")
-                        return result
-
-                    response = fallback_generator(prompt, slp_context)
-                    logger.info(f"🔧 [SLP] Final response length: {len(response)}")
-                    logger.info(f"🔧 [SLP] Response contains <think>: {'<think>' in response}")
-
-                    # Consider capturing this successful interaction as a new program
-                    if response and len(response) > 50:
-                        capture_result = {
-                            'response': response,
-                            'quality_score': 0.8,  # Assume good quality for successful generation
-                            'execution_time_ms': 1000,  # Estimate
-                            'token_count': len(response.split()) * 1.3
-                        }
-
-                        capture_success = slp_integration.program_manager.consider_program_capture(
-                            prompt, slp_context, capture_result, getattr(st.session_state, 'user_profile', 'general')
-                        )
-
-                        # Store capture metadata for UI display
-                        if 'slp_session_data' not in st.session_state:
-                            st.session_state.slp_session_data = {}
-
-                        st.session_state.slp_session_data['last_response'] = {
-                            'used_program': False,
-                            'captured_program': capture_success,
-                            'signature_match_confidence': confidence,
-                            'response_time_ms': 1000,
-                            'quality_score': 0.8,
-                            'total_programs': len(slp_integration.program_manager.store.get_all_programs()) if capture_success else None
-                        }
-
-                        if capture_success:
-                            logger.info(f"📚 New cognitive program captured for future use")
-
-                    return response
-
-            except Exception as e:
-                logger.warning(f"SLP processing failed, falling back to standard: {e}")
-                # Continue with standard processing
-
-        # Phase 8.2: Assess confidence in retrieval quality (unless forced to use local)
-        if not force_local:
-            try:
-                from reasoning.confidence_assessor import get_confidence_assessor
-                confidence_assessor = get_confidence_assessor()
-
-                # Convert memory results to format expected by confidence assessor
-                search_results_for_assessment = []
-                for result in memory_results:
-                    search_results_for_assessment.append({
-                        'similarity_score': result.similarity_score,
-                        'content': result.chunk.content,
-                        'metadata': {
-                            'source': result.chunk.source,
-                            'timestamp': getattr(result.chunk, 'timestamp', None)
-                        }
-                    })
-
-                logger.info(f"🔍 Starting confidence assessment for {len(search_results_for_assessment)} results")
-                logger.info(f"🔍 Query: '{prompt[:50]}...'")
-
-                assessment = confidence_assessor.assess_retrieval_quality(search_results_for_assessment, prompt)
-
-                logger.info(f"🔍 Confidence assessment complete: {assessment.status} ({assessment.confidence_score:.2f})")
-                logger.info(f"🔍 Confidence level: {assessment.confidence_level}")
-                logger.info(f"🔍 Recommendation: {assessment.recommendation}")
-                logger.info(f"🔍 Reasons: {assessment.reasons}")
-
-                # Phase 8.3: Check if web search escalation should be offered
-                if assessment.status == "NOT_CONFIDENT":
-                    logger.info(f"🌐 Triggering web search escalation for low confidence")
-                    escalation_message, escalation_id = create_web_search_escalation_message(assessment, prompt)
-                    return escalation_message, escalation_id
-                else:
-                    logger.info(f"✅ Confidence sufficient, proceeding with local response")
-
-            except Exception as e:
-                logger.warning(f"Confidence assessment failed: {e}")
-                import traceback
-                logger.warning(f"Confidence assessment traceback: {traceback.format_exc()}")
-                # Continue with normal processing if confidence assessment fails
-
-        if memory_results:
-            # Count sources for transparency
-            secure_count = sum(1 for r in memory_results if getattr(r, 'source_type', '') == 'secure_documents')
-            web_count = sum(1 for r in memory_results if getattr(r, 'source_type', '') == 'web_knowledge')
-
-            # Build context from all available memories
-            context_parts = []
-            for i, result in enumerate(memory_results):
-                source_type = getattr(result, 'source_type', 'unknown')
-                source_label = "📄 Document" if source_type == 'secure_documents' else "🌐 Web Knowledge" if source_type == 'web_knowledge' else "📋 Memory"
-
-                logger.debug(f"Result {i+1}: Score={result.similarity_score:.3f}, Source={result.chunk.source}, Type={source_type}")
-
-                # Get more content for better context (up to 1000 chars instead of 300)
-                content_preview = result.chunk.content[:1000]
-                if len(result.chunk.content) > 1000:
-                    content_preview += "..."
-                context_parts.append(f"{source_label} - {result.chunk.source}\nContent: {content_preview}")
-
+        # Search for relevant content from uploaded documents and web knowledge
+        results = search_unified_memory(query=prompt, max_results=10)
+        
+        context_parts = []
+        secure_count = 0
+        web_count = 0
+        
+        if results:
+            for result in results:
+                if result.similarity_score > 0.2:  # Lower threshold for better recall
+                    context_parts.append(f"Source: {result.chunk.source}\nContent: {result.chunk.content}")
+                    
+                    if 'upload:' in result.chunk.source:
+                        secure_count += 1
+                    elif 'web:' in result.chunk.source:
+                        web_count += 1
+        
+        if context_parts:
             context = "\n\n".join(context_parts)
+            
+            # Generate response using Ollama with document context
+            system_prompt = f"""You are SAM, a secure AI assistant. Answer the user's question based on the provided content from uploaded documents and knowledge sources.
 
-            # Add source summary
-            source_summary = []
-            if secure_count > 0:
-                source_summary.append(f"{secure_count} uploaded document(s)")
-            if web_count > 0:
-                source_summary.append(f"{web_count} web knowledge item(s)")
+When the user asks you to "resume" or "continue" a story, use the provided document content as the foundation and continue the narrative in the same style and tone.
 
-            sources_text = " and ".join(source_summary) if source_summary else "available sources"
+Be helpful and use the available information to provide a complete response."""
 
-            # Generate response using Ollama model
-            try:
-                import requests
-
-                # Prepare the prompt for Ollama
-                system_prompt = f"""You are SAM, a secure AI assistant. Answer the user's question based on the provided content from {sources_text}.
-
-When thinking through complex questions, you can use <think>...</think> tags to show your reasoning process. This helps users understand how you arrived at your answer.
-
-Be helpful and informative. Extract relevant information from the provided sources to answer the question directly.
-If the information isn't sufficient, say so clearly. Always be concise but thorough.
-
-The sources include both uploaded documents and current web knowledge that has been vetted and approved for your knowledge base."""
-
-                user_prompt = f"""Question: {prompt}
+            user_prompt = f"""Question: {prompt}
 
 Available Information:
 {context}
 
 Please provide a helpful answer based on the available information."""
 
-                # TPV-enabled response generation
-                if sam_tpv_integration:
-                    try:
-                        # Use TPV integration for response generation
-                        full_prompt = f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:"
-
-                        # Calculate initial confidence based on context quality
-                        initial_confidence = min(0.8, len(context) / 2000.0) if context else 0.3
-
-                        tpv_response = sam_tpv_integration.generate_response_with_tpv(
-                            prompt=full_prompt,
-                            user_profile=user_profile,
-                            initial_confidence=initial_confidence,
-                            context={'has_context': bool(context), 'sources': sources_text},
-                            ollama_params={
-                                "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
-                                "stream": False,
-                                "options": {
-                                    "temperature": 0.7,
-                                    "top_p": 0.9,
-                                    "max_tokens": 500
-                                }
-                            }
-                        )
-
-                        # Store TPV data in session state for UI display
-                        if 'tpv_session_data' not in st.session_state:
-                            st.session_state.tpv_session_data = {}
-
-                        # Get active control information
-                        control_decision = 'CONTINUE'
-                        control_reason = 'No control action taken'
-                        control_statistics = {}
-
-                        if hasattr(sam_tpv_integration, 'reasoning_controller'):
-                            recent_actions = sam_tpv_integration.reasoning_controller.get_recent_actions(1)
-                            if recent_actions:
-                                control_decision = recent_actions[0].metadata.get('action_type', 'CONTINUE')
-                                control_reason = recent_actions[0].reason
-                            control_statistics = sam_tpv_integration.reasoning_controller.get_control_statistics()
-
-                        st.session_state.tpv_session_data['last_response'] = {
-                            'tpv_enabled': tpv_response.tpv_enabled,
-                            'trigger_type': tpv_response.trigger_result.trigger_type if tpv_response.trigger_result else None,
-                            'final_score': tpv_response.tpv_trace.current_score if tpv_response.tpv_trace else 0.0,
-                            'tpv_steps': len(tpv_response.tpv_trace.steps) if tpv_response.tpv_trace else 0,
-                            'performance_metrics': tpv_response.performance_metrics,
-                            'control_decision': control_decision,
-                            'control_reason': control_reason,
-                            'control_statistics': control_statistics
-                        }
-
-                        if tpv_response.content:
-                            return tpv_response.content
-                        else:
-                            logger.warning("Empty response from TPV-enabled generation")
-
-                    except Exception as e:
-                        logger.error(f"TPV-enabled generation failed: {e}")
-                        # Fall back to standard Ollama call
-
-                # Fallback: Standard Ollama API call
-                ollama_response = requests.post(
-                    "http://localhost:11434/api/generate",
-                    json={
-                        "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
-                        "prompt": f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:",
-                        "stream": False,
-                        "options": {
-                            "temperature": 0.7,
-                            "top_p": 0.9,
-                            "max_tokens": 500
-                        }
-                    },
-                    timeout=30
-                )
-
-                if ollama_response.status_code == 200:
-                    response_data = ollama_response.json()
-                    ai_response = response_data.get('response', '').strip()
-
-                    if ai_response:
-                        return ai_response
-                    else:
-                        logger.warning("Empty response from Ollama")
-
-            except Exception as e:
-                logger.error(f"Ollama API call failed: {e}")
-
-            # Fallback: return context with basic formatting
-            return f"""Based on {sources_text}, here's what I found:
-
-{context}
-
-I'm SAM, your secure AI assistant. How can I help you further?"""
-
-        else:
-            # Check if we have any memories at all
-            security_status = st.session_state.secure_memory_store.get_security_status()
-            total_chunks = security_status.get('encrypted_chunk_count', 0)
-
-            if total_chunks > 0:
-                # Check if web retrieval should be suggested (Phase 7.1)
-                try:
-                    from utils.web_retrieval_suggester import WebRetrievalSuggester
-                    suggester = WebRetrievalSuggester()
-
-                    if suggester.should_suggest_web_retrieval(prompt, []):
-                        logger.info(f"Suggesting web retrieval for Streamlit query: {prompt[:50]}...")
-                        return suggester.format_retrieval_suggestion(prompt)
-
-                except ImportError:
-                    logger.warning("Web retrieval suggester not available")
-
-                # Generate a response using Ollama even without specific context
-                try:
-                    import requests
-
-                    system_prompt = """You are SAM, a helpful AI assistant. When thinking through questions, you can use <think>...</think> tags to show your reasoning process.
-
-Answer the user's question helpfully and accurately based on your general knowledge."""
-
-                    ollama_response = requests.post(
-                        "http://localhost:11434/api/generate",
-                        json={
-                            "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
-                            "prompt": f"System: {system_prompt}\n\nUser: {prompt}\n\nAssistant:",
-                            "stream": False,
-                            "options": {
-                                "temperature": 0.7,
-                                "top_p": 0.9,
-                                "max_tokens": 500
-                            }
-                        },
-                        timeout=30
-                    )
-
-                    if ollama_response.status_code == 200:
-                        response_data = ollama_response.json()
-                        ai_response = response_data.get('response', '').strip()
-                        if ai_response:
-                            return ai_response
-
-                except Exception as e:
-                    logger.error(f"Fallback Ollama call failed: {e}")
-
-                return f"""I searched through your {total_chunks} encrypted memory chunks but couldn't find relevant information about "{prompt}".
-
-This could be because:
-- The search terms don't match the document content
-- The document content wasn't properly extracted
-- The similarity threshold is too high
-
-Try rephrasing your question or uploading more relevant documents."""
-            else:
-                return """No documents found in your secure memory. Please upload some documents first, then ask questions about their content."""
-
-    except Exception as e:
-        logger.error(f"Response generation failed: {e}")
-
-        # Trace final error
-        if enable_tracing and trace_logger:
-            log_event(
-                trace_id=trace_id,
-                source_module="SecureResponseGenerator",
-                event_type=EventType.ERROR,
-                severity=Severity.ERROR,
-                message=f"Response generation failed with exception: {str(e)}",
-                payload={
-                    'exception_type': type(e).__name__,
-                    'exception_message': str(e),
-                    'final_fallback': True
-                }
-            )
-
-            # End the trace with failure
-            trace_logger.end_trace(trace_id, success=False, final_response=None)
-
-        return f"I apologize, but I encountered an error while processing your request: {e}"
-
-    finally:
-        # End successful trace if tracing is enabled
-        if enable_tracing and trace_logger and trace_id:
-            # This will only execute if no exception occurred
-            try:
-                # Check if we have a response to log
-                response_to_log = None
-                if 'response' in locals():
-                    response_to_log = response
-
-                log_event(
-                    trace_id=trace_id,
-                    source_module="SecureResponseGenerator",
-                    event_type=EventType.END,
-                    severity=Severity.INFO,
-                    message="Response generation completed successfully",
-                    payload={
-                        'response_length': len(response_to_log) if response_to_log else 0,
-                        'success': True
+            # Make request to Ollama
+            import requests
+            ollama_response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "hf.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF:Q4_K_M",
+                    "prompt": f"System: {system_prompt}\n\nUser: {user_prompt}\n\nAssistant:",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "max_tokens": 800
                     }
-                )
-
-                trace_logger.end_trace(trace_id, success=True, final_response=response_to_log)
-            except Exception as trace_error:
-                logger.warning(f"Failed to end trace: {trace_error}")
-
-
-def _generate_standard_secure_response(query: str, context: Dict[str, Any],
-                                     sam_tpv_integration=None, user_profile=None) -> str:
-    """
-    Generate standard secure response for SLP fallback.
-
-    This function provides the standard SAM response generation logic
-    that can be used as a fallback when SLP programs are not available.
-    """
-    try:
-        logger.info(f"🔧 [SLP Fallback] _generate_standard_secure_response called")
-        logger.info(f"🔧 [SLP Fallback] Query: '{query[:50]}...'")
-
-        # Extract memory results from context
-        memory_results = context.get('memory_results', [])
-        force_local = context.get('force_local', False)
-
-        logger.info(f"🔧 [SLP Fallback] Memory results: {len(memory_results)}")
-        logger.info(f"🔧 [SLP Fallback] Force local: {force_local}")
-
-        # Phase 8.2: Assess confidence in retrieval quality (unless forced to use local)
-        if not force_local and memory_results:
-            try:
-                from reasoning.confidence_assessor import get_confidence_assessor
-                confidence_assessor = get_confidence_assessor()
-
-                # Convert memory results to format expected by confidence assessor
-                search_results_for_assessment = []
-                for result in memory_results:
-                    search_results_for_assessment.append({
-                        'similarity_score': result.similarity_score,
-                        'content': result.chunk.content,
-                        'metadata': {
-                            'source': result.chunk.source,
-                            'timestamp': getattr(result.chunk, 'timestamp', None)
-                        }
-                    })
-
-                logger.info(f"🔍 [SLP Fallback] Starting confidence assessment for {len(search_results_for_assessment)} results")
-                logger.info(f"🔍 [SLP Fallback] Query: '{query[:50]}...'")
-
-                assessment = confidence_assessor.assess_retrieval_quality(search_results_for_assessment, query)
-
-                logger.info(f"🔍 [SLP Fallback] Confidence assessment complete: {assessment.status} ({assessment.confidence_score:.2f})")
-                logger.info(f"🔍 [SLP Fallback] Confidence level: {assessment.confidence_level}")
-                logger.info(f"🔍 [SLP Fallback] Recommendation: {assessment.recommendation}")
-                logger.info(f"🔍 [SLP Fallback] Reasons: {assessment.reasons}")
-
-                # Phase 8.3: Check if web search escalation should be offered
-                if assessment.status == "NOT_CONFIDENT":
-                    logger.info(f"🌐 [SLP Fallback] Triggering web search escalation for low confidence")
-                    escalation_message, escalation_id = create_web_search_escalation_message(assessment, query)
-                    return escalation_message, escalation_id
-                else:
-                    logger.info(f"✅ [SLP Fallback] Confidence sufficient, proceeding with local response")
-
-            except Exception as e:
-                logger.warning(f"[SLP Fallback] Confidence assessment failed: {e}")
-                import traceback
-                logger.warning(f"[SLP Fallback] Confidence assessment traceback: {traceback.format_exc()}")
-                # Continue with normal processing if confidence assessment fails
-
-        if memory_results:
-            # Count sources for transparency
-            secure_count = sum(1 for r in memory_results if getattr(r, 'source_type', '') == 'secure_documents')
-            web_count = sum(1 for r in memory_results if getattr(r, 'source_type', '') == 'web_knowledge')
-
-            # Build context from all available memories
-            context_parts = []
-            for i, result in enumerate(memory_results):
-                source_type = getattr(result, 'source_type', 'unknown')
-                source_label = "📄 Document" if source_type == 'secure_documents' else "🌐 Web Knowledge" if source_type == 'web_knowledge' else "📋 Memory"
-
-                # Get more content for better context (up to 1000 chars instead of 300)
-                content_preview = result.chunk.content[:1000]
-                if len(result.chunk.content) > 1000:
-                    content_preview += "..."
-                context_parts.append(f"{source_label} - {result.chunk.source}\nContent: {content_preview}")
-
-            context_text = "\n\n".join(context_parts)
-
-            # Add source summary
-            source_summary = []
-            if secure_count > 0:
-                source_summary.append(f"{secure_count} uploaded document(s)")
+                },
+                timeout=45
+            )
+            
+            if ollama_response.status_code == 200:
+                response_data = ollama_response.json()
+                ai_response = response_data.get('response', '').strip()
+                
+                if ai_response:
+                    source_info = f"\n\n*📚 Based on {secure_count} uploaded document(s)" + (f" and {web_count} web source(s)" if web_count > 0 else "") + "*"
+                    return ai_response + source_info
+        
+        # Fallback if no context found
+        return f"I don't see any uploaded documents that match your query about '{prompt}'. Please make sure the document was successfully uploaded and try rephrasing your question."
+        
+    except Exception as e:
+        logger.error(f"Error in generate_secure_response: {e}")
+        return f"I encountered an error accessing the uploaded documents. Please try again or re-upload the document."
             if web_count > 0:
                 source_summary.append(f"{web_count} web knowledge item(s)")
 
